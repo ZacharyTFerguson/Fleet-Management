@@ -39,3 +39,7 @@ The binary loads `oilchange.env` on startup (or `OILCHANGE_ENV`, `secrets/oilcha
 Tests never hit live eFleets, OneStep, or Supabase.
 
 HOLD `LOGISTICS_PERSONNEL` (third-spec name `RICH_TYLER_PAIRING`): logistics-personnel names on a punch or OneStep label never create a device↔car link.
+
+## Accidental twin
+
+See [`docs/ACCIDENTAL-TWIN.md`](docs/ACCIDENTAL-TWIN.md) — do not use `fleetmanager` / `fleetmanagerlocalvscode`.

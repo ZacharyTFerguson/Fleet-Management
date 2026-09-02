@@ -1,0 +1,6 @@
+# See ../../.gitignore — keep secrets out of git
+.env*.local
+node_modules
+.next
+out
+*.log

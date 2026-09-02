@@ -1,0 +1,9 @@
+# Local secrets — never commit
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*secret*
+onestep.env
+onestep*.local

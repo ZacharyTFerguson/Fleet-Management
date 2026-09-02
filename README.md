@@ -1,14 +1,6 @@
-# Fleet-Management
+# oilchange
 
-Helpers and docs for PDI fleet automation, plus the `oilchange` Last Reading binary.
-
-## Docs
-
-- [OneStepGPS API credentials and usage](docs/onestep-api-auth.md) — how to use the API key (and related credentials) against `track.onestepgps.com` without committing secrets.
-
-## oilchange
-
-PDI fleet oil-change binary. Last Reading is computed only in `internal/oil`.
+PDI fleet oil-change binary in **Fleet-Management**. Last Reading is computed only in `internal/oil`.
 Do not invent miles. HOLD skips the Last Reading write.
 
 ```
@@ -18,9 +10,11 @@ go test ./...
 
 Toolchain: Go 1.27.1.
 
-Also in this tree: location-dwell Node app (`server.js`, `lib/`, `bin/`, `public/`).
+OneStep live auth: short-lived RS256 JWT when a PEM is present in gitignored `oilchange.env`; otherwise `api-key` query (see [`docs/onestep-api-auth.md`](docs/onestep-api-auth.md)).
 
-### Commands
+Sit-still / important-location Node app lives in a separate PR (`cursor/important-location-trigger-61d4`); it is intentionally not bundled here.
+
+## Commands
 
 | Cmd | What |
 |---|---|
@@ -34,11 +28,13 @@ Also in this tree: location-dwell Node app (`server.js`, `lib/`, `bin/`, `public
 
 Exit: `0` ok, `1` error, `2` compute finished with open HOLDs (report still allowed).
 
-### Secrets (never commit)
+## Secrets (never commit)
 
 Paste live values into **`oilchange.env`** in this directory (gitignored). Template: `oilchange.env.example`.
 
 The binary loads `oilchange.env` on startup (or `OILCHANGE_ENV`, `secrets/oilchange.env`, `.env`). Already-set process env wins.
+
+`EFLEETS_CUST_NUM` has **no** hardcoded default — set it in env for live eFleets sync.
 
 Tests never hit live eFleets, OneStep, or Supabase.
 

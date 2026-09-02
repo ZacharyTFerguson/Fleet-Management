@@ -130,13 +130,14 @@ func TestLoadReadsOilchangeEnv(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = os.Chdir(prev) })
-	body := "EFLEETS_USERNAME=envuser\nEFLEETS_CUST_NUM=583424\nOILCHANGE_DB=./fromenv.sqlite\n"
+	body := "EFLEETS_USERNAME=envuser\nEFLEETS_CUST_NUM=999999\nOILCHANGE_DB=./fromenv.sqlite\n"
 	if err := os.WriteFile("oilchange.env", []byte(body), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("OILCHANGE_ENV", "")
 	_ = os.Unsetenv("OILCHANGE_ENV")
 	_ = os.Unsetenv("EFLEETS_USERNAME")
+	_ = os.Unsetenv("EFLEETS_CUST_NUM")
 	_ = os.Unsetenv("OILCHANGE_DB")
 	_ = os.Unsetenv("ONESTEP_API_TOKEN")
 	_ = os.Unsetenv("ONESTEP_API_KEY")
@@ -144,6 +145,9 @@ func TestLoadReadsOilchangeEnv(t *testing.T) {
 	cfg := Load()
 	if cfg.EFleetsUser != "envuser" {
 		t.Fatalf("user %q", cfg.EFleetsUser)
+	}
+	if cfg.EFleetsCust != "999999" {
+		t.Fatalf("cust %q", cfg.EFleetsCust)
 	}
 	if cfg.SQLitePath != "./fromenv.sqlite" {
 		t.Fatalf("db %q", cfg.SQLitePath)

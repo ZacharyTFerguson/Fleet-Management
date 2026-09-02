@@ -74,10 +74,13 @@ type HTTPAdapter struct {
 	FleetURL   string
 }
 
-// NewHTTPAdapter builds a session client. Missing username/password must fail before any parse so we never invent files.
+// NewHTTPAdapter builds a session client. Missing username/password/cust must fail before any parse so we never invent files.
 func NewHTTPAdapter(base, user, pass, cust string) (*HTTPAdapter, error) {
 	if user == "" || pass == "" {
 		return nil, fmt.Errorf("EFLEETS_USERNAME and EFLEETS_PASSWORD are required for live download")
+	}
+	if strings.TrimSpace(cust) == "" {
+		return nil, fmt.Errorf("EFLEETS_CUST_NUM is required for live download (no hardcoded default)")
 	}
 	if base == "" {
 		base = "https://login.efleets.com"
@@ -131,9 +134,6 @@ func (a *HTTPAdapter) Fetch(ctx context.Context, kind ReportKind) ([]byte, strin
 
 // urlFor refuses to guess portal export paths; wrong CSV would silently feed fake miles.
 func (a *HTTPAdapter) urlFor(kind ReportKind) (string, string, error) {
-	if a.CustNum == "" {
-		a.CustNum = "583424"
-	}
 	switch kind {
 	case ReportFuelDetails:
 		if a.DetailsURL != "" {

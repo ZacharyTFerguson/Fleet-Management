@@ -42,7 +42,7 @@ func Load() Config {
 		OneStepBase:       strings.TrimRight(base, "/"),
 		EFleetsUser:       os.Getenv("EFLEETS_USERNAME"),
 		EFleetsPass:       os.Getenv("EFLEETS_PASSWORD"),
-		EFleetsCust:       getenv("EFLEETS_CUST_NUM", "583424"),
+		EFleetsCust:       os.Getenv("EFLEETS_CUST_NUM"),
 		EFleetsBase:       getenv("EFLEETS_BASE_URL", "https://login.efleets.com"),
 		EFleetsDetails:    os.Getenv("EFLEETS_DETAILS_URL"),
 		EFleetsMaint:      os.Getenv("EFLEETS_MAINT_URL"),

@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  go:
+    name: go test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Detect Go module
+        id: detect
+        run: |
+          if [ -f go.mod ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/setup-go@v5
+        if: steps.detect.outputs.present == 'true'
+        with:
+          go-version-file: go.mod
+      - name: go test
+        if: steps.detect.outputs.present == 'true'
+        run: go test ./...
+      - name: Skip (no go.mod)
+        if: steps.detect.outputs.present != 'true'
+        run: echo "No go.mod on this branch; skipping Go tests."
+
+  node:
+    name: npm test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Detect package.json
+        id: detect
+        run: |
+          if [ -f package.json ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/setup-node@v4
+        if: steps.detect.outputs.present == 'true'
+        with:
+          node-version: '20'
+      - name: npm test
+        if: steps.detect.outputs.present == 'true'
+        run: npm test
+      - name: Skip (no package.json)
+        if: steps.detect.outputs.present != 'true'
+        run: echo "No package.json on this branch; skipping Node tests."

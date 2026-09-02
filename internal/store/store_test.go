@@ -2,7 +2,9 @@ package store
 
 import (
 	"context"
+	"fmt"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -65,5 +67,47 @@ func TestOpaquePDINoStatePrefix(t *testing.T) {
 	c, _ := s.CarByEFleets(ctx, "A")
 	if c.PDIID == "CT1" || len(c.PDIID) < 4 {
 		t.Fatalf("%s", c.PDIID)
+	}
+}
+
+func TestConcurrentUpsertCarUniquePDI(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "race.sqlite")
+	s, err := Open("sqlite", p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	ctx := context.Background()
+	const n = 32
+	errCh := make(chan error, n)
+	var wg sync.WaitGroup
+	for i := 0; i < n; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			id := fmt.Sprintf("CAR%03d", i)
+			errCh <- s.UpsertCar(ctx, model.Car{EFleetsID: id, Nickname: id})
+		}(i)
+	}
+	wg.Wait()
+	close(errCh)
+	for err := range errCh {
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	cars, err := s.ListCars(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cars) != n {
+		t.Fatalf("cars %d want %d", len(cars), n)
+	}
+	seen := map[string]struct{}{}
+	for _, c := range cars {
+		if _, ok := seen[c.PDIID]; ok {
+			t.Fatalf("duplicate pdi %s", c.PDIID)
+		}
+		seen[c.PDIID] = struct{}{}
 	}
 }

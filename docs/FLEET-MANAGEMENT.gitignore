@@ -1,0 +1,17 @@
+# From github.com/ZacharyTFerguson/Fleet-Management
+# main:
+# Local secrets — never commit
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*secret*
+onestep.env
+onestep*.local
+
+# cursor/important-location-trigger-61d4 extras:
+# node_modules/
+# data/runtime/
+# *.log
+# .DS_Store

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -18,6 +19,12 @@ import (
 type Store struct {
 	db      *sql.DB
 	dialect string
+	// mu serializes in-process access. Concurrent CLI ticks (sync --interval),
+	// compute, and sync-enterprise can share one SQLite file; database/sql's
+	// pool plus modernc otherwise races nextPDI (COUNT then INSERT) and
+	// last_reading vs HOLD writes. Cross-process locking is still SQLite's job
+	// (MaxOpenConns(1) + busy timeout).
+	mu sync.Mutex
 }
 
 // Open migrates and returns a store. dialect is sqlite or pgx.
@@ -26,11 +33,15 @@ func Open(driver, dsn string) (*Store, error) {
 		if dsn == "" {
 			return nil, fmt.Errorf("empty sqlite path")
 		}
-		dsn = "file:" + dsn + "?_pragma=foreign_keys(1)"
+		dsn = "file:" + dsn + "?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)"
 	}
 	db, err := sql.Open(driver, dsn)
 	if err != nil {
 		return nil, err
+	}
+	if driver == "sqlite" {
+		// One connection so SQLite writers are not interleaved across the pool.
+		db.SetMaxOpenConns(1)
 	}
 	if err := db.Ping(); err != nil {
 		_ = db.Close()
@@ -66,18 +77,31 @@ func (s *Store) pg(q string) string {
 }
 
 // exec runs a statement after placeholder rewrite so tests (sqlite) and fleet-oil (pgx) share SQL.
-func (s *Store) exec(ctx context.Context, q string, args ...any) (sql.Result, error) {
+func (s *Store) rawExec(ctx context.Context, q string, args ...any) (sql.Result, error) {
 	return s.db.ExecContext(ctx, s.pg(q), args...)
+}
+
+func (s *Store) rawQuery(ctx context.Context, q string, args ...any) (*sql.Rows, error) {
+	return s.db.QueryContext(ctx, s.pg(q), args...)
+}
+
+func (s *Store) rawQueryRow(ctx context.Context, q string, args ...any) *sql.Row {
+	return s.db.QueryRowContext(ctx, s.pg(q), args...)
+}
+
+// exec runs a statement after placeholder rewrite so tests (sqlite) and fleet-oil (pgx) share SQL.
+func (s *Store) exec(ctx context.Context, q string, args ...any) (sql.Result, error) {
+	return s.rawExec(ctx, q, args...)
 }
 
 // query is the read twin of exec (placeholder rewrite).
 func (s *Store) query(ctx context.Context, q string, args ...any) (*sql.Rows, error) {
-	return s.db.QueryContext(ctx, s.pg(q), args...)
+	return s.rawQuery(ctx, q, args...)
 }
 
 // queryRow is the single-row twin of query.
 func (s *Store) queryRow(ctx context.Context, q string, args ...any) *sql.Row {
-	return s.db.QueryRowContext(ctx, s.pg(q), args...)
+	return s.rawQueryRow(ctx, q, args...)
 }
 
 // scanIntPtr keeps SQL NULL as Go nil so "no last reading" is not stored as 0 miles.
@@ -115,9 +139,11 @@ func scanStrPtr(n sql.NullString) *string {
 
 // UpsertCar inserts or updates identity fields without clobbering last_reading on a re-sync.
 func (s *Store) UpsertCar(ctx context.Context, c model.Car) error {
-	existing, err := s.CarByEFleets(ctx, c.EFleetsID)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	existing, err := s.carByEFleetsLocked(ctx, c.EFleetsID)
 	if err == nil && existing != nil {
-		_, err = s.exec(ctx, `UPDATE cars SET nickname=?, plate=?, vin=?, region=?, updated_at=? WHERE efleets_id=?`,
+		_, err = s.rawExec(ctx, `UPDATE cars SET nickname=?, plate=?, vin=?, region=?, updated_at=? WHERE efleets_id=?`,
 			c.Nickname, c.Plate, c.VIN, c.Region, time.Now().UTC().Format(time.RFC3339), c.EFleetsID)
 		return err
 	}
@@ -125,22 +151,23 @@ func (s *Store) UpsertCar(ctx context.Context, c model.Car) error {
 		return err
 	}
 	if c.PDIID == "" {
-		id, err := s.nextPDI(ctx)
+		id, err := s.nextPDILocked(ctx)
 		if err != nil {
 			return err
 		}
 		c.PDIID = id
 	}
 	now := time.Now().UTC().Format(time.RFC3339)
-	_, err = s.exec(ctx, `INSERT INTO cars (pdi_id, efleets_id, nickname, plate, vin, region, interval_miles, created_at, updated_at)
+	_, err = s.rawExec(ctx, `INSERT INTO cars (pdi_id, efleets_id, nickname, plate, vin, region, interval_miles, created_at, updated_at)
 		VALUES (?,?,?,?,?,?,?,?,?)`, c.PDIID, c.EFleetsID, c.Nickname, c.Plate, c.VIN, c.Region, c.IntervalMiles, now, now)
 	return err
 }
 
-// nextPDI allocates opaque PDI-NNNN so region cannot live in the primary key.
-func (s *Store) nextPDI(ctx context.Context) (string, error) {
+// nextPDILocked allocates opaque PDI-NNNN so region cannot live in the primary key.
+// Caller must hold mu so two upserts cannot COUNT the same n and insert duplicate keys.
+func (s *Store) nextPDILocked(ctx context.Context) (string, error) {
 	var n int
-	err := s.queryRow(ctx, `SELECT COUNT(*) FROM cars`).Scan(&n)
+	err := s.rawQueryRow(ctx, `SELECT COUNT(*) FROM cars`).Scan(&n)
 	if err != nil {
 		return "", err
 	}
@@ -149,7 +176,13 @@ func (s *Store) nextPDI(ctx context.Context) (string, error) {
 
 // CarByEFleets loads one car. EFleetsID is the join key.
 func (s *Store) CarByEFleets(ctx context.Context, id string) (*model.Car, error) {
-	row := s.queryRow(ctx, `SELECT pdi_id, efleets_id, nickname, plate, vin, region,
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.carByEFleetsLocked(ctx, id)
+}
+
+func (s *Store) carByEFleetsLocked(ctx context.Context, id string) (*model.Car, error) {
+	row := s.rawQueryRow(ctx, `SELECT pdi_id, efleets_id, nickname, plate, vin, region,
 		last_oil_miles, last_oil_date, last_reading_miles, last_reading_at, last_reading_source, hold_reason, interval_miles
 		FROM cars WHERE efleets_id=?`, id)
 	return scanCar(row)

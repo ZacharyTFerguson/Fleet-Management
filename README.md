@@ -1,8 +1,14 @@
 # Fleet-Management
 
+Helpers and docs for PDI fleet automation.
+
 Records **important locations**: places where a vehicle sits still long enough to matter.
 
 This automation run received an empty trigger body — no vehicle was named and no GPS ping was sent — so no live unit was written to the catalog. The recorder is ready for the next ping.
+
+## Docs
+
+- [OneStepGPS API credentials and usage](docs/onestep-api-auth.md) — how to use the API key (and related credentials) against `track.onestepgps.com` without committing secrets.
 
 ## Sit rule
 

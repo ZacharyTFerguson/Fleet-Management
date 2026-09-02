@@ -2,5 +2,13 @@ node_modules/
 data/runtime/
 *.log
 .DS_Store
+
+# Local secrets — never commit
 .env
 .env.*
+!.env.example
+*.pem
+*.key
+*secret*
+onestep.env
+onestep*.local

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"oilchange/internal/config"
+	"oilchange/internal/enterprise"
 	"oilchange/internal/model"
 	"oilchange/internal/store"
 )
@@ -84,6 +85,60 @@ func TestSyncAndComputeFileDrop(t *testing.T) {
 	out := buf.String()
 	if strings.Contains(out, "Change oil at 0") || strings.Contains(out, "Mileage due at") {
 		t.Fatal(out)
+	}
+}
+
+func TestLiveFleetHasMoreVehiclesThanTwoCarDemo(t *testing.T) {
+	demo, err := os.Open(testdata("enterprise", "fleetsummary.csv"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer demo.Close()
+	demoCars, err := enterprise.ParseVehicles(demo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(demoCars) != 2 {
+		t.Fatalf("old demo fleet: got %d want 2", len(demoCars))
+	}
+
+	livePath := testdata("enterprise", "fleetsummary_live.csv")
+	live, err := os.Open(livePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer live.Close()
+	liveCars, err := enterprise.ParseVehicles(live)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(liveCars) <= len(demoCars) {
+		t.Fatalf("live fleet %d is not larger than the 2-car demo", len(liveCars))
+	}
+	if len(liveCars) < 100 {
+		t.Fatalf("live fleet %d; want at least 100 imported cars", len(liveCars))
+	}
+	if len(liveCars) != 205 {
+		t.Fatalf("stable live roster: got %d want 205", len(liveCars))
+	}
+
+	p := filepath.Join(t.TempDir(), "live.sqlite")
+	st, err := store.Open("sqlite", p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	a := &App{Cfg: config.Config{SQLitePath: p}, Store: st}
+	ctx := context.Background()
+	if err := a.SyncEnterprise(ctx, livePath, "", "", ""); err != nil {
+		t.Fatal(err)
+	}
+	got, err := st.ListCars(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 205 {
+		t.Fatalf("store after live sync: got %d want 205", len(got))
 	}
 }
 

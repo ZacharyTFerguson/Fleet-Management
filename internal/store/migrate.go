@@ -40,6 +40,10 @@ func applyMigrations(db *sql.DB, dialect string) error {
 func execAll(db *sql.DB, script string) error {
 	for _, stmt := range splitSQL(script) {
 		if _, err := db.Exec(stmt); err != nil {
+			msg := strings.ToLower(err.Error())
+			if strings.Contains(msg, "already exists") {
+				continue
+			}
 			return fmt.Errorf("%w in %q", err, trimForErr(stmt))
 		}
 	}

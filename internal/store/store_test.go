@@ -76,7 +76,11 @@ func TestConcurrentUpsertCarUniquePDI(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer s.Close()
+	defer func() {
+		if err := s.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
 	ctx := context.Background()
 	const n = 32
 	errCh := make(chan error, n)
@@ -97,6 +101,65 @@ func TestConcurrentUpsertCarUniquePDI(t *testing.T) {
 		}
 	}
 	cars, err := s.ListCars(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cars) != n {
+		t.Fatalf("cars %d want %d", len(cars), n)
+	}
+	seen := map[string]struct{}{}
+	for _, c := range cars {
+		if _, ok := seen[c.PDIID]; ok {
+			t.Fatalf("duplicate pdi %s", c.PDIID)
+		}
+		seen[c.PDIID] = struct{}{}
+	}
+}
+
+func TestTwoStoresConcurrentUpsertCarUniquePDI(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "two.sqlite")
+	a, err := Open("sqlite", p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := a.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
+	b, err := Open("sqlite", p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := b.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
+	ctx := context.Background()
+	const n = 24
+	errCh := make(chan error, n)
+	var wg sync.WaitGroup
+	for i := 0; i < n; i++ {
+		wg.Add(1)
+		st := a
+		if i%2 == 1 {
+			st = b
+		}
+		go func(i int, st *Store) {
+			defer wg.Done()
+			id := fmt.Sprintf("TWO%03d", i)
+			errCh <- st.UpsertCar(ctx, model.Car{EFleetsID: id, Nickname: id})
+		}(i, st)
+	}
+	wg.Wait()
+	close(errCh)
+	for err := range errCh {
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	cars, err := a.ListCars(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}

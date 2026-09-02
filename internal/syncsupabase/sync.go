@@ -231,7 +231,7 @@ func pushEdgeSync(ctx context.Context, client *http.Client, base, secret string,
 	if err != nil {
 		return err
 	}
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 	if res.StatusCode >= 300 {
 		b, _ := io.ReadAll(io.LimitReader(res.Body, 4096))
 		return fmt.Errorf("fleet-sync HTTP %d: %s", res.StatusCode, strings.TrimSpace(string(b)))
@@ -260,7 +260,7 @@ func upsert(ctx context.Context, client *http.Client, base, key, table string, r
 	if err != nil {
 		return err
 	}
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 	if res.StatusCode >= 300 {
 		b, _ := io.ReadAll(io.LimitReader(res.Body, 4096))
 		return fmt.Errorf("HTTP %d: %s", res.StatusCode, strings.TrimSpace(string(b)))

@@ -22,8 +22,8 @@ type Store struct {
 	// mu serializes in-process access. Concurrent CLI ticks (sync --interval),
 	// compute, and sync-enterprise can share one SQLite file; database/sql's
 	// pool plus modernc otherwise races nextPDI (COUNT then INSERT) and
-	// last_reading vs HOLD writes. Cross-process locking is still SQLite's job
-	// (MaxOpenConns(1) + busy timeout).
+	// last_reading vs HOLD writes. Cross-process locking is SQLite BEGIN
+	// IMMEDIATE (_txlock=immediate) plus busy timeout.
 	mu sync.Mutex
 }
 
@@ -33,7 +33,7 @@ func Open(driver, dsn string) (*Store, error) {
 		if dsn == "" {
 			return nil, fmt.Errorf("empty sqlite path")
 		}
-		dsn = "file:" + dsn + "?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)"
+		dsn = "file:" + dsn + "?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)&_txlock=immediate"
 	}
 	db, err := sql.Open(driver, dsn)
 	if err != nil {
@@ -138,40 +138,84 @@ func scanStrPtr(n sql.NullString) *string {
 }
 
 // UpsertCar inserts or updates identity fields without clobbering last_reading on a re-sync.
+// COUNT+INSERT for a new PDI runs in one IMMEDIATE/serializable transaction so two
+// Store instances on the same SQLite file cannot mint the same PDI-NNNN.
 func (s *Store) UpsertCar(ctx context.Context, c model.Car) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	existing, err := s.carByEFleetsLocked(ctx, c.EFleetsID)
-	if err == nil && existing != nil {
-		_, err = s.rawExec(ctx, `UPDATE cars SET nickname=?, plate=?, vin=?, region=?, updated_at=? WHERE efleets_id=?`,
-			c.Nickname, c.Plate, c.VIN, c.Region, time.Now().UTC().Format(time.RFC3339), c.EFleetsID)
+	var err error
+	for attempt := 0; attempt < 16; attempt++ {
+		err = s.upsertCarTx(ctx, c)
+		if err == nil {
+			return nil
+		}
+		if !retryableAlloc(err) {
+			return err
+		}
+	}
+	return err
+}
+
+func (s *Store) upsertCarTx(ctx context.Context, c model.Car) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
 		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	existing, err := s.carByEFleetsTx(ctx, tx, c.EFleetsID)
+	if err == nil && existing != nil {
+		_, err = tx.ExecContext(ctx, s.pg(`UPDATE cars SET nickname=?, plate=?, vin=?, region=?, updated_at=? WHERE efleets_id=?`),
+			c.Nickname, c.Plate, c.VIN, c.Region, time.Now().UTC().Format(time.RFC3339), c.EFleetsID)
+		if err != nil {
+			return err
+		}
+		return tx.Commit()
 	}
 	if err != nil && err != sql.ErrNoRows {
 		return err
 	}
 	if c.PDIID == "" {
-		id, err := s.nextPDILocked(ctx)
+		id, err := s.nextPDITx(ctx, tx)
 		if err != nil {
 			return err
 		}
 		c.PDIID = id
 	}
 	now := time.Now().UTC().Format(time.RFC3339)
-	_, err = s.rawExec(ctx, `INSERT INTO cars (pdi_id, efleets_id, nickname, plate, vin, region, interval_miles, created_at, updated_at)
-		VALUES (?,?,?,?,?,?,?,?,?)`, c.PDIID, c.EFleetsID, c.Nickname, c.Plate, c.VIN, c.Region, c.IntervalMiles, now, now)
-	return err
+	_, err = tx.ExecContext(ctx, s.pg(`INSERT INTO cars (pdi_id, efleets_id, nickname, plate, vin, region, interval_miles, created_at, updated_at)
+		VALUES (?,?,?,?,?,?,?,?,?)`), c.PDIID, c.EFleetsID, c.Nickname, c.Plate, c.VIN, c.Region, c.IntervalMiles, now, now)
+	if err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
-// nextPDILocked allocates opaque PDI-NNNN so region cannot live in the primary key.
-// Caller must hold mu so two upserts cannot COUNT the same n and insert duplicate keys.
-func (s *Store) nextPDILocked(ctx context.Context) (string, error) {
+func (s *Store) carByEFleetsTx(ctx context.Context, tx *sql.Tx, id string) (*model.Car, error) {
+	row := tx.QueryRowContext(ctx, s.pg(`SELECT pdi_id, efleets_id, nickname, plate, vin, region,
+		last_oil_miles, last_oil_date, last_reading_miles, last_reading_at, last_reading_source, hold_reason, interval_miles
+		FROM cars WHERE efleets_id=?`), id)
+	return scanCar(row)
+}
+
+// nextPDITx allocates opaque PDI-NNNN inside an open write txn (caller holds the lock).
+func (s *Store) nextPDITx(ctx context.Context, tx *sql.Tx) (string, error) {
 	var n int
-	err := s.rawQueryRow(ctx, `SELECT COUNT(*) FROM cars`).Scan(&n)
+	err := tx.QueryRowContext(ctx, s.pg(`SELECT COUNT(*) FROM cars`)).Scan(&n)
 	if err != nil {
 		return "", err
 	}
 	return fmt.Sprintf("PDI-%04d", n+1), nil
+}
+
+func retryableAlloc(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "unique") ||
+		strings.Contains(msg, "primary key") ||
+		strings.Contains(msg, "database is locked") ||
+		strings.Contains(msg, "sqlite_busy")
 }
 
 // CarByEFleets loads one car. EFleetsID is the join key.

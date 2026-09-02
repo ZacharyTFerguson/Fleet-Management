@@ -1,0 +1,22 @@
+# testdata
+
+Each locked rule has a fixture. Live eFleets/OneStep/Supabase are never required.
+
+| Rule | Where |
+|---|---|
+| Last Reading = fill odo + drive-stop miles | `internal/oil` TestEvaluateGoldenFillPlusDriveStop + `fixtures/lastreading_golden.json` |
+| Backward odo rejected | `internal/oil` TestBackwardOdoRejected |
+| Unusual Y → HOLD, no write | `internal/oil` TestUnusualYHoldNoWrite |
+| Shop RO typically beats fuel; shop spike abandoned (148k…170k…149k) | `internal/oil` TestShopROTypicallyBeatsFuel, TestShopSpikeAbandonedByLaterFills, TestFuelSpikeAbandoned |
+| Lower Last Reading refused; `--override-lower` writes | `internal/oil` TestLowerReadingRefusedAndOverride |
+| factory_id join, not display_name | `internal/oil` TestJoinIsFactoryIDNotDisplayName + `internal/onestep` |
+| Multi-device fight → HOLD | `internal/oil` TestMultiDeviceFight |
+| Digit-swap only when flagged and in band | `internal/oil` TestDigitSwapOnlyWhenFlaggedAndInBand |
+| VA15/VA19 card mix → HOLD | `internal/oil` TestCardMixVA15VA19 + `enterprise/details_cardmix.csv` |
+| Opaque PDI id, no state prefix | `internal/enterprise` TestOpaquePDIID |
+| Exporter never writes remaining/due | `internal/export` TestNeverWritesRemainingDue |
+| Logistics personnel names do not link devices | `internal/oil` TestLogisticsPersonnelDoesNotLinkDevice |
+| Same-second different odo → SAME_SECOND_FILL | `internal/oil` TestSameSecondDifferentOdo |
+| Dead factory_id not summed | `internal/oil` TestDeadFactoryIDNotSummed |
+| Header trim (`Cust Name `) not column I/J | `enterprise/details.csv` |
+| Real DETAILS/Maintenance/FleetSummary header sets | `testdata/enterprise/*.csv` |

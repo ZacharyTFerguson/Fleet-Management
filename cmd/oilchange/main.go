@@ -44,6 +44,8 @@ func run(args []string) int {
 		return cmdDevices(ctx, cfg, args[1:])
 	case "sync", "sync-supabase":
 		return cmdSyncSupabase(ctx, cfg, args[1:])
+	case "serve":
+		return cmdServe(args[1:])
 	case "env":
 		return cmdEnv(cfg)
 	default:
@@ -69,10 +71,12 @@ func usage() {
   oilchange devices sync [--map PATH]
   oilchange devices list
   oilchange sync [--interval 5m] [--mirror web/data/cars.json]
+  oilchange serve [--addr 127.0.0.1:4739] [--mirror web/data/cars.json] [--web-dir PATH]
   oilchange env
 
 Secrets: paste into oilchange.env (gitignored). See oilchange.env.example.
 oilchange env prints which keys loaded; it never prints secret values.
+Desktop UI: oilchange serve hosts embedded Oil Desk + /api/cars (no npm).
 `)
 }
 

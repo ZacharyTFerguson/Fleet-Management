@@ -150,26 +150,59 @@ func (a *App) adapter(vehicles, fuel, shop, mileage string) (enterprise.Adapter,
 	return h, nil
 }
 
-// SyncOneStep loads factory_id map and drive-stop miles-since after each car's trusted second.
-func (a *App) SyncOneStep(ctx context.Context, mapPath string, client *onestep.Client) error {
+// SyncDevices upserts the durable OneStep device registry from a map CSV and/or API.
+// Join key is factory_id only; display_name is never used to pair. Does not fetch drive-stop miles.
+func (a *App) SyncDevices(ctx context.Context, mapPath string, client *onestep.Client) (int, error) {
+	factoryToCar := map[string]string{}
 	var mapped []model.OneStepDevice
 	if mapPath != "" {
 		var err error
 		mapped, err = onestep.LoadMapCSV(mapPath)
 		if err != nil {
-			return err
+			return 0, err
 		}
-	} else if client != nil && a.Cfg.OneStepToken != "" {
-		var err error
-		mapped, err = client.ListDevices(ctx)
-		if err != nil {
-			return err
+		for _, d := range mapped {
+			if d.LinkedCarEFleetsID != nil && *d.LinkedCarEFleetsID != "" {
+				factoryToCar[d.FactoryID] = *d.LinkedCarEFleetsID
+			}
 		}
 	}
-	for _, d := range mapped {
-		if err := a.Store.UpsertDevice(ctx, d); err != nil {
-			return err
+
+	var devices []model.OneStepDevice
+	if client != nil && a.Cfg.OneStepToken != "" {
+		apiDevs, err := client.ListDevices(ctx)
+		if err != nil {
+			return 0, err
 		}
+		for _, d := range apiDevs {
+			devices = append(devices, onestep.LinkByFactoryID(d, factoryToCar))
+		}
+		// Keep map rows whose factory_id is absent from the live inventory (retired / offline boxes).
+		seen := make(map[string]bool, len(devices))
+		for _, d := range devices {
+			seen[d.FactoryID] = true
+		}
+		for _, d := range mapped {
+			if !seen[d.FactoryID] {
+				devices = append(devices, d)
+			}
+		}
+	} else {
+		devices = mapped
+	}
+
+	for _, d := range devices {
+		if err := a.Store.UpsertDevice(ctx, d); err != nil {
+			return 0, err
+		}
+	}
+	return len(devices), nil
+}
+
+// SyncOneStep loads the device registry then drive-stop miles-since after each car's trusted second.
+func (a *App) SyncOneStep(ctx context.Context, mapPath string, client *onestep.Client) error {
+	if _, err := a.SyncDevices(ctx, mapPath, client); err != nil {
+		return err
 	}
 	if client == nil {
 		return nil

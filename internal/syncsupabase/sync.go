@@ -205,9 +205,20 @@ func writeMirror(path string, snap *Snapshot) error {
 	return os.Rename(tmp, path)
 }
 
+var errRedirectRefused = errors.New("supabase push refused HTTP redirect")
+
+func pushClient() *http.Client {
+	return &http.Client{
+		Timeout: 60 * time.Second,
+		CheckRedirect: func(*http.Request, []*http.Request) error {
+			return errRedirectRefused
+		},
+	}
+}
+
 func pushSupabase(ctx context.Context, cfg Config, snap *Snapshot) error {
 	base := strings.TrimRight(cfg.URL, "/")
-	client := &http.Client{Timeout: 60 * time.Second}
+	client := pushClient()
 
 	// Prefer service-role PostgREST when available; else fleet-sync edge function.
 	if cfg.ServiceRole != "" {

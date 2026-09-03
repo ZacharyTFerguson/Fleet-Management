@@ -190,9 +190,11 @@ func sumDriveStop(b []byte) (float64, error) {
 			if sl, ok := v.([]any); ok {
 				var maps []map[string]any
 				for _, x := range sl {
-					if m, ok := x.(map[string]any); ok {
-						maps = append(maps, m)
+					m, ok := x.(map[string]any)
+					if !ok {
+						return 0, fmt.Errorf("drive-stop JSON %s contains a non-object row", k)
 					}
+					maps = append(maps, m)
 				}
 				if sum, ok := sumMaps(maps); ok {
 					return sum, nil

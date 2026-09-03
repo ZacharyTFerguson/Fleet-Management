@@ -120,13 +120,17 @@ func TestOpenAppliesAdditiveMigrations(t *testing.T) {
 		`SELECT card_id FROM card_pairings LIMIT 0`,
 		`SELECT linked_car_pdi_id, active, retired_at, last_synced_at FROM onestep_devices LIMIT 0`,
 	} {
-		rows, err := s.db.Query(query)
-		if err != nil {
-			t.Fatalf("%s: %v", query, err)
-		}
-		if err := rows.Close(); err != nil {
-			t.Fatal(err)
-		}
+		func() {
+			rows, err := s.db.QueryContext(context.Background(), query)
+			if err != nil {
+				t.Fatalf("%s: %v", query, err)
+			}
+			defer func() {
+				if err := rows.Close(); err != nil {
+					t.Error(err)
+				}
+			}()
+		}()
 	}
 }
 

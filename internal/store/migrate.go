@@ -1,6 +1,7 @@
 package store
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"sort"
@@ -10,7 +11,7 @@ import (
 )
 
 // applyMigrations runs schema and additive migrations before Postgres-only RLS.
-func applyMigrations(db *sql.DB, dialect string) error {
+func applyMigrations(ctx context.Context, db *sql.DB, dialect string) error {
 	names, err := migrationSQLNames()
 	if err != nil {
 		return err
@@ -28,7 +29,7 @@ func applyMigrations(db *sql.DB, dialect string) error {
 		if name != "001_schema.sql" {
 			run = execAllIgnoreDup
 		}
-		if err := run(db, sqlText); err != nil {
+		if err := run(ctx, db, sqlText); err != nil {
 			return fmt.Errorf("%s: %w", name, err)
 		}
 	}
@@ -37,7 +38,7 @@ func applyMigrations(db *sql.DB, dialect string) error {
 		if err != nil {
 			return fmt.Errorf("read rls: %w", err)
 		}
-		if err := execAll(db, string(rls)); err != nil {
+		if err := execAll(ctx, db, string(rls)); err != nil {
 			msg := strings.ToLower(err.Error())
 			if !strings.Contains(msg, "already exists") {
 				return fmt.Errorf("rls: %w", err)
@@ -64,9 +65,9 @@ func migrationSQLNames() ([]string, error) {
 	return append([]string{"001_schema.sql"}, extra...), nil
 }
 
-func execAll(db *sql.DB, script string) error {
+func execAll(ctx context.Context, db *sql.DB, script string) error {
 	for _, stmt := range splitSQL(script) {
-		if _, err := db.Exec(stmt); err != nil {
+		if _, err := db.ExecContext(ctx, stmt); err != nil {
 			msg := strings.ToLower(err.Error())
 			if strings.Contains(msg, "already exists") {
 				continue
@@ -77,9 +78,9 @@ func execAll(db *sql.DB, script string) error {
 	return nil
 }
 
-func execAllIgnoreDup(db *sql.DB, script string) error {
+func execAllIgnoreDup(ctx context.Context, db *sql.DB, script string) error {
 	for _, stmt := range splitSQL(script) {
-		if _, err := db.Exec(stmt); err != nil {
+		if _, err := db.ExecContext(ctx, stmt); err != nil {
 			msg := strings.ToLower(err.Error())
 			if strings.Contains(msg, "duplicate column") ||
 				strings.Contains(msg, "already exists") ||

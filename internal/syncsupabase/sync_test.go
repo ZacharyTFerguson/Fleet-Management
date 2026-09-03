@@ -2,6 +2,7 @@ package syncsupabase
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -163,5 +164,30 @@ func TestRefuseXRAY(t *testing.T) {
 	}
 	if CarsTable != "fleet_cars" || CardsTable != "fleet_cards" {
 		t.Fatalf("unexpected tables %s %s", CarsTable, CardsTable)
+	}
+}
+
+func TestPushSupabaseRejectsRedirect(t *testing.T) {
+	var destHits int
+	dest := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		destHits++
+	}))
+	defer dest.Close()
+	src := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, dest.URL+r.URL.RequestURI(), http.StatusTemporaryRedirect)
+	}))
+	defer src.Close()
+	_, err := Run(t.Context(), Config{
+		URL:         src.URL,
+		ServiceRole: "test-key",
+	}, []CarRow{{PDIID: "PDI-0001", EFleetsID: "CAR1"}}, nil, nil)
+	if err == nil {
+		t.Fatal("expected redirect refusal")
+	}
+	if !errors.Is(err, errRedirectRefused) {
+		t.Fatalf("err=%v", err)
+	}
+	if destHits != 0 {
+		t.Fatalf("followed redirect to XRAY-capable host: destHits=%d", destHits)
 	}
 }

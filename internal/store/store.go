@@ -3,14 +3,17 @@ package store
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	_ "github.com/jackc/pgx/v5/stdlib"
-	_ "modernc.org/sqlite"
+	sqlite "modernc.org/sqlite"
+	sqlite3 "modernc.org/sqlite/lib"
 
 	"oilchange/internal/model"
 )
@@ -47,7 +50,7 @@ func Open(driver, dsn string) (*Store, error) {
 		_ = db.Close()
 		return nil, err
 	}
-	if err := applyMigrations(db, driver); err != nil {
+	if err := applyMigrations(context.Background(), db, driver); err != nil {
 		_ = db.Close()
 		return nil, err
 	}
@@ -241,11 +244,19 @@ func retryableAlloc(err error) bool {
 	if err == nil {
 		return false
 	}
-	msg := strings.ToLower(err.Error())
-	return strings.Contains(msg, "unique") ||
-		strings.Contains(msg, "primary key") ||
-		strings.Contains(msg, "database is locked") ||
-		strings.Contains(msg, "sqlite_busy")
+	var se *sqlite.Error
+	if errors.As(err, &se) {
+		switch se.Code() & 0xff {
+		case sqlite3.SQLITE_BUSY, sqlite3.SQLITE_LOCKED, sqlite3.SQLITE_CONSTRAINT:
+			return true
+		}
+		return false
+	}
+	var pe *pgconn.PgError
+	if errors.As(err, &pe) {
+		return pe.Code == "23505"
+	}
+	return false
 }
 
 // CarByEFleets loads one car. EFleetsID is the join key.

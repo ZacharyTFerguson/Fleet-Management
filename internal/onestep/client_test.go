@@ -52,6 +52,12 @@ func TestDriveStopRejectsRowsWithoutDistance(t *testing.T) {
 	}
 }
 
+func TestDriveStopRejectsNonObjectRows(t *testing.T) {
+	if _, err := sumDriveStop([]byte(`{"stops":[null]}`)); err == nil {
+		t.Fatal("null stop row must not become zero miles")
+	}
+}
+
 func TestParseDevicesResultList(t *testing.T) {
 	devs, err := parseDevices([]byte(`{"result_list":[{"factory_id":"FACT1","device_id":"DEV1","display_name":"VA19","odometer":50}]}`))
 	if err != nil {

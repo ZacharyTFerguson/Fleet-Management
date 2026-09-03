@@ -38,6 +38,10 @@ func run(args []string) int {
 		return cmdReport(ctx, cfg, args[1:])
 	case "holds":
 		return cmdHolds(ctx, cfg, args[1:])
+	case "cards":
+		return cmdCards(ctx, cfg, args[1:])
+	case "devices":
+		return cmdDevices(ctx, cfg, args[1:])
 	case "sync", "sync-supabase":
 		return cmdSyncSupabase(ctx, cfg, args[1:])
 	case "env":
@@ -58,6 +62,12 @@ func usage() {
   oilchange oil-done --efleets-id ID --miles N --date YYYY-MM-DD [--location NAME]
   oilchange report [--interval 5000] [--due-within N] [--out PATH.csv]
   oilchange holds
+  oilchange cards rebuild [--fuel-details PATH]
+  oilchange cards suspect
+  oilchange cards trace --card ID [--window-days 2]
+  oilchange cards pairings [--card ID]
+  oilchange devices sync [--map PATH]
+  oilchange devices list
   oilchange sync [--interval 5m] [--mirror web/data/cars.json]
   oilchange env
 
@@ -223,4 +233,60 @@ func cmdHolds(ctx context.Context, cfg config.Config, args []string) int {
 		return model.ExitError
 	}
 	return model.ExitOK
+}
+
+func cmdCards(ctx context.Context, cfg config.Config, args []string) int {
+	if len(args) < 1 {
+		fmt.Fprintln(os.Stderr, "usage: oilchange cards rebuild|suspect|trace|pairings")
+		return model.ExitError
+	}
+	fs := flag.NewFlagSet("cards", flag.ContinueOnError)
+	fs.SetOutput(os.Stderr)
+	details := fs.String("fuel-details", "", "optional DETAILS CSV to ingest before rebuild")
+	cardID := fs.String("card", "", "card id (trace/pairings)")
+	window := fs.Int("window-days", 2, "station co-occurrence window in days (trace)")
+	if err := fs.Parse(args[1:]); err != nil {
+		return model.ExitError
+	}
+	a, done, err := openApp(cfg)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return model.ExitError
+	}
+	defer done()
+	switch args[0] {
+	case "rebuild":
+		n, err := a.CardsRebuild(ctx, *details)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "cards rebuild: %v\n", err)
+			return model.ExitError
+		}
+		fmt.Fprintf(os.Stdout, "cards rebuild: %d transactions rescored\n", n)
+		return model.ExitOK
+	case "suspect":
+		if err := a.CardsSuspects(ctx); err != nil {
+			fmt.Fprintf(os.Stderr, "cards suspect: %v\n", err)
+			return model.ExitError
+		}
+		return model.ExitOK
+	case "trace":
+		if *cardID == "" {
+			fmt.Fprintln(os.Stderr, "cards trace: --card is required")
+			return model.ExitError
+		}
+		if err := a.CardsTrace(ctx, *cardID, *window); err != nil {
+			fmt.Fprintf(os.Stderr, "cards trace: %v\n", err)
+			return model.ExitError
+		}
+		return model.ExitOK
+	case "pairings":
+		if err := a.CardsPairings(ctx, *cardID); err != nil {
+			fmt.Fprintf(os.Stderr, "cards pairings: %v\n", err)
+			return model.ExitError
+		}
+		return model.ExitOK
+	default:
+		fmt.Fprintf(os.Stderr, "unknown cards verb %q\n", args[0])
+		return model.ExitError
+	}
 }

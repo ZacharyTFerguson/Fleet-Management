@@ -154,8 +154,8 @@ func parseDevices(b []byte) ([]model.OneStepDevice, error) {
 			FactoryID:   fid,
 			DeviceID:    did,
 			DisplayName: name,
-			// This branch's model uses Dead as its only non-live state.
-			Dead: d.Dead || !active,
+			Active:      active,
+			Dead:        d.Dead,
 		})
 	}
 	return out, nil
@@ -465,6 +465,9 @@ func LoadMapCSV(path string) ([]model.OneStepDevice, error) {
 			continue
 		}
 		d := model.OneStepDevice{FactoryID: fid, DeviceID: did, DisplayName: name}
+		dead := strings.ToLower(pick(row, "dead", "retired"))
+		d.Dead = dead == "1" || dead == "true" || dead == "yes" || dead == "dead"
+		d.Active = !d.Dead
 		if oil.HasLogisticsPersonnel(name) {
 			d.LinkedCarEFleetsID = nil
 			continue

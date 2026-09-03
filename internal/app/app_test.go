@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"oilchange/internal/cards"
 	"oilchange/internal/config"
 	"oilchange/internal/enterprise"
 	"oilchange/internal/model"
@@ -167,7 +168,6 @@ func TestSyncOneStepFetchesFromTrustedEnterpriseAnchor(t *testing.T) {
 	}
 }
 
-
 func TestSyncOneStepReturnsDriveStopFailures(t *testing.T) {
 	p := filepath.Join(t.TempDir(), "onestep-error.sqlite")
 	st, err := store.Open("sqlite", p)
@@ -211,83 +211,6 @@ func TestSyncOneStepReturnsDriveStopFailures(t *testing.T) {
 	err = a.SyncOneStep(ctx, "", client)
 	if err == nil || !strings.Contains(err.Error(), "factory_id FACT1") {
 		t.Fatalf("expected surfaced OneStep failure, got %v", err)
-	}
-}
-
-func TestLiveFleetHasMoreVehiclesThanTwoCarDemo(t *testing.T) {
-	demo, err := os.Open(testdata("enterprise", "fleetsummary.csv"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer demo.Close()
-	demoCars, err := enterprise.ParseVehicles(demo)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(demoCars) != 2 {
-		t.Fatalf("old demo fleet got %d want 2", len(demoCars))
-	}
-
-	livePath := testdata("enterprise", "fleetsummary_live.csv")
-	live, err := os.Open(livePath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer live.Close()
-	liveCars, err := enterprise.ParseVehicles(live)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(liveCars) <= len(demoCars) {
-		t.Fatalf("live fleet %d is not larger than the 2-car demo", len(liveCars))
-	}
-	if len(liveCars) < 100 {
-		t.Fatalf("live fleet %d; want at least 100 imported cars", len(liveCars))
-	}
-	if len(liveCars) != 205 {
-		t.Fatalf("stable live roster: got %d want 205", len(liveCars))
-	}
-
-	p := filepath.Join(t.TempDir(), "live.sqlite")
-	st, err := store.Open("sqlite", p)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer st.Close()
-	a := &App{Cfg: config.Config{SQLitePath: p}, Store: st}
-	ctx := context.Background()
-	if err := a.SyncEnterprise(ctx, livePath, "","",""); err != nil {
-		t.Fatal(err)
-	}
-	got, err := st.ListCars(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(got) != 205 {
-		t.Fatalf("store after live sync: got %d want 205", len(got))
-	}
-}
-
-func TestOilDoneDoesNotChangeLastReading(t *testing.T) {
-	p := filepath.Join(t.TempDir(), "oil.sqlite")
-	st, err := store.Open("sqlite", p)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer st.Close()
-	a := &App{Store: st}
-	ctx := context.Background()
-	_ = st.UpsertCar(ctx, model.Car{EFleetsID: "X"})
-	_ = st.WriteLastReading(ctx, "X", 111, time.Now().UTC(), model.SourceFuelDetails)
-	if err := a.OilDone(ctx, "X", 50, time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC), "shop"); err != nil {
-		t.Fatal(err)
-	}
-	c, _ := st.CarByEFleets(ctx, "X")
-	if c.LastReadingMiles == nil || *c.LastReadingMiles != 111 {
-		t.Fatal("oil-done must not change last reading")
-	}
-	if c.LastOilMiles == nil || *c.LastOilMiles != 50 {
-		t.Fatal("last oil")
 	}
 }
 
@@ -347,5 +270,128 @@ func TestSyncDevicesLinksAPIByFactoryIDNotDisplayName(t *testing.T) {
 	}
 	if len(wrong) != 0 {
 		t.Fatalf("must not join display_name WrongCar: %+v", wrong)
+	}
+}
+
+func TestLiveFleetHasMoreVehiclesThanTwoCarDemo(t *testing.T) {
+	demo, err := os.Open(testdata("enterprise", "fleetsummary.csv"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer demo.Close()
+	demoCars, err := enterprise.ParseVehicles(demo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(demoCars) != 2 {
+		t.Fatalf("old demo fleet: got %d want 2", len(demoCars))
+	}
+
+	livePath := testdata("enterprise", "fleetsummary_live.csv")
+	live, err := os.Open(livePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer live.Close()
+	liveCars, err := enterprise.ParseVehicles(live)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(liveCars) <= len(demoCars) {
+		t.Fatalf("live fleet %d is not larger than the 2-car demo", len(liveCars))
+	}
+	if len(liveCars) < 100 {
+		t.Fatalf("live fleet %d; want at least 100 imported cars", len(liveCars))
+	}
+	if len(liveCars) != 205 {
+		t.Fatalf("stable live roster: got %d want 205", len(liveCars))
+	}
+
+	p := filepath.Join(t.TempDir(), "live.sqlite")
+	st, err := store.Open("sqlite", p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	a := &App{Cfg: config.Config{SQLitePath: p}, Store: st}
+	ctx := context.Background()
+	if err := a.SyncEnterprise(ctx, livePath, "", "", ""); err != nil {
+		t.Fatal(err)
+	}
+	got, err := st.ListCars(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 205 {
+		t.Fatalf("store after live sync: got %d want 205", len(got))
+	}
+}
+
+func TestOilDoneDoesNotChangeLastReading(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "oil.sqlite")
+	st, err := store.Open("sqlite", p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	a := &App{Store: st}
+	ctx := context.Background()
+	_ = st.UpsertCar(ctx, model.Car{EFleetsID: "X"})
+	_ = st.WriteLastReading(ctx, "X", 111, time.Now().UTC(), model.SourceFuelDetails)
+	if err := a.OilDone(ctx, "X", 50, time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC), "shop"); err != nil {
+		t.Fatal(err)
+	}
+	c, _ := st.CarByEFleets(ctx, "X")
+	if c.LastReadingMiles == nil || *c.LastReadingMiles != 111 {
+		t.Fatal("oil-done must not change last reading")
+	}
+	if c.LastOilMiles == nil || *c.LastOilMiles != 50 {
+		t.Fatal("last oil")
+	}
+}
+
+func TestWrongCardRebuildSuspectTrace(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "wrongcard.sqlite")
+	st, err := store.Open("sqlite", p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	a := &App{Cfg: config.Config{SQLitePath: p}, Store: st}
+	ctx := context.Background()
+	if err := a.SyncEnterprise(ctx, testdata("enterprise", "fleetsummary_wrongcard.csv"), testdata("enterprise", "details_wrongcard.csv"), "", ""); err != nil {
+		t.Fatal(err)
+	}
+	n, err := a.CardsRebuild(ctx, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n < 4 {
+		t.Fatalf("expected CARD-MIX-99 + neighbors, got %d txs", n)
+	}
+	txs, _ := st.ListCardTxs(ctx, "")
+	ps, _ := st.ListPairings(ctx, "CARD-MIX-99")
+	var best string
+	for _, p := range ps {
+		if p.EntityType == "car" && p.Best {
+			best = p.EntityKey
+		}
+	}
+	if best != "27VA15" {
+		t.Fatalf("best pairing %q want 27VA15", best)
+	}
+	ss := cards.FindSuspects(txs, ps)
+	if len(ss) != 1 || ss[0].EnterpriseCar != "27VA19" || ss[0].BestCar != "27VA15" {
+		t.Fatalf("suspects %+v", ss)
+	}
+	hits := cards.TraceStationDays(txs, "CARD-MIX-99", 2)
+	found := false
+	for _, h := range hits {
+		if h.OtherEFleetsID == "27VA15" && h.OtherCardID == "CARD-15" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("trace missed 27VA15/CARD-15, hits=%+v", hits)
 	}
 }

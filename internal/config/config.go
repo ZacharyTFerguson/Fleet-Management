@@ -37,7 +37,7 @@ func Load() Config {
 		SQLitePath:        getenv("OILCHANGE_DB", ""),
 		SupabaseURL:       os.Getenv("SUPABASE_URL"),
 		ServiceRole:       os.Getenv("SUPABASE_SERVICE_ROLE"),
-		SyncSecret:        os.Getenv("SUPABASE_SYNC_SECRET"),
+		SyncSecret: os.Getenv("SUPABASE_SYNC_SECRET"),
 		// Cloud Agent secret names: OneStepAPIKEYTobeSigned (API key) + OneStepAPIKEY (PEM for JWS).
 		OneStepToken: firstEnv("ONESTEP_API_TOKEN", "ONESTEP_API_KEY", "ONE_STEP_FULL_API_KEY", "OneStepAPIKEYTobeSigned"),
 		OneStepPrivateKey: firstNonEmpty(

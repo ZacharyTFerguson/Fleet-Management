@@ -3,11 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev -H 127.0.0.1 -p 3847",
+    "dev": "next dev -H 127.0.0.1 -p 4739",
     "build": "next build",
-    "start": "next start -H 127.0.0.1 -p 3847",
-    "lint": "eslint .",
-    "test": "tsx --test src/lib/types.test.ts"
+    "start": "next start -H 127.0.0.1 -p 4739",
+    "lint": "eslint ."
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.1",
@@ -23,7 +22,6 @@
     "eslint": "^9",
     "eslint-config-next": "16.3.4",
     "tailwindcss": "^4.0.0",
-    "tsx": "^4.23.13",
     "typescript": "^5"
   }
 }

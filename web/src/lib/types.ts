@@ -36,6 +36,6 @@ export function remainingMiles(car: Car): number | null {
 }
 
 export function formatMiles(n: number | null | undefined): string {
-  if (n == null || Number.isNaN(n)) return "\u2014";
+  if (n == null || Number.isNaN(n)) return "—";
   return n.toLocaleString("en-US");
 }

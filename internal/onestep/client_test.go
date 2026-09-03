@@ -105,7 +105,7 @@ func TestParseDevicesDoesNotPromoteGenericID(t *testing.T) {
 	}
 }
 
-func TestParseDevicesMarksInactiveAndDeadNonLive(t *testing.T) {
+func TestParseDevicesPreservesInactiveAndDead(t *testing.T) {
 	devs, err := parseDevices([]byte(`[
 		{"factory_id":"INACTIVE","active":false},
 		{"factory_id":"DEAD","active":true,"dead":true},
@@ -117,13 +117,13 @@ func TestParseDevicesMarksInactiveAndDeadNonLive(t *testing.T) {
 	if len(devs) != 3 {
 		t.Fatalf("devices %+v", devs)
 	}
-	if !devs[0].Dead {
+	if devs[0].Active || devs[0].Dead {
 		t.Fatalf("inactive device parsed as live: %+v", devs[0])
 	}
-	if !devs[1].Dead {
+	if devs[1].Active || !devs[1].Dead {
 		t.Fatalf("dead device parsed as live: %+v", devs[1])
 	}
-	if devs[2].Dead {
+	if !devs[2].Active || devs[2].Dead {
 		t.Fatalf("missing active flag should default live: %+v", devs[2])
 	}
 }
@@ -284,28 +284,26 @@ func TestHTTPErrorBodyRedactsJWT(t *testing.T) {
 		t.Fatal(err)
 	}
 	pemBytes := pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: der})
-	var sawJWT string
+	var jwt string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		auth := r.Header.Get("Authorization")
-		sawJWT = strings.TrimPrefix(auth, "Bearer ")
-		http.Error(w, "invalid token "+sawJWT, http.StatusUnauthorized)
+		jwt = strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+		http.Error(w, "invalid bearer "+jwt, http.StatusUnauthorized)
 	}))
 	defer srv.Close()
-	client := NewClient(srv.URL, "raw-api-key-must-not-appear")
+	client := NewClient(srv.URL, "raw-api-key")
 	client.PrivateKeyPEM = string(pemBytes)
 	client.HTTP = srv.Client()
 	_, err = client.ListDevices(context.Background())
 	if err == nil {
 		t.Fatal("expected error")
 	}
-	if sawJWT == "" || !strings.HasPrefix(sawJWT, "eyJ") {
-		t.Fatalf("expected JWT auth, got %q", sawJWT)
+	if jwt == "" || !strings.HasPrefix(jwt, "eyJ") {
+		t.Fatalf("expected JWT, got %q", jwt)
 	}
-	if strings.Contains(err.Error(), sawJWT) {
-		t.Fatalf("leaked JWT in error: %v", err)
-	}
-	if strings.Contains(err.Error(), "raw-api-key-must-not-appear") {
-		t.Fatalf("leaked api key in error: %v", err)
+	for _, leaked := range []string{jwt, "raw-api-key"} {
+		if strings.Contains(err.Error(), leaked) {
+			t.Fatalf("error leaked %q: %v", leaked, err)
+		}
 	}
 	if !strings.Contains(err.Error(), "[redacted]") {
 		t.Fatalf("expected redaction marker: %v", err)

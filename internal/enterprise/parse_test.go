@@ -98,6 +98,30 @@ func TestOpaquePDIID(t *testing.T) {
 	}
 }
 
+func TestParseWrongCardSynthetic(t *testing.T) {
+	f, err := os.Open(testdata(t, "enterprise", "details_wrongcard.csv"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	fills, _, _, err := ParseFills(f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(fills) != 6 {
+		t.Fatalf("fills %d", len(fills))
+	}
+	var mixOn19 int
+	for _, fl := range fills {
+		if fl.CardID == "CARD-MIX-99" && fl.EFleetsID == "27VA19" {
+			mixOn19++
+		}
+	}
+	if mixOn19 != 1 {
+		t.Fatalf("want one CARD-MIX-99 swipe on 27VA19, got %d", mixOn19)
+	}
+}
+
 func TestHeaderTrimCustName(t *testing.T) {
 	idx := headerIndex([]string{"Cust Name ", "Vehicle"})
 	if _, ok := idx["cust name"]; !ok {

@@ -12,8 +12,8 @@ import (
 	"oilchange/internal/model"
 )
 
-// cmdSyncSupabase pushes local SQLite to fleet Supabase (or the mock mirror).
-// --interval keeps a durable ticker for throughout-the-day refreshes.
+// cmdSyncSupabase pushes local SQLite → fleet-oil Supabase (or mock mirror).
+// --interval keeps a durable ticker for "throughout the day" refresh.
 func cmdSyncSupabase(ctx context.Context, cfg config.Config, args []string) int {
 	fs := flag.NewFlagSet("sync", flag.ContinueOnError)
 	interval := fs.Duration("interval", 0, "repeat every duration (e.g. 5m); 0 = once")
@@ -37,14 +37,14 @@ func cmdSyncSupabase(ctx context.Context, cfg config.Config, args []string) int 
 	if code := runOnce(); code != model.ExitOK || *interval <= 0 {
 		return code
 	}
-	ticker := time.NewTicker(*interval)
-	defer ticker.Stop()
+	t := time.NewTicker(*interval)
+	defer t.Stop()
 	fmt.Fprintf(os.Stderr, "sync ticker every %s (ctrl-c to stop)\n", interval.String())
 	for {
 		select {
 		case <-ctx.Done():
 			return model.ExitOK
-		case <-ticker.C:
+		case <-t.C:
 			if code := runOnce(); code != model.ExitOK {
 				fmt.Fprintln(os.Stderr, "sync tick failed; will retry next interval")
 			}
@@ -53,8 +53,8 @@ func cmdSyncSupabase(ctx context.Context, cfg config.Config, args []string) int 
 }
 
 func defaultMirrorPath() string {
-	if path := os.Getenv("FLEET_MIRROR_PATH"); path != "" {
-		return path
+	if v := os.Getenv("FLEET_MIRROR_PATH"); v != "" {
+		return v
 	}
 	return filepath.Join("web", "data", "cars.json")
 }

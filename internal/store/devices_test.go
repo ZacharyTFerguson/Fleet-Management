@@ -3,136 +3,117 @@ package store
 import (
 	"context"
 	"path/filepath"
-	"strings"
+	"runtime"
 	"testing"
 
 	"oilchange/internal/model"
+	"oilchange/internal/onestep"
 )
 
-func deviceFor(t *testing.T, s *Store, efleetsID, factoryID string) *model.OneStepDevice {
-	t.Helper()
-	devs, err := s.ListDevicesForCar(context.Background(), efleetsID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for i := range devs {
-		if devs[i].FactoryID == factoryID {
-			return &devs[i]
-		}
-	}
-	return nil
-}
-
-// TestUpsertDeviceCoalesceKeepLink pins the link rule: nil (API inventory) keeps
-// the existing pairing, non-nil (device map) relinks, and nothing unlinks.
-func TestUpsertDeviceCoalesceKeepLink(t *testing.T) {
-	p := filepath.Join(t.TempDir(), "coalesce.sqlite")
+func TestUpsertDeviceByFactoryID(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "dev.sqlite")
 	s, err := Open("sqlite", p)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer s.Close()
 	ctx := context.Background()
-	for _, id := range []string{"CARA", "CARB"} {
-		if err := s.UpsertCar(ctx, model.Car{EFleetsID: id}); err != nil {
-			t.Fatal(err)
-		}
-	}
-	linkA, linkB, empty := "CARA", "CARB", ""
-
-	// Inventory row first: no link known yet.
-	if err := s.UpsertDevice(ctx, model.OneStepDevice{FactoryID: "F1", DeviceID: "D1"}); err != nil {
+	if err := s.UpsertCar(ctx, model.Car{EFleetsID: "27TESTA", Nickname: "VA19"}); err != nil {
 		t.Fatal(err)
 	}
-	if deviceFor(t, s, "CARA", "F1") != nil {
-		t.Fatal("no map row yet, F1 must not belong to CARA")
-	}
-	// Map row links.
-	if err := s.UpsertDevice(ctx, model.OneStepDevice{FactoryID: "F1", DeviceID: "D1", LinkedCarEFleetsID: &linkA}); err != nil {
-		t.Fatal(err)
-	}
-	// Inventory refresh (nil link) keeps the pairing but refreshes device_id.
-	if err := s.UpsertDevice(ctx, model.OneStepDevice{FactoryID: "F1", DeviceID: "D1-v2"}); err != nil {
-		t.Fatal(err)
-	}
-	got := deviceFor(t, s, "CARA", "F1")
-	if got == nil || got.DeviceID != "D1-v2" {
-		t.Fatalf("nil link must keep CARA and still refresh device_id: %+v", got)
-	}
-	// Empty-string link is "unknown", not "unlink".
-	if err := s.UpsertDevice(ctx, model.OneStepDevice{FactoryID: "F1", DeviceID: "D1-v2", LinkedCarEFleetsID: &empty}); err != nil {
-		t.Fatal(err)
-	}
-	if deviceFor(t, s, "CARA", "F1") == nil {
-		t.Fatal("empty link must not unlink")
-	}
-	// A map row for a different car relinks (box moved to another car).
-	if err := s.UpsertDevice(ctx, model.OneStepDevice{FactoryID: "F1", DeviceID: "D1-v2", LinkedCarEFleetsID: &linkB}); err != nil {
-		t.Fatal(err)
-	}
-	if deviceFor(t, s, "CARA", "F1") != nil || deviceFor(t, s, "CARB", "F1") == nil {
-		t.Fatal("non-nil link must relink to CARB")
-	}
-	// Marking dead keeps the link (history) but the box stops counting.
-	if err := s.UpsertDevice(ctx, model.OneStepDevice{FactoryID: "F1", DeviceID: "D1-v2", Dead: true}); err != nil {
-		t.Fatal(err)
-	}
-	got = deviceFor(t, s, "CARB", "F1")
-	if got == nil || !got.Dead {
-		t.Fatalf("dead box keeps its link for history: %+v", got)
-	}
-}
-
-func TestUpsertDevicesIsAllOrNothing(t *testing.T) {
-	p := filepath.Join(t.TempDir(), "batch.sqlite")
-	s, err := Open("sqlite", p)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer s.Close()
-	ctx := context.Background()
-	if err := s.UpsertCar(ctx, model.Car{EFleetsID: "CARA"}); err != nil {
-		t.Fatal(err)
-	}
-	linkA, ghost := "CARA", "NOSUCHCAR"
-	if err := s.UpsertDevice(ctx, model.OneStepDevice{FactoryID: "F1", DeviceID: "OLD", LinkedCarEFleetsID: &linkA}); err != nil {
-		t.Fatal(err)
-	}
-	err = s.UpsertDevices(ctx, []model.OneStepDevice{
-		{FactoryID: "F1", DeviceID: "NEW"},
-		{FactoryID: "F2", DeviceID: "D2", LinkedCarEFleetsID: &linkA},
-		{FactoryID: "F3", DeviceID: "D3", LinkedCarEFleetsID: &ghost}, // FK violation
-	})
-	if err == nil {
-		t.Fatal("map row linking a car that does not exist must fail the import")
-	}
-	if !strings.Contains(err.Error(), "F3") {
-		t.Fatalf("error should name the offending factory_id: %v", err)
-	}
-	devs, err := s.ListDevicesForCar(ctx, "CARA")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(devs) != 1 || devs[0].FactoryID != "F1" || devs[0].DeviceID != "OLD" {
-		t.Fatalf("partial import applied: %+v", devs)
-	}
-	// The same batch without the bad row applies as a unit.
-	if err := s.UpsertDevices(ctx, []model.OneStepDevice{
-		{FactoryID: "F1", DeviceID: "NEW"},
-		{FactoryID: "F2", DeviceID: "D2", LinkedCarEFleetsID: &linkA},
+	link := "27TESTA"
+	if err := s.UpsertDevice(ctx, model.OneStepDevice{
+		FactoryID: "FACT1", DeviceID: "DEV1", DisplayName: "Label A", LinkedCarEFleetsID: &link, Active: true,
 	}); err != nil {
 		t.Fatal(err)
 	}
-	devs, _ = s.ListDevicesForCar(ctx, "CARA")
+	if err := s.UpsertDevice(ctx, model.OneStepDevice{
+		FactoryID: "FACT1", DeviceID: "DEV1-NEW", DisplayName: "Label B", LinkedCarEFleetsID: &link, Active: true,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.UpsertDevice(ctx, model.OneStepDevice{
+		FactoryID: "FACT1", DeviceID: "DEV1-LIVE", DisplayName: "Live API label", Active: true,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	got, err := s.GetDevice(ctx, "FACT1")
+	if err != nil || got == nil {
+		t.Fatalf("get: %v %+v", err, got)
+	}
+	if got.DeviceID != "DEV1-LIVE" {
+		t.Fatalf("upsert must key by factory_id, device_id=%s", got.DeviceID)
+	}
+	if got.DisplayName != "Live API label" {
+		t.Fatalf("label update %q", got.DisplayName)
+	}
+	if got.LinkedCarEFleetsID == nil || *got.LinkedCarEFleetsID != link {
+		t.Fatalf("live API refresh erased factory_id pairing: %+v", got)
+	}
+	if got.LastSyncedAt == nil {
+		t.Fatal("last_synced_at required")
+	}
+	if !got.Active || got.Dead {
+		t.Fatalf("active/dead %+v", got)
+	}
+	all, err := s.ListDevices(ctx)
+	if err != nil || len(all) != 1 {
+		t.Fatalf("list %d %v", len(all), err)
+	}
+}
+
+func TestDisplayNameIsNeverTheJoin(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "dev.sqlite")
+	s, err := Open("sqlite", p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	ctx := context.Background()
+	if err := s.UpsertCar(ctx, model.Car{EFleetsID: "27TESTA", Nickname: "VA19"}); err != nil {
+		t.Fatal(err)
+	}
+
+	_, file, _, _ := runtime.Caller(0)
+	mapPath := filepath.Join(filepath.Dir(file), "..", "..", "testdata", "onestep", "map_same_display_name.csv")
+	devs, err := onestep.LoadMapCSV(mapPath)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if len(devs) != 2 {
-		t.Fatalf("batch upsert: %+v", devs)
+		t.Fatalf("want 2 rows with shared display_name, got %d", len(devs))
 	}
 	for _, d := range devs {
-		if d.FactoryID == "F1" && d.DeviceID != "NEW" {
-			t.Fatalf("F1 not refreshed: %+v", d)
+		if err := s.UpsertDevice(ctx, d); err != nil {
+			t.Fatal(err)
 		}
 	}
-	if err := s.UpsertDevices(ctx, nil); err != nil {
-		t.Fatalf("empty batch is a no-op: %v", err)
+	all, err := s.ListDevices(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(all) != 2 {
+		t.Fatalf("same display_name must not collapse rows, got %d", len(all))
+	}
+	byName := map[string]int{}
+	for _, d := range all {
+		byName[d.DisplayName]++
+		if d.FactoryID == "SAME_B" && d.LinkedCarEFleetsID != nil {
+			t.Fatalf("SAME_B must not inherit car link from shared display_name: %+v", d)
+		}
+		if d.FactoryID == "SAME_A" && (d.LinkedCarEFleetsID == nil || *d.LinkedCarEFleetsID != "27TESTA") {
+			t.Fatalf("SAME_A links by factory map efleets_id: %+v", d)
+		}
+	}
+	if byName["Shared Label"] != 2 {
+		t.Fatalf("expected two Shared Label labels, got %#v", byName)
+	}
+
+	linked := onestep.LinkByFactoryID(
+		model.OneStepDevice{FactoryID: "NOPE", DisplayName: "27TESTA"},
+		map[string]string{"SAME_A": "27TESTA"},
+	)
+	if linked.LinkedCarEFleetsID != nil {
+		t.Fatal("display_name must never be the join key")
 	}
 }

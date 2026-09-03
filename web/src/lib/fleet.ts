@@ -1,7 +1,6 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { readFile } from "fs/promises";
 import path from "path";
-import { assertFleetSupabaseURL } from "./supabaseTarget";
 import type { FleetSnapshot } from "./types";
 
 function supabase(): SupabaseClient | null {
@@ -10,7 +9,10 @@ function supabase(): SupabaseClient | null {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim() ||
     process.env.SUPABASE_ANON_KEY?.trim();
   if (!url || !key) return null;
-  assertFleetSupabaseURL(url);
+  // Guard: never point the oil UI at the XRAY project by accident.
+  if (/xray/i.test(url) || url.includes("chjqcznyxvtjbamttqdj")) {
+    throw new Error("Refusing XRAY Supabase project for fleet-oil data");
+  }
   return createClient(url, key);
 }
 

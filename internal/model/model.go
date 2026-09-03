@@ -53,17 +53,48 @@ type MaintenanceLocation struct {
 
 // Fill is one Fuel & Charging DETAILS punch. Trusted fill is the latest row that survives checks.
 type Fill struct {
-	EFleetsID                   string
-	CardCompanyVehicleNumber    string
+	EFleetsID                    string
+	CardID                       string // Provider Card Number; empty if the export omitted it
+	CardCompanyVehicleNumber     string
 	ProviderCompanyVehicleNumber string
-	Odometer                    *int
-	UnusualY                    bool
-	ProviderTransactionTime     time.Time // second precision; America/New_York if naive
-	MerchantName                string
-	MerchantAddress             string
-	Source                      string
-	DriverFirst                 string
-	DriverLast                  string
+	Odometer                     *int
+	UnusualY                     bool
+	ProviderTransactionTime      time.Time // second precision; America/New_York if naive
+	MerchantName                 string
+	MerchantAddress              string
+	Source                       string
+	DriverFirst                  string
+	DriverLast                   string
+	Gallons                      *float64
+	Amount                       *float64
+	Plate                        string
+}
+
+// CardTx is one swipe in the card intelligence store (not last-write-wins on cards).
+type CardTx struct {
+	CardID            string
+	At                time.Time
+	StationName       string
+	StationAddress    string
+	Gallons           *float64
+	Amount            *float64
+	RecordedEFleetsID string
+	RecordedCVN       string
+	Plate             string
+	DriverFirst       string
+	DriverLast        string
+	SourceRow         string
+	Odometer          *int
+}
+
+// CardPairing is a scored car or person link for one card over the full history.
+type CardPairing struct {
+	CardID     string
+	EntityType string // "car" or "person"
+	EntityKey  string
+	EvidenceN  int
+	Score      float64
+	Best       bool
 }
 
 // ShopRO is one repair order. Many line items share RO ID and one odometer.
@@ -76,13 +107,20 @@ type ShopRO struct {
 	ServiceDesc  string
 }
 
-// OneStepDevice is a GPS box. Pair by factory_id only. Dead boxes are not summed.
+// OneStepDevice is a GPS box in the durable device registry.
+// Pair by factory_id only. device_id is history identity. display_name is label only (never a join key).
 type OneStepDevice struct {
 	FactoryID          string
 	DeviceID           string
 	DisplayName        string
 	LinkedCarEFleetsID *string
+	LinkedCarPDIID     *string
 	Dead               bool
+	Active             bool
+	RetiredAt          *time.Time
+	LastSyncedAt       *time.Time
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
 }
 
 // HoldEvent is a persisted open/closed HOLD. Open holds skip Last Reading writes.

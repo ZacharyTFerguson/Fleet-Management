@@ -509,32 +509,55 @@ func (s *Store) ListMilesSince(ctx context.Context, factoryIDs []string) ([]mode
 
 // WriteLastReading is the only SQL that stores Last Reading miles. Callers must not write on HOLD.
 func (s *Store) WriteLastReading(ctx context.Context, efleetsID string, miles int, at time.Time, source string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
 	now := time.Now().UTC().Format(time.RFC3339)
-	_, err := s.exec(ctx, `UPDATE cars SET last_reading_miles=?, last_reading_at=?, last_reading_source=?, hold_reason=NULL, updated_at=? WHERE efleets_id=?`,
-		miles, at.UTC().Format(time.RFC3339), source, now, efleetsID)
-	return err
+	if _, err := tx.ExecContext(ctx, s.pg(`UPDATE cars SET last_reading_miles=?, last_reading_at=?, last_reading_source=?, hold_reason=NULL, updated_at=? WHERE efleets_id=?`),
+		miles, at.UTC().Format(time.RFC3339), source, now, efleetsID); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, s.pg(`UPDATE hold_events SET open=FALSE WHERE efleets_id=? AND open=TRUE`), efleetsID); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 // SetHold skips Last Reading. Prior last_reading_* stay put so operators do not trust a flagged number.
 func (s *Store) SetHold(ctx context.Context, efleetsID, reason, detail string) error {
-	now := time.Now().UTC().Format(time.RFC3339)
-	if _, err := s.exec(ctx, `UPDATE cars SET hold_reason=?, updated_at=? WHERE efleets_id=?`, reason, now, efleetsID); err != nil {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
 		return err
 	}
-	_, err := s.exec(ctx, `INSERT INTO hold_events (efleets_id, reason, detail, at, open) VALUES (?,?,?,?,1)`,
-		efleetsID, reason, detail, now)
-	return err
+	defer func() { _ = tx.Rollback() }()
+	now := time.Now().UTC().Format(time.RFC3339)
+	if _, err := tx.ExecContext(ctx, s.pg(`UPDATE cars SET hold_reason=?, updated_at=? WHERE efleets_id=?`), reason, now, efleetsID); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, s.pg(`INSERT INTO hold_events (efleets_id, reason, detail, at, open) VALUES (?,?,?,?,?)`),
+		efleetsID, reason, detail, now, true); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 // ClearHolds closes open events after a successful write.
 func (s *Store) ClearHolds(ctx context.Context, efleetsID string) error {
-	_, err := s.exec(ctx, `UPDATE hold_events SET open=0 WHERE efleets_id=? AND open=1`, efleetsID)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	_, err := s.exec(ctx, `UPDATE hold_events SET open=FALSE WHERE efleets_id=? AND open=TRUE`, efleetsID)
 	return err
 }
 
 // OpenHolds is the holds command.
 func (s *Store) OpenHolds(ctx context.Context) ([]model.HoldEvent, error) {
-	rows, err := s.query(ctx, `SELECT efleets_id, reason, detail, at, open FROM hold_events WHERE open=1 ORDER BY at`)
+	rows, err := s.query(ctx, `SELECT efleets_id, reason, detail, at, open FROM hold_events WHERE open=TRUE ORDER BY at`)
 	if err != nil {
 		return nil, err
 	}

@@ -40,6 +40,18 @@ func TestDriveStopSumsMilesIgnoresOdometerJSON(t *testing.T) {
 	}
 }
 
+
+func TestDriveStopRejectsRowsWithoutDistance(t *testing.T) {
+	_, err := sumDriveStop([]byte(`{"stops":[{"odometer":999999}]}`))
+	if err == nil {
+		t.Fatal("device odometer must not become zero drive-stop miles")
+	}
+	n, err := sumDriveStop([]byte(`{"stops":[],"odometer":999999}`))
+	if err != nil || n != 0 {
+		t.Fatalf("empty measured trip list: miles=%v err=%v", n, err)
+	}
+}
+
 func TestParseDevicesResultList(t *testing.T) {
 	devs, err := parseDevices([]byte(`{"result_list":[{"factory_id":"FACT1","device_id":"DEV1","display_name":"VA19","odometer":50}]}`))
 	if err != nil {

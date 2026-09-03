@@ -3,6 +3,7 @@ package app
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"time"
@@ -173,6 +174,7 @@ func (a *App) SyncOneStep(ctx context.Context, mapPath string, client *onestep.C
 	if client == nil {
 		return nil
 	}
+	var fetchErrors []error
 	cars, err := a.Store.ListCars(ctx)
 	if err != nil {
 		return err
@@ -200,6 +202,7 @@ func (a *App) SyncOneStep(ctx context.Context, mapPath string, client *onestep.C
 			}
 			n, err := client.DriveStopMilesFor(ctx, d, out.FillTime)
 			if err != nil {
+				fetchErrors = append(fetchErrors, fmt.Errorf("%s factory_id %s: %w", c.EFleetsID, d.FactoryID, err))
 				continue
 			}
 			if err := a.Store.SaveMilesSince(ctx, model.DriveStopMiles{FactoryID: d.FactoryID, Since: out.FillTime, Miles: n}); err != nil {
@@ -207,7 +210,7 @@ func (a *App) SyncOneStep(ctx context.Context, mapPath string, client *onestep.C
 			}
 		}
 	}
-	return nil
+	return errors.Join(fetchErrors...)
 }
 
 // Compute runs Last Reading + HOLD for every car. Returns exit 2 if any open HOLD remains.
@@ -262,9 +265,6 @@ func (a *App) Compute(ctx context.Context, overrideLower bool) (int, error) {
 			continue
 		}
 		if err := a.Store.WriteLastReading(ctx, c.EFleetsID, out.Reading, out.FillTime, out.Source); err != nil {
-			return model.ExitError, err
-		}
-		if err := a.Store.ClearHolds(ctx, c.EFleetsID); err != nil {
 			return model.ExitError, err
 		}
 	}

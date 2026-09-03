@@ -180,7 +180,10 @@ func sumDriveStop(b []byte) (float64, error) {
 		if err2 := json.Unmarshal(b, &arr); err2 != nil {
 			return 0, err
 		}
-		return sumMaps(arr), nil
+		if sum, ok := sumMaps(arr); ok {
+			return sum, nil
+		}
+		return 0, fmt.Errorf("drive-stop JSON rows had no miles")
 	}
 	for _, k := range []string{"stops", "routes", "data", "trips"} {
 		if v, ok := obj[k]; ok {
@@ -191,7 +194,10 @@ func sumDriveStop(b []byte) (float64, error) {
 						maps = append(maps, m)
 					}
 				}
-				return sumMaps(maps), nil
+				if sum, ok := sumMaps(maps); ok {
+					return sum, nil
+				}
+				return 0, fmt.Errorf("drive-stop JSON %s rows had no miles", k)
 			}
 		}
 	}
@@ -204,23 +210,28 @@ func sumDriveStop(b []byte) (float64, error) {
 	return 0, fmt.Errorf("drive-stop JSON had no miles")
 }
 
-// sumMaps is GPS/trip distance, not a device odometer reading.
-func sumMaps(maps []map[string]any) float64 {
+// sumMaps is GPS/trip distance, not a device odometer reading. An empty list
+// is a measured zero; non-empty rows without distance are a malformed response.
+func sumMaps(maps []map[string]any) (float64, bool) {
 	var sum float64
+	found := len(maps) == 0
 	for _, m := range maps {
 		if n, ok := asFloat(m["miles"]); ok {
 			sum += n
+			found = true
 			continue
 		}
 		if n, ok := asFloat(m["distance"]); ok {
 			sum += n
+			found = true
 			continue
 		}
 		if n, ok := asFloat(m["distance_miles"]); ok {
 			sum += n
+			found = true
 		}
 	}
-	return sum
+	return sum, found
 }
 
 // asFloat accepts JSON number-or-string miles without defaulting missing to zero (zero would invent a trip).

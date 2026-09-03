@@ -170,6 +170,59 @@ func TestDeviceRefreshPreservesFactoryIDPairing(t *testing.T) {
 	}
 }
 
+
+func TestConcurrentHoldAndReadingStayConsistent(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "hold-reading.sqlite")
+	s, err := Open("sqlite", p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := s.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
+	ctx := context.Background()
+	if err := s.UpsertCar(ctx, model.Car{EFleetsID: "CAR1"}); err != nil {
+		t.Fatal(err)
+	}
+	const n = 40
+	errCh := make(chan error, n)
+	var wg sync.WaitGroup
+	for i := 0; i < n; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			if i%2 == 0 {
+				errCh <- s.SetHold(ctx, "CAR1", model.HoldNoDriveStop, "test")
+				return
+			}
+			errCh <- s.WriteLastReading(ctx, "CAR1", 100000+i, time.Now().UTC(), model.SourceFuelDetails)
+		}(i)
+	}
+	wg.Wait()
+	close(errCh)
+	for err := range errCh {
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	car, err := s.CarByEFleets(ctx, "CAR1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	holds, err := s.OpenHolds(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if car.HoldReason == nil && len(holds) != 0 {
+		t.Fatalf("reading committed with %d open holds", len(holds))
+	}
+	if car.HoldReason != nil && len(holds) == 0 {
+		t.Fatal("hold_reason committed without an open hold event")
+	}
+}
+
 func TestConcurrentUpsertCarUniquePDI(t *testing.T) {
 	p := filepath.Join(t.TempDir(), "race.sqlite")
 	s, err := Open("sqlite", p)

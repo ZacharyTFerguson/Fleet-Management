@@ -167,6 +167,53 @@ func TestSyncOneStepFetchesFromTrustedEnterpriseAnchor(t *testing.T) {
 	}
 }
 
+
+func TestSyncOneStepReturnsDriveStopFailures(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "onestep-error.sqlite")
+	st, err := store.Open("sqlite", p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := st.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
+	ctx := context.Background()
+	if err := st.UpsertCar(ctx, model.Car{EFleetsID: "CAR1", Nickname: "VA1"}); err != nil {
+		t.Fatal(err)
+	}
+	odo := 100000
+	if err := st.UpsertFill(ctx, model.Fill{
+		EFleetsID:                    "CAR1",
+		ProviderCompanyVehicleNumber: "VA1",
+		Odometer:                     &odo,
+		ProviderTransactionTime:      time.Date(2026, 6, 1, 10, 0, 0, 0, time.UTC),
+		Source:                       model.SourceFuelDetails,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	carID := "CAR1"
+	if err := st.UpsertDevice(ctx, model.OneStepDevice{
+		FactoryID:          "FACT1",
+		DeviceID:           "DEV1",
+		LinkedCarEFleetsID: &carID,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, "unavailable", http.StatusServiceUnavailable)
+	}))
+	defer srv.Close()
+	client := onestep.NewClient(srv.URL, "")
+	client.HTTP = srv.Client()
+	a := &App{Store: st}
+	err = a.SyncOneStep(ctx, "", client)
+	if err == nil || !strings.Contains(err.Error(), "factory_id FACT1") {
+		t.Fatalf("expected surfaced OneStep failure, got %v", err)
+	}
+}
+
 func TestLiveFleetHasMoreVehiclesThanTwoCarDemo(t *testing.T) {
 	demo, err := os.Open(testdata("enterprise", "fleetsummary.csv"))
 	if err != nil {

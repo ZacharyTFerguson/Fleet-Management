@@ -264,13 +264,16 @@ func (c *Client) get(ctx context.Context, path string, q url.Values) ([]byte, er
 	if err != nil {
 		return nil, err
 	}
+	var sentAuth string
 	if c.PrivateKeyPEM != "" && c.Token != "" {
 		tok, err := signAPIKeyJWT(c.PrivateKeyPEM, c.Token, time.Minute)
 		if err != nil {
 			return nil, err
 		}
+		sentAuth = tok
 		req.Header.Set("Authorization", "Bearer "+tok)
 	} else if c.Token != "" {
+		sentAuth = c.Token
 		q.Set("api-key", c.Token)
 	}
 	if len(q) > 0 {
@@ -287,6 +290,7 @@ func (c *Client) get(ctx context.Context, path string, q url.Values) ([]byte, er
 	}
 	if res.StatusCode >= 400 {
 		msg := strings.TrimSpace(string(b))
+		msg = redactAuthSecrets(msg, c.Token, sentAuth)
 		if len(msg) > 240 {
 			msg = msg[:240] + "…"
 		}
@@ -297,6 +301,18 @@ func (c *Client) get(ctx context.Context, path string, q url.Values) ([]byte, er
 		return nil, fmt.Errorf("onestep %s: HTTP %s: %s", path, res.Status, msg)
 	}
 	return b, nil
+}
+
+// redactAuthSecrets strips API keys / JWTs that an upstream error body may echo.
+func redactAuthSecrets(msg string, secrets ...string) string {
+	for _, s := range secrets {
+		s = strings.TrimSpace(s)
+		if s == "" {
+			continue
+		}
+		msg = strings.ReplaceAll(msg, s, "[redacted]")
+	}
+	return msg
 }
 
 // resolve joins Base with a /v3/api/public path whether Base is the host or already includes that prefix.

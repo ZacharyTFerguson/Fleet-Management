@@ -94,22 +94,22 @@ func EvaluateHolds(in ComputeIn) ComputeOut {
 	live := liveDevices(in.Devices)
 	if len(live) == 0 {
 		holds = append(holds, model.Hold{Code: model.HoldNoDevice, Detail: "no live factory_id linked; dead boxes are not summed"})
-		return skip(holds)
+		return skipTrusted(holds, chosen)
 	}
 	miles, mh := pickMilesSince(live, in.MilesSince, chosen.At)
 	holds = append(holds, mh...)
 	if hasCode(holds, model.HoldMultiDeviceFight) || hasCode(holds, model.HoldDeviceAmbiguous) || hasCode(holds, model.HoldNoDriveStop) {
-		return skip(holds)
+		return skipTrusted(holds, chosen)
 	}
 
 	reading, lrHolds, err := LastReading(chosen.Odo, chosen.At, miles)
 	if err != nil {
 		holds = append(holds, model.Hold{Code: model.HoldNoDriveStop, Detail: err.Error()})
-		return skip(holds)
+		return skipTrusted(holds, chosen)
 	}
 	holds = append(holds, lrHolds...)
 	if hasCode(holds, model.HoldNoDriveStop) {
-		return skip(holds)
+		return skipTrusted(holds, chosen)
 	}
 
 	if in.StoredLastReading != nil && reading < *in.StoredLastReading && !in.OverrideLower {
@@ -117,7 +117,7 @@ func EvaluateHolds(in ComputeIn) ComputeOut {
 			Code:   model.HoldLowerReadingRefused,
 			Detail: fmt.Sprintf("computed %d is lower than stored %d; pass --override-lower to write", reading, *in.StoredLastReading),
 		})
-		return skip(holds)
+		return skipTrusted(holds, chosen)
 	}
 
 	out := ComputeOut{
@@ -348,6 +348,20 @@ func pickMilesSince(live []model.OneStepDevice, rows []model.DriveStopMiles, sin
 // skip is the HOLD path: no last_reading_* write, so operators cannot trust a flagged number.
 func skip(holds []model.Hold) ComputeOut {
 	return ComputeOut{SkipWrite: true, Holds: uniqueHolds(holds)}
+}
+
+// skipTrusted keeps the trusted Enterprise anchor available to SyncOneStep
+// while still refusing a Last Reading write. The first GPS fetch necessarily
+// starts with no stored miles-since, so dropping FillTime here would prevent
+// the fetch that resolves NO_DRIVESTOP.
+func skipTrusted(holds []model.Hold, t *trusted) ComputeOut {
+	out := skip(holds)
+	if t != nil {
+		out.EnterpriseOdo = t.Odo
+		out.FillTime = t.At
+		out.Source = t.Source
+	}
+	return out
 }
 
 // hasCode lets a later rule see that an earlier check already decided skip-write.

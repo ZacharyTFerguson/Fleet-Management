@@ -3,6 +3,8 @@ package app
 import (
 	"bytes"
 	"context"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -13,6 +15,7 @@ import (
 	"oilchange/internal/config"
 	"oilchange/internal/enterprise"
 	"oilchange/internal/model"
+	"oilchange/internal/onestep"
 	"oilchange/internal/store"
 )
 
@@ -85,6 +88,82 @@ func TestSyncAndComputeFileDrop(t *testing.T) {
 	out := buf.String()
 	if strings.Contains(out, "Change oil at 0") || strings.Contains(out, "Mileage due at") {
 		t.Fatal(out)
+	}
+}
+
+func TestSyncOneStepFetchesFromTrustedEnterpriseAnchor(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "onestep.sqlite")
+	st, err := store.Open("sqlite", p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := st.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
+	ctx := context.Background()
+	if err := st.UpsertCar(ctx, model.Car{EFleetsID: "CAR1", Nickname: "VA1"}); err != nil {
+		t.Fatal(err)
+	}
+	odo := 100000
+	trustedAt := time.Date(2026, 6, 1, 10, 0, 0, 0, time.UTC)
+	if err := st.UpsertFill(ctx, model.Fill{
+		EFleetsID:                    "CAR1",
+		ProviderCompanyVehicleNumber: "VA1",
+		Odometer:                     &odo,
+		ProviderTransactionTime:      trustedAt,
+		Source:                       model.SourceFuelDetails,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	carID := "CAR1"
+	if err := st.UpsertDevice(ctx, model.OneStepDevice{
+		FactoryID:          "FACT1",
+		DeviceID:           "DEV1",
+		LinkedCarEFleetsID: &carID,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v3/api/public/route/drive-stop" {
+			http.NotFound(w, r)
+			return
+		}
+		if got := r.URL.Query().Get("factory_id"); got != "FACT1" {
+			t.Errorf("factory_id %q", got)
+		}
+		if got := r.URL.Query().Get("from"); got != trustedAt.Format(time.RFC3339) {
+			t.Errorf("from %q", got)
+		}
+		_, _ = w.Write([]byte(`{"miles":12.4,"odometer":999999}`))
+	}))
+	defer srv.Close()
+	client := onestep.NewClient(srv.URL, "")
+	client.HTTP = srv.Client()
+
+	a := &App{Store: st}
+	if err := a.SyncOneStep(ctx, "", client); err != nil {
+		t.Fatal(err)
+	}
+	miles, err := st.ListMilesSince(ctx, []string{"FACT1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(miles) != 1 || miles[0].Miles != 12.4 || !miles[0].Since.Equal(trustedAt) {
+		t.Fatalf("stored drive-stop miles: %+v", miles)
+	}
+	code, err := a.Compute(ctx, false)
+	if err != nil || code != model.ExitOK {
+		t.Fatalf("compute code=%d err=%v", code, err)
+	}
+	car, err := st.CarByEFleets(ctx, "CAR1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if car.LastReadingMiles == nil || *car.LastReadingMiles != 100012 {
+		t.Fatalf("last reading must use Enterprise odo plus miles-since: %+v", car.LastReadingMiles)
 	}
 }
 

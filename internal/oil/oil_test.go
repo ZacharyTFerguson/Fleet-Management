@@ -378,6 +378,12 @@ func TestMissingDriveStopHold(t *testing.T) {
 	if !out.SkipWrite || !hasCode(out.Holds, model.HoldNoDriveStop) {
 		t.Fatalf("want NO_DRIVESTOP %+v", out)
 	}
+	if !out.FillTime.Equal(at(10)) || out.EnterpriseOdo != 100000 {
+		t.Fatalf("trusted anchor lost before GPS fetch: %+v", out)
+	}
+	if out.Reading != 0 {
+		t.Fatalf("HOLD must not expose a reading, got %d", out.Reading)
+	}
 }
 
 func TestJoinIsFactoryIDNotDisplayName(t *testing.T) {

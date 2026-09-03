@@ -2,10 +2,11 @@ package syncsupabase
 
 import (
 	"encoding/json"
-	"errors"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
+	"strings"
 	"sync"
 	"testing"
 )
@@ -167,27 +168,160 @@ func TestRefuseXRAY(t *testing.T) {
 	}
 }
 
-func TestPushSupabaseRejectsRedirect(t *testing.T) {
-	var destHits int
-	dest := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
-		destHits++
-	}))
-	defer dest.Close()
-	src := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, dest.URL+r.URL.RequestURI(), http.StatusTemporaryRedirect)
-	}))
-	defer src.Close()
-	_, err := Run(t.Context(), Config{
-		URL:         src.URL,
-		ServiceRole: "test-key",
+func TestValidateFleetTargetAllowlistAndXRAY(t *testing.T) {
+	t.Parallel()
+	ok := []string{
+		"https://hdtwfdjdvdzdxfdriyzn.supabase.co",
+		"https://HDTWFDJDVDZDXFDRIYZN.supabase.co/rest/v1/fleet_cars",
+		"https://hdtwfdjdvdzdxfdriyzn.supabase.co:443",
+		"https://hdtwfdjdvdzdxfdriyzn.supabase.co.",
+		"http://127.0.0.1:54321",
+		"http://localhost:54321",
+		"http://[::1]:54321",
+	}
+	for _, raw := range ok {
+		if err := refuseXRAY(raw); err != nil {
+			t.Fatalf("allow %q: %v", raw, err)
+		}
+	}
+
+	blocked := []string{
+		"https://chjqcznyxvtjbamttqdj.supabase.co",
+		"https://CHJQCZNYXVTJBAMTTQDJ.SUPABASE.CO/rest/v1/fleet_cars",
+		"http://chjqcznyxvtjbamttqdj.supabase.co",
+		"https://xray.supabase.co",
+		"https://example.supabase.co/?ref=chjqcznyxvtjbamttqdj",
+		"https://otherprojectref12345.supabase.co",
+		"http://hdtwfdjdvdzdxfdriyzn.supabase.co",
+		"https://evil.example",
+		"https://user:super-secret-service-role-token@hdtwfdjdvdzdxfdriyzn.supabase.co",
+		"ftp://hdtwfdjdvdzdxfdriyzn.supabase.co",
+	}
+	for _, raw := range blocked {
+		if err := refuseXRAY(raw); err == nil {
+			t.Fatalf("expected refuse for %q", raw)
+		}
+	}
+}
+
+func TestRunRefusesXRAYCaseVariantsWithoutNetwork(t *testing.T) {
+	path := t.TempDir() + "/cars.json"
+	out, err := Run(t.Context(), Config{
+		URL:         "https://CHJQCZNYXVTJBAMTTQDJ.supabase.co",
+		ServiceRole: "super-secret-service-role-token",
+		MirrorPath:  path,
 	}, []CarRow{{PDIID: "PDI-0001", EFleetsID: "CAR1"}}, nil, nil)
 	if err == nil {
-		t.Fatal("expected redirect refusal")
+		t.Fatal("expected XRAY refuse")
 	}
-	if !errors.Is(err, errRedirectRefused) {
-		t.Fatalf("err=%v", err)
+	if !strings.Contains(err.Error(), "XRAY") {
+		t.Fatalf("want XRAY in error, got %v", err)
 	}
-	if destHits != 0 {
-		t.Fatalf("followed redirect to XRAY-capable host: destHits=%d", destHits)
+	if strings.Contains(err.Error(), "super-secret-service-role-token") {
+		t.Fatal("leaked service role")
+	}
+	if out == nil || out.Source != "mock-mirror" {
+		t.Fatalf("fallback snapshot: %+v", out)
+	}
+}
+
+func TestRunRefusesOtherSupabaseProject(t *testing.T) {
+	_, err := Run(t.Context(), Config{
+		URL:         "https://abcdefghijklmnopqr.supabase.co",
+		ServiceRole: "super-secret-service-role-token",
+	}, []CarRow{{PDIID: "PDI-0001"}}, nil, nil)
+	if err == nil {
+		t.Fatal("expected non-fleet refuse")
+	}
+	if strings.Contains(err.Error(), "super-secret-service-role-token") {
+		t.Fatal("leaked service role")
+	}
+}
+
+func TestRedirectToXRAYRefused(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "https://CHJQCZNYXVTJBAMTTQDJ.supabase.co/rest/v1/fleet_cars", http.StatusTemporaryRedirect)
+	}))
+	defer srv.Close()
+	path := t.TempDir() + "/cars.json"
+	_, err := Run(t.Context(), Config{
+		URL:         srv.URL,
+		ServiceRole: "super-secret-service-role-token",
+		MirrorPath:  path,
+	}, []CarRow{{PDIID: "PDI-0001", EFleetsID: "CAR1"}}, nil, nil)
+	if err == nil {
+		t.Fatal("expected redirect refuse")
+	}
+	if !strings.Contains(err.Error(), "XRAY") {
+		t.Fatalf("want XRAY refuse, got %v", err)
+	}
+	if strings.Contains(err.Error(), "super-secret-service-role-token") {
+		t.Fatal("leaked service role")
+	}
+}
+
+func TestRedirectToNonFleetHostRefused(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "https://evil.example/steal", http.StatusTemporaryRedirect)
+	}))
+	defer srv.Close()
+	_, err := Run(t.Context(), Config{
+		URL:        srv.URL,
+		SyncSecret: "super-secret-sync-token-value",
+		MirrorPath: t.TempDir() + "/cars.json",
+	}, []CarRow{{PDIID: "PDI-0001", EFleetsID: "CAR1"}}, nil, nil)
+	if err == nil {
+		t.Fatal("expected redirect refuse")
+	}
+	if strings.Contains(err.Error(), "super-secret-sync-token-value") {
+		t.Fatal("leaked sync token")
+	}
+}
+
+func TestServiceRoleRedactedFromHTTPError(t *testing.T) {
+	const secret = "super-secret-service-role-token"
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, "invalid apikey "+secret+" also "+url.QueryEscape(secret), http.StatusUnauthorized)
+	}))
+	defer srv.Close()
+	_, err := Run(t.Context(), Config{
+		URL:         srv.URL,
+		ServiceRole: secret,
+		MirrorPath:  t.TempDir() + "/cars.json",
+	}, []CarRow{{PDIID: "PDI-0001", EFleetsID: "CAR1"}}, nil, nil)
+	if err == nil {
+		t.Fatal("expected remote error")
+	}
+	if strings.Contains(err.Error(), secret) {
+		t.Fatal("leaked service role")
+	}
+	if !strings.Contains(err.Error(), "[redacted]") {
+		t.Fatalf("expected redaction marker: %v", err)
+	}
+}
+
+func TestSyncSecretRedactedFromEdgeHTTPError(t *testing.T) {
+	const secret = "super-secret-sync-token-value"
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !strings.Contains(r.URL.Path, "fleet-sync") {
+			http.NotFound(w, r)
+			return
+		}
+		http.Error(w, "bad token "+secret, http.StatusForbidden)
+	}))
+	defer srv.Close()
+	_, err := Run(t.Context(), Config{
+		URL:        srv.URL,
+		SyncSecret: secret,
+		MirrorPath: t.TempDir() + "/cars.json",
+	}, []CarRow{{PDIID: "PDI-0001", EFleetsID: "CAR1"}}, nil, nil)
+	if err == nil {
+		t.Fatal("expected remote error")
+	}
+	if strings.Contains(err.Error(), secret) {
+		t.Fatal("leaked sync token")
+	}
+	if !strings.Contains(err.Error(), "[redacted]") {
+		t.Fatalf("expected redaction marker: %v", err)
 	}
 }

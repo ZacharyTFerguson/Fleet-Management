@@ -1,4 +1,4 @@
-factory_id,device_id,efleets_id,display_name
-FACT1,DEV1,27TESTA,VA19
-FACTDEAD,DEVOLD,27TESTA,old box
-TYLERBOX,DEVX,27TESTA,Tyler spare
+factory_id,device_id,efleets_id,display_name,dead
+FACT1,DEV1,27TESTA,VA19,0
+FACTDEAD,DEVOLD,27TESTA,old box,1
+TYLERBOX,DEVX,27TESTA,Tyler spare,0

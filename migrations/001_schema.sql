@@ -54,12 +54,19 @@ CREATE TABLE shop_ros (
   UNIQUE (efleets_id, at, odometer)
 );
 
+-- OneStep GPS boxes. Join on factory_id only; display_name is never a join key.
 CREATE TABLE onestep_devices (
   factory_id TEXT PRIMARY KEY,
   device_id TEXT NOT NULL,
   display_name TEXT,
   linked_car_efleets_id TEXT REFERENCES cars(efleets_id),
-  dead BOOLEAN NOT NULL DEFAULT false
+  linked_car_pdi_id TEXT,
+  dead BOOLEAN NOT NULL DEFAULT false,
+  active BOOLEAN NOT NULL DEFAULT true,
+  retired_at TIMESTAMPTZ,
+  last_synced_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 -- GPS trip sum after a known second. Never stores device odometer. Ready for fleet-oil.

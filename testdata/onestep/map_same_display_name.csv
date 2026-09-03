@@ -1,0 +1,3 @@
+factory_id,device_id,efleets_id,display_name,dead
+SAME_A,DEV_A,27TESTA,Shared Label,0
+SAME_B,DEV_B,,Shared Label,0

@@ -32,3 +32,10 @@ CREATE POLICY deny_anon_hold ON hold_events FOR ALL TO anon USING (false);
 CREATE POLICY deny_authenticated_hold ON hold_events FOR ALL TO authenticated USING (false);
 CREATE POLICY deny_anon_oc ON oil_changes FOR ALL TO anon USING (false);
 CREATE POLICY deny_authenticated_oc ON oil_changes FOR ALL TO authenticated USING (false);
+
+ALTER TABLE card_transactions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE card_pairings ENABLE ROW LEVEL SECURITY;
+CREATE POLICY deny_anon_cardtx ON card_transactions FOR ALL TO anon USING (false);
+CREATE POLICY deny_authenticated_cardtx ON card_transactions FOR ALL TO authenticated USING (false);
+CREATE POLICY deny_anon_cardpair ON card_pairings FOR ALL TO anon USING (false);
+CREATE POLICY deny_authenticated_cardpair ON card_pairings FOR ALL TO authenticated USING (false);

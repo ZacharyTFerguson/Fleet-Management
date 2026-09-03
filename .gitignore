@@ -2,6 +2,7 @@
 .env
 .env.*
 !.env.example
+!web/.env.example
 oilchange.env
 secrets/oilchange.env
 onestep.env
@@ -16,8 +17,12 @@ onestep*.local
 *.sqlite-journal
 *.dcm
 /vendor/
+/bin/
+/agent-tools/
 node_modules/
 data/runtime/
+supabase/.temp/
 *.log
 .DS_Store
 Thumbs.db
+web/tsconfig.tsbuildinfo

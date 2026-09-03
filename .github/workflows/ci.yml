@@ -26,6 +26,11 @@ jobs:
       - name: go test
         if: steps.detect.outputs.present == 'true'
         run: go test ./...
+      # Store/compute/sync share one SQLite file across CLI ticks; the race
+      # detector guards the HOLD vs Last Reading and PDI allocation paths.
+      - name: go test -race (store, app, sync)
+        if: steps.detect.outputs.present == 'true'
+        run: go test -race -count=1 ./internal/store/... ./internal/app/... ./internal/syncsupabase/...
       - name: Skip (no go.mod)
         if: steps.detect.outputs.present != 'true'
         run: echo "No go.mod on this branch; skipping Go tests."

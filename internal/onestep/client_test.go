@@ -6,8 +6,10 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
+	"errors"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -40,7 +42,6 @@ func TestDriveStopSumsMilesIgnoresOdometerJSON(t *testing.T) {
 	}
 }
 
-
 func TestDriveStopRejectsRowsWithoutDistance(t *testing.T) {
 	_, err := sumDriveStop([]byte(`{"stops":[{"odometer":999999}]}`))
 	if err == nil {
@@ -52,9 +53,35 @@ func TestDriveStopRejectsRowsWithoutDistance(t *testing.T) {
 	}
 }
 
+func TestDriveStopRejectsMalformedMiles(t *testing.T) {
+	for _, body := range []string{
+		`{"stops":[{"miles":-1}]}`,
+		`{"stops":[{"miles":"NaN"}]}`,
+		`{"stops":[{"distance":"Inf"}]}`,
+		`{"stops":[{"distance_miles":"-Inf"}]}`,
+		`{"stops":[{"miles":1},{"distance":"NaN"}]}`,
+	} {
+		if n, err := sumDriveStop([]byte(body)); err == nil {
+			t.Errorf("sumDriveStop(%s) = %v, want error", body, n)
+		}
+	}
+}
+
 func TestDriveStopRejectsNonObjectRows(t *testing.T) {
 	if _, err := sumDriveStop([]byte(`{"stops":[null]}`)); err == nil {
 		t.Fatal("null stop row must not become zero miles")
+	}
+}
+
+func TestDriveStopDoesNotUseRootDistanceOrOdometer(t *testing.T) {
+	for _, body := range []string{
+		`{"distance":12.5}`,
+		`{"odometer":123456}`,
+		`{"distance":12.5,"odometer":123456}`,
+	} {
+		if n, err := sumDriveStop([]byte(body)); err == nil {
+			t.Errorf("sumDriveStop(%s) = %v, want error", body, n)
+		}
 	}
 }
 
@@ -65,6 +92,39 @@ func TestParseDevicesResultList(t *testing.T) {
 	}
 	if len(devs) != 1 || devs[0].FactoryID != "FACT1" || devs[0].DeviceID != "DEV1" {
 		t.Fatalf("%+v", devs)
+	}
+}
+
+func TestParseDevicesDoesNotPromoteGenericID(t *testing.T) {
+	devs, err := parseDevices([]byte(`[{"id":"history-device-id","display_name":"VA19"}]`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(devs) != 0 {
+		t.Fatalf("generic id became factory_id: %+v", devs)
+	}
+}
+
+func TestParseDevicesMarksInactiveAndDeadNonLive(t *testing.T) {
+	devs, err := parseDevices([]byte(`[
+		{"factory_id":"INACTIVE","active":false},
+		{"factory_id":"DEAD","active":true,"dead":true},
+		{"factory_id":"LIVE"}
+	]`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(devs) != 3 {
+		t.Fatalf("devices %+v", devs)
+	}
+	if !devs[0].Dead {
+		t.Fatalf("inactive device parsed as live: %+v", devs[0])
+	}
+	if !devs[1].Dead {
+		t.Fatalf("dead device parsed as live: %+v", devs[1])
+	}
+	if devs[2].Dead {
+		t.Fatalf("missing active flag should default live: %+v", devs[2])
 	}
 }
 
@@ -135,6 +195,34 @@ func TestListDevicesFactoryID(t *testing.T) {
 	}
 	if len(devs) != 1 || devs[0].FactoryID != "FACT1" {
 		t.Fatalf("%+v", devs)
+	}
+}
+
+func TestListDevicesSkipsIDOnlyEndpoint(t *testing.T) {
+	var paths []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		paths = append(paths, r.URL.Path)
+		switch r.URL.Path {
+		case "/v3/api/public/device-info":
+			_, _ = w.Write([]byte(`[{"id":"history-only"}]`))
+		case "/v3/api/public/device":
+			_, _ = w.Write([]byte(`[{"factory_id":"FACTORY","device_id":"DEVICE"}]`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer srv.Close()
+	client := NewClient(srv.URL, "token")
+	client.HTTP = srv.Client()
+	devs, err := client.ListDevices(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(devs) != 1 || devs[0].FactoryID != "FACTORY" {
+		t.Fatalf("devices %+v", devs)
+	}
+	if got := strings.Join(paths, ","); got != "/v3/api/public/device-info,/v3/api/public/device" {
+		t.Fatalf("paths %s", got)
 	}
 }
 
@@ -221,5 +309,81 @@ func TestHTTPErrorBodyRedactsJWT(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "[redacted]") {
 		t.Fatalf("expected redaction marker: %v", err)
+	}
+}
+
+func TestHTTPErrorRedactsURLEncodedAuthAndQuery(t *testing.T) {
+	token := "secret key+/="
+	encoded := url.QueryEscape(token)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "denied "+encoded+" at https://example.test/device?foo=bar&api-key="+encoded, http.StatusUnauthorized)
+	}))
+	defer srv.Close()
+	client := NewClient(srv.URL, token)
+	client.HTTP = srv.Client()
+	_, err := client.ListDevices(context.Background())
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	for _, leaked := range []string{token, encoded, "foo=bar", "api-key="} {
+		if strings.Contains(err.Error(), leaked) {
+			t.Fatalf("error leaked %q: %v", leaked, err)
+		}
+	}
+	if !strings.Contains(err.Error(), "[redacted]") {
+		t.Fatalf("expected redaction marker: %v", err)
+	}
+}
+
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return f(req)
+}
+
+func TestTransportURLErrorDoesNotLeakRequestQuery(t *testing.T) {
+	token := "transport key+/="
+	client := NewClient("https://example.test", token)
+	client.HTTP = &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		return nil, errors.New("dial failed for " + req.URL.String())
+	})}
+	_, err := client.ListDevices(context.Background())
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	for _, leaked := range []string{token, url.QueryEscape(token), "api-key=", "latest_point="} {
+		if strings.Contains(err.Error(), leaked) {
+			t.Fatalf("transport error leaked %q: %v", leaked, err)
+		}
+	}
+}
+
+func TestAuthenticatedRedirectIsNotFollowed(t *testing.T) {
+	token := "redirect-secret"
+	sinkHits := 0
+	sink := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		sinkHits++
+		if r.Header.Get("Authorization") != "" || r.URL.Query().Get("api-key") != "" {
+			t.Errorf("redirect target received auth: header=%q query=%q", r.Header.Get("Authorization"), r.URL.RawQuery)
+		}
+		_, _ = w.Write([]byte(`[{"factory_id":"STOLEN"}]`))
+	}))
+	defer sink.Close()
+	source := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, sink.URL+"/capture?api-key="+url.QueryEscape(token), http.StatusFound)
+	}))
+	defer source.Close()
+
+	client := NewClient(source.URL, token)
+	client.HTTP = source.Client()
+	_, err := client.ListDevices(context.Background())
+	if err == nil {
+		t.Fatal("expected redirect refusal")
+	}
+	if sinkHits != 0 {
+		t.Fatalf("followed authenticated redirect %d times", sinkHits)
+	}
+	if strings.Contains(err.Error(), token) || strings.Contains(err.Error(), "api-key=") {
+		t.Fatalf("redirect error leaked auth: %v", err)
 	}
 }

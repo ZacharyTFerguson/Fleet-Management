@@ -6,9 +6,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"net/url"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -64,6 +66,9 @@ type deviceJSON struct {
 	ID          string `json:"id"`
 	DisplayName string `json:"display_name"`
 	Name        string `json:"name"`
+	Active      *bool  `json:"active"`
+	IsActive    *bool  `json:"is_active"`
+	Dead        bool   `json:"dead"`
 	Odometer    any    `json:"odometer"` // present on some payloads; must not be used as Last Reading
 }
 
@@ -127,16 +132,30 @@ func parseDevices(b []byte) ([]model.OneStepDevice, error) {
 	}
 	var out []model.OneStepDevice
 	for _, d := range raw {
-		fid := first(d.FactoryID, d.FactoryId, d.ID)
+		// A generic id is an API/history identity, not the hardware factory_id.
+		// Skipping id-only rows lets ListDevices try the actual inventory endpoint.
+		fid := first(d.FactoryID, d.FactoryId)
 		did := first(d.DeviceID, d.DeviceId, d.ID)
 		name := first(d.DisplayName, d.Name)
 		if fid == "" {
 			continue
 		}
+		active := true
+		if d.Active != nil && !*d.Active {
+			active = false
+		}
+		if d.IsActive != nil && !*d.IsActive {
+			active = false
+		}
+		if d.Dead {
+			active = false
+		}
 		out = append(out, model.OneStepDevice{
 			FactoryID:   fid,
 			DeviceID:    did,
 			DisplayName: name,
+			// This branch's model uses Dead as its only non-live state.
+			Dead: d.Dead || !active,
 		})
 	}
 	return out, nil
@@ -180,33 +199,32 @@ func sumDriveStop(b []byte) (float64, error) {
 		if err2 := json.Unmarshal(b, &arr); err2 != nil {
 			return 0, err
 		}
-		if sum, ok := sumMaps(arr); ok {
-			return sum, nil
-		}
-		return 0, fmt.Errorf("drive-stop JSON rows had no miles")
+		return sumMaps(arr)
 	}
 	for _, k := range []string{"stops", "routes", "data", "trips"} {
 		if v, ok := obj[k]; ok {
 			if sl, ok := v.([]any); ok {
 				var maps []map[string]any
-				for _, x := range sl {
+				for i, x := range sl {
 					m, ok := x.(map[string]any)
 					if !ok {
-						return 0, fmt.Errorf("drive-stop JSON %s contains a non-object row", k)
+						return 0, fmt.Errorf("drive-stop JSON %s row %d is not an object", k, i)
 					}
 					maps = append(maps, m)
 				}
-				if sum, ok := sumMaps(maps); ok {
-					return sum, nil
+				sum, err := sumMaps(maps)
+				if err != nil {
+					return 0, fmt.Errorf("drive-stop JSON %s: %w", k, err)
 				}
-				return 0, fmt.Errorf("drive-stop JSON %s rows had no miles", k)
+				return sum, nil
 			}
 		}
 	}
-	if n, ok := asFloat(obj["miles"]); ok {
-		return n, nil
-	}
-	if n, ok := asFloat(obj["distance"]); ok {
+	if v, ok := obj["miles"]; ok {
+		n, valid := asFloat(v)
+		if !valid {
+			return 0, fmt.Errorf("drive-stop JSON root miles is not a finite non-negative number")
+		}
 		return n, nil
 	}
 	return 0, fmt.Errorf("drive-stop JSON had no miles")
@@ -214,44 +232,60 @@ func sumDriveStop(b []byte) (float64, error) {
 
 // sumMaps is GPS/trip distance, not a device odometer reading. An empty list
 // is a measured zero; non-empty rows without distance are a malformed response.
-func sumMaps(maps []map[string]any) (float64, bool) {
+func sumMaps(maps []map[string]any) (float64, error) {
 	var sum float64
-	found := len(maps) == 0
-	for _, m := range maps {
-		if n, ok := asFloat(m["miles"]); ok {
+	for i, m := range maps {
+		found := false
+		for _, key := range []string{"miles", "distance", "distance_miles"} {
+			v, exists := m[key]
+			if !exists {
+				continue
+			}
+			n, ok := asFloat(v)
+			if !ok {
+				return 0, fmt.Errorf("row %d %s is not a finite non-negative number", i, key)
+			}
 			sum += n
+			if math.IsNaN(sum) || math.IsInf(sum, 0) {
+				return 0, fmt.Errorf("row %d makes total miles non-finite", i)
+			}
 			found = true
-			continue
+			break
 		}
-		if n, ok := asFloat(m["distance"]); ok {
-			sum += n
-			found = true
-			continue
-		}
-		if n, ok := asFloat(m["distance_miles"]); ok {
-			sum += n
-			found = true
+		if !found {
+			return 0, fmt.Errorf("row %d had no miles", i)
 		}
 	}
-	return sum, found
+	return sum, nil
 }
 
-// asFloat accepts JSON number-or-string miles without defaulting missing to zero (zero would invent a trip).
+// asFloat accepts only finite, non-negative JSON number-or-string miles.
 func asFloat(v any) (float64, bool) {
+	var n float64
 	switch t := v.(type) {
 	case float64:
-		return t, true
+		n = t
 	case json.Number:
 		f, err := t.Float64()
-		return f, err == nil
+		if err != nil {
+			return 0, false
+		}
+		n = f
 	case string:
 		f, err := strconv.ParseFloat(t, 64)
-		return f, err == nil
+		if err != nil {
+			return 0, false
+		}
+		n = f
 	case int:
-		return float64(t), true
+		n = float64(t)
 	default:
 		return 0, false
 	}
+	if n < 0 || math.IsNaN(n) || math.IsInf(n, 0) {
+		return 0, false
+	}
+	return n, true
 }
 
 // get is the only HTTP in this package; oil.LastReading never calls it.
@@ -262,13 +296,13 @@ func (c *Client) get(ctx context.Context, path string, q url.Values) ([]byte, er
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.resolve(path), nil)
 	if err != nil {
-		return nil, err
+		return nil, safeHTTPError(path, "build request", err, c.Token)
 	}
 	var sentAuth string
 	if c.PrivateKeyPEM != "" && c.Token != "" {
 		tok, err := signAPIKeyJWT(c.PrivateKeyPEM, c.Token, time.Minute)
 		if err != nil {
-			return nil, err
+			return nil, safeHTTPError(path, "sign authentication", err, c.Token)
 		}
 		sentAuth = tok
 		req.Header.Set("Authorization", "Bearer "+tok)
@@ -279,18 +313,28 @@ func (c *Client) get(ctx context.Context, path string, q url.Values) ([]byte, er
 	if len(q) > 0 {
 		req.URL.RawQuery = q.Encode()
 	}
-	res, err := c.HTTP.Do(req)
+	httpClient := c.HTTP
+	if httpClient == nil {
+		httpClient = http.DefaultClient
+	}
+	redirectSafeClient := *httpClient
+	// Authentication must never be replayed to a Location target. Returning the
+	// 3xx response also keeps redirect URLs out of url.Error values.
+	redirectSafeClient.CheckRedirect = func(_ *http.Request, _ []*http.Request) error {
+		return http.ErrUseLastResponse
+	}
+	res, err := redirectSafeClient.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, safeHTTPError(path, "request failed", err, c.Token, sentAuth)
 	}
 	defer res.Body.Close()
 	b, err := io.ReadAll(res.Body)
 	if err != nil {
-		return nil, err
+		return nil, safeHTTPError(path, "read response", err, c.Token, sentAuth)
 	}
-	if res.StatusCode >= 400 {
+	if res.StatusCode >= 300 {
 		msg := strings.TrimSpace(string(b))
-		msg = redactAuthSecrets(msg, c.Token, sentAuth)
+		msg = sanitizeAuthError(msg, c.Token, sentAuth)
 		if len(msg) > 240 {
 			msg = msg[:240] + "…"
 		}
@@ -303,16 +347,57 @@ func (c *Client) get(ctx context.Context, path string, q url.Values) ([]byte, er
 	return b, nil
 }
 
-// redactAuthSecrets strips API keys / JWTs that an upstream error body may echo.
-func redactAuthSecrets(msg string, secrets ...string) string {
+var (
+	errorURLQuery = regexp.MustCompile(`(?i)(https?://[^\s?#"'<>]+)(?:\?|%3f)[^\s#"'<>]*`)
+	errorJWT      = regexp.MustCompile(`(?i)\beyJ[A-Za-z0-9_-]*(?:\.|%2e)[A-Za-z0-9_-]+(?:\.|%2e)[A-Za-z0-9_-]+\b`)
+	errorBearer   = regexp.MustCompile(`(?i)\bbearer(?:\s+|%20+)[A-Za-z0-9._~+/=%-]+`)
+	errorAuthPair = regexp.MustCompile(`(?i)\b(api[-_]?key|access[-_]?token|authorization)(?:\s*[:=]\s*|%3[ad])[^\s"'<>]+`)
+)
+
+func safeHTTPError(path, action string, err error, secrets ...string) error {
+	msg := "unknown error"
+	if err != nil {
+		msg = sanitizeAuthError(err.Error(), secrets...)
+	}
+	return fmt.Errorf("onestep %s: %s: %s", path, action, msg)
+}
+
+// sanitizeAuthError strips request query strings and raw, percent-encoded, or
+// generic credential echoes from both HTTP bodies and transport/url.Error text.
+func sanitizeAuthError(msg string, secrets ...string) string {
 	for _, s := range secrets {
-		s = strings.TrimSpace(s)
 		if s == "" {
 			continue
 		}
-		msg = strings.ReplaceAll(msg, s, "[redacted]")
+		msg = encodedSecretPattern(s).ReplaceAllString(msg, "[redacted]")
 	}
+	msg = errorURLQuery.ReplaceAllString(msg, `$1?[redacted]`)
+	msg = errorJWT.ReplaceAllString(msg, "[redacted]")
+	msg = errorBearer.ReplaceAllString(msg, "Bearer [redacted]")
+	msg = errorAuthPair.ReplaceAllStringFunc(msg, func(pair string) string {
+		if i := strings.IndexAny(pair, ":="); i >= 0 {
+			return pair[:i+1] + "[redacted]"
+		}
+		if i := strings.Index(strings.ToLower(pair), "%3"); i >= 0 {
+			return pair[:i] + "=[redacted]"
+		}
+		return "[redacted]"
+	})
 	return msg
+}
+
+// encodedSecretPattern matches a secret even when an echo percent-encodes only
+// some bytes or uses '+' for spaces.
+func encodedSecretPattern(secret string) *regexp.Regexp {
+	parts := make([]string, 0, len(secret))
+	for _, b := range []byte(secret) {
+		alternatives := []string{regexp.QuoteMeta(string([]byte{b})), fmt.Sprintf("%%%02X", b)}
+		if b == ' ' {
+			alternatives = append(alternatives, `\+`)
+		}
+		parts = append(parts, "(?:"+strings.Join(alternatives, "|")+")")
+	}
+	return regexp.MustCompile("(?i)" + strings.Join(parts, ""))
 }
 
 // resolve joins Base with a /v3/api/public path whether Base is the host or already includes that prefix.

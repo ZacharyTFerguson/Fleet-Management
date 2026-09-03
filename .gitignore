@@ -3,6 +3,7 @@
 .env.*
 !.env.example
 !web/.env.example
+!web/.env.local.example
 oilchange.env
 secrets/oilchange.env
 onestep.env

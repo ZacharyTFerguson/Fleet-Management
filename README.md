@@ -27,6 +27,7 @@ Sit-still / important-location Node app lives in a separate PR (`cursor/importan
 | `report` | `[--interval 5000] [--due-within N] [--out PATH.csv]` |
 | `holds` | open HOLDs |
 | `sync` | Push local SQLite cars/holds to **ZacharyTFerguson's Project** (`hdtwfdjdvdzdxfdriyzn`, table `fleet_cars`) when `SUPABASE_URL` + (`SUPABASE_SERVICE_ROLE` or `SUPABASE_SYNC_SECRET`) are set, and refresh `web/data/cars.json`. `[--interval 5m]` for throughout-the-day refresh. Never targets XRAY. |
+| `serve` | Host Oil Desk UI + `/api/cars` on `127.0.0.1:4739` from the **embedded** static export (`web/out`). **No npm/Node required.** `[--addr]` `[--mirror]` `[--web-dir]`. |
 | `cards rebuild` | ingest optional `--fuel-details` then score every swipe into `card_pairings` (never writes Last Reading) |
 | `cards suspect` | cards whose latest Enterprise Vehicle is not the swipe-majority car |
 | `cards trace` | `--card ID [--window-days 2]` other cars at the same station on nearby days |
@@ -36,22 +37,23 @@ Sit-still / important-location Node app lives in a separate PR (`cursor/importan
 Exit: `0` ok, `1` error, `2` compute finished with open HOLDs (report still allowed).
 
 
-## Run on desktop (backend + Oil Desk)
+## Run on desktop (no npm)
 
 **Supabase target:** [ZacharyTFerguson's Project](https://supabase.com/dashboard/project/hdtwfdjdvdzdxfdriyzn) — ref `hdtwfdjdvdzdxfdriyzn`, host `https://hdtwfdjdvdzdxfdriyzn.supabase.co` (us-east-2). Fleet oil uses `fleet_*` tables only. **Never** write oil/fleet data to XRAY (`chjqcznyxvtjbamttqdj`).
 
+Desktop only needs **Go** (or a prebuilt `oilchange` binary) plus env files. The Oil Desk UI is a **committed static export** under `web/out`, embedded into the binary. You do **not** need Node/npm on the machine that runs the desk.
+
 ```bash
-# 0) One-time: copy env templates (fill secrets locally; never commit them)
+# 0) One-time: copy env template (fill secrets locally; never commit them)
 cp oilchange.env.example oilchange.env
-cp web/.env.local.example web/.env.local
-# Edit oilchange.env: SUPABASE_URL + SUPABASE_SERVICE_ROLE or SUPABASE_SYNC_SECRET
-# Edit web/.env.local: NEXT_PUBLIC_SUPABASE_URL + NEXT_PUBLIC_SUPABASE_ANON_KEY
-# Without secrets the CLI still writes a mock mirror and the UI serves /api/cars from it.
+# Edit oilchange.env: OILCHANGE_DB, optional SUPABASE_URL + SUPABASE_SERVICE_ROLE or SUPABASE_SYNC_SECRET
+# Without secrets the CLI still writes a mock mirror and serve reads /api/cars from it.
 
-# 1) Build the backend binary
+# 1) Build the backend (embeds web/out — no npm)
 go build -o bin/oilchange ./cmd/oilchange
+# Or download a release binary for your OS and skip this step.
 
-# 2) Load sample Enterprise CSVs → SQLite, compute, push first rows to Supabase
+# 2) Load sample Enterprise CSVs → SQLite, compute, refresh the mirror
 export OILCHANGE_DB=./oilchange.sqlite
 ./bin/oilchange sync-enterprise \
   --vehicles testdata/enterprise/fleetsummary.csv \
@@ -59,24 +61,37 @@ export OILCHANGE_DB=./oilchange.sqlite
   --shop-ro testdata/enterprise/maintenance.csv
 ./bin/oilchange compute || true   # exit 2 with open HOLDs is OK without OneStep miles
 ./bin/oilchange sync --mirror web/data/cars.json
-# Optional all-day refresh: ./bin/oilchange sync --interval 5m --mirror web/data/cars.json
+# Optional all-day refresh (separate terminal):
+# ./bin/oilchange sync --interval 5m --mirror web/data/cars.json
 
-# 3) Start Oil Desk (http://127.0.0.1:4739)
-cd web && npm install && npm run dev
+# 3) Start Oil Desk (http://127.0.0.1:4739) — static UI + /api/cars, no npm
+./bin/oilchange serve --addr 127.0.0.1:4739 --mirror web/data/cars.json
 ```
 
 Binary path after build: `bin/oilchange`. Alias: `sync-supabase` ≡ `sync`.
+
+**Windows / macOS:** same commands after `go build` on that OS (`GOOS=windows go build -o bin/oilchange.exe ./cmd/oilchange`, etc.). Prebuilt assets are already in the repo; `go build` does not invoke npm.
+
+### Optional: Next.js cloud/dev (npm only when editing the UI)
+
+```bash
+cp web/.env.local.example web/.env.local
+# NEXT_PUBLIC_SUPABASE_* for live PostgREST reads in next dev
+cd web && npm ci && npm run dev          # App Router + /api/cars in Node
+# Rebuild the committed static export after UI changes:
+# cd web && npm ci && npm run build:static && cd .. && go build -o bin/oilchange ./cmd/oilchange
+```
 
 ### Env
 
 | Where | Vars |
 |---|---|
 | CLI (`oilchange.env`) | `OILCHANGE_DB`, `SUPABASE_URL`, then either `SUPABASE_SERVICE_ROLE` (PostgREST upsert into `fleet_cars`) or `SUPABASE_SYNC_SECRET` (`/functions/v1/fleet-sync`). Optional `FLEET_MIRROR_PATH`. |
-| Web (`web/.env.local`) | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`. Never put service role / sync secret in `NEXT_PUBLIC_*`. Templates: `oilchange.env.example`, `web/.env.local.example`. |
+| Web (`web/.env.local`) | Only needed for `npm run dev`. `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`. Never put service role / sync secret in `NEXT_PUBLIC_*`. Templates: `oilchange.env.example`, `web/.env.local.example`. |
 
-Without Supabase credentials the CLI writes a **mock mirror** at `web/data/cars.json` and the UI serves that via `/api/cars`. With credentials, sync upserts into `fleet_cars`. Schema/RLS: `supabase/migrations/` + `migrations/005_shared_project_fleet_prefix.sql` (anon SELECT on `fleet_cars` only).
+Without Supabase credentials the CLI writes a **mock mirror** at `web/data/cars.json` and `oilchange serve` (or Next `/api/cars`) serves that. With credentials, sync upserts into `fleet_cars`. Schema/RLS: `supabase/migrations/` + `migrations/005_shared_project_fleet_prefix.sql` (anon SELECT on `fleet_cars` only).
 
-Cadence: `oilchange sync --interval 5m` keeps the mirror (and Supabase) fresh while the UI polls (`NEXT_PUBLIC_REFRESH_MS`, default 120s).
+Cadence: `oilchange sync --interval 5m` keeps the mirror (and Supabase) fresh while the UI polls (`NEXT_PUBLIC_REFRESH_MS`, default 120s; baked into the static export at build time).
 
 ## Secrets (never commit)
 

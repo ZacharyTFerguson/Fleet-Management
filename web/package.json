@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev -H 127.0.0.1 -p 4739",
     "build": "next build",
+    "build:static": "bash scripts/static-export.sh",
     "start": "next start -H 127.0.0.1 -p 4739",
     "lint": "eslint ."
   },

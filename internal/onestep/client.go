@@ -286,7 +286,15 @@ func (c *Client) get(ctx context.Context, path string, q url.Values) ([]byte, er
 		return nil, err
 	}
 	if res.StatusCode >= 400 {
-		return nil, fmt.Errorf("onestep %s: HTTP %s", path, res.Status)
+		msg := strings.TrimSpace(string(b))
+		if len(msg) > 240 {
+			msg = msg[:240] + "…"
+		}
+		// Never echo query strings (api-key) or Authorization material.
+		if msg == "" {
+			return nil, fmt.Errorf("onestep %s: HTTP %s", path, res.Status)
+		}
+		return nil, fmt.Errorf("onestep %s: HTTP %s: %s", path, res.Status, msg)
 	}
 	return b, nil
 }

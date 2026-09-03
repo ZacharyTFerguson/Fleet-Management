@@ -12,6 +12,7 @@ type Config struct {
 	SQLitePath        string
 	SupabaseURL       string
 	ServiceRole       string
+	SyncSecret        string // SUPABASE_SYNC_SECRET for fleet-sync edge function
 	OneStepToken      string
 	OneStepPrivateKey string
 	OneStepPublicKey  string
@@ -36,9 +37,15 @@ func Load() Config {
 		SQLitePath:        getenv("OILCHANGE_DB", ""),
 		SupabaseURL:       os.Getenv("SUPABASE_URL"),
 		ServiceRole:       os.Getenv("SUPABASE_SERVICE_ROLE"),
-		OneStepToken:      firstEnv("ONESTEP_API_TOKEN", "ONESTEP_API_KEY", "ONE_STEP_FULL_API_KEY"),
-		OneStepPrivateKey: firstNonEmpty(firstEnv("ONESTEP_API_PRIVATEKEY", "ONESTEP_API_PRIVATE_KEY"), readEnvFile("ONESTEP_PEM_PATH")),
-		OneStepPublicKey:  firstEnv("ONESTEP_API_PUBLIC_KEY", "ONESTEP_API_PUBLICKEY"),
+		SyncSecret:        os.Getenv("SUPABASE_SYNC_SECRET"),
+		// Cloud Agent secret names: OneStepAPIKEYTobeSigned (API key) + OneStepAPIKEY (PEM for JWS).
+		OneStepToken: firstEnv("ONESTEP_API_TOKEN", "ONESTEP_API_KEY", "ONE_STEP_FULL_API_KEY", "OneStepAPIKEYTobeSigned"),
+		OneStepPrivateKey: firstNonEmpty(
+			firstEnv("ONESTEP_API_PRIVATEKEY", "ONESTEP_API_PRIVATE_KEY", "OneStepAPIKEY"),
+			readEnvFile("ONESTEP_PEM_PATH"),
+			readEnvFile("ONESTEP_JWT_PEM_PATH"),
+		),
+		OneStepPublicKey: firstEnv("ONESTEP_API_PUBLIC_KEY", "ONESTEP_API_PUBLICKEY"),
 		OneStepBase:       strings.TrimRight(base, "/"),
 		EFleetsUser:       os.Getenv("EFLEETS_USERNAME"),
 		EFleetsPass:       os.Getenv("EFLEETS_PASSWORD"),
@@ -132,6 +139,10 @@ func (c Config) EnvReport() []string {
 	}
 	return []string{
 		line("OILCHANGE_DB", c.SQLitePath, ""),
+		line("DATABASE_URL", c.DatabaseURL, ""),
+		line("SUPABASE_URL", c.SupabaseURL, "ZacharyTFerguson's Project (fleet_*); never XRAY"),
+		line("SUPABASE_SERVICE_ROLE", c.ServiceRole, "server-side PostgREST sync only"),
+		line("SUPABASE_SYNC_SECRET", c.SyncSecret, "fleet-sync edge token when service role unset"),
 		line("EFLEETS_USERNAME", c.EFleetsUser, ""),
 		line("EFLEETS_PASSWORD", c.EFleetsPass, ""),
 		line("EFLEETS_CUST_NUM", c.EFleetsCust, ""),

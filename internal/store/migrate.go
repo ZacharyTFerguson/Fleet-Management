@@ -1,32 +1,44 @@
 package store
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
+	"sort"
 	"strings"
 
 	"oilchange/migrations"
 )
 
-// applyMigrations runs schema SQL. SQLite is a test double; RLS is Postgres/fleet-oil only.
-func applyMigrations(db *sql.DB, dialect string) error {
-	schema, err := migrations.SQL.ReadFile("001_schema.sql")
+// applyMigrations runs schema and additive migrations before Postgres-only RLS.
+func applyMigrations(ctx context.Context, db *sql.DB, dialect string) error {
+	names, err := migrationSQLNames()
 	if err != nil {
-		return fmt.Errorf("read schema: %w", err)
+		return err
 	}
-	sqlText := string(schema)
-	if dialect == "sqlite" {
-		sqlText = sqliteSchema(sqlText)
-	}
-	if err := execAll(db, sqlText); err != nil {
-		return fmt.Errorf("schema: %w", err)
+	for _, name := range names {
+		raw, err := migrations.SQL.ReadFile(name)
+		if err != nil {
+			return fmt.Errorf("read %s: %w", name, err)
+		}
+		sqlText := string(raw)
+		if dialect == "sqlite" {
+			sqlText = sqliteSchema(sqlText)
+		}
+		run := execAll
+		if name != "001_schema.sql" {
+			run = execAllIgnoreDup
+		}
+		if err := run(ctx, db, sqlText); err != nil {
+			return fmt.Errorf("%s: %w", name, err)
+		}
 	}
 	if dialect == "pgx" {
 		rls, err := migrations.SQL.ReadFile("002_rls.sql")
 		if err != nil {
 			return fmt.Errorf("read rls: %w", err)
 		}
-		if err := execAll(db, string(rls)); err != nil {
+		if err := execAll(ctx, db, string(rls)); err != nil {
 			msg := strings.ToLower(err.Error())
 			if !strings.Contains(msg, "already exists") {
 				return fmt.Errorf("rls: %w", err)
@@ -36,10 +48,45 @@ func applyMigrations(db *sql.DB, dialect string) error {
 	return nil
 }
 
-// execAll splits statements because the sqlite driver will not run a whole file in one Exec.
-func execAll(db *sql.DB, script string) error {
+func migrationSQLNames() ([]string, error) {
+	entries, err := migrations.SQL.ReadDir(".")
+	if err != nil {
+		return nil, err
+	}
+	var extra []string
+	for _, entry := range entries {
+		name := entry.Name()
+		if !strings.HasSuffix(name, ".sql") || name == "001_schema.sql" || name == "002_rls.sql" {
+			continue
+		}
+		extra = append(extra, name)
+	}
+	sort.Strings(extra)
+	return append([]string{"001_schema.sql"}, extra...), nil
+}
+
+func execAll(ctx context.Context, db *sql.DB, script string) error {
 	for _, stmt := range splitSQL(script) {
-		if _, err := db.Exec(stmt); err != nil {
+		if _, err := db.ExecContext(ctx, stmt); err != nil {
+			msg := strings.ToLower(err.Error())
+			if strings.Contains(msg, "already exists") {
+				continue
+			}
+			return fmt.Errorf("%w in %q", err, trimForErr(stmt))
+		}
+	}
+	return nil
+}
+
+func execAllIgnoreDup(ctx context.Context, db *sql.DB, script string) error {
+	for _, stmt := range splitSQL(script) {
+		if _, err := db.ExecContext(ctx, stmt); err != nil {
+			msg := strings.ToLower(err.Error())
+			if strings.Contains(msg, "duplicate column") ||
+				strings.Contains(msg, "already exists") ||
+				strings.Contains(msg, "already exist") {
+				continue
+			}
 			return fmt.Errorf("%w in %q", err, trimForErr(stmt))
 		}
 	}
@@ -87,6 +134,7 @@ func sqliteSchema(s string) string {
 	s = strings.ReplaceAll(s, "BOOLEAN NOT NULL DEFAULT true", "INTEGER NOT NULL DEFAULT 1")
 	s = strings.ReplaceAll(s, "BOOLEAN", "INTEGER")
 	s = strings.ReplaceAll(s, "DEFAULT now()", "DEFAULT (datetime('now'))")
+	s = strings.ReplaceAll(s, "now()", "datetime('now')")
 	s = strings.ReplaceAll(s, "DATE NOT NULL", "TEXT NOT NULL")
 	return s
 }

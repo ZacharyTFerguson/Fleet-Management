@@ -3,6 +3,7 @@ package app
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"time"
@@ -149,30 +150,64 @@ func (a *App) adapter(vehicles, fuel, shop, mileage string) (enterprise.Adapter,
 	return h, nil
 }
 
-// SyncOneStep loads factory_id map and drive-stop miles-since after each car's trusted second.
-func (a *App) SyncOneStep(ctx context.Context, mapPath string, client *onestep.Client) error {
+// SyncDevices upserts the durable OneStep device registry from a map CSV and/or API.
+// Join key is factory_id only; display_name is never used to pair. Does not fetch drive-stop miles.
+func (a *App) SyncDevices(ctx context.Context, mapPath string, client *onestep.Client) (int, error) {
+	factoryToCar := map[string]string{}
 	var mapped []model.OneStepDevice
 	if mapPath != "" {
 		var err error
 		mapped, err = onestep.LoadMapCSV(mapPath)
 		if err != nil {
-			return err
+			return 0, err
 		}
-	} else if client != nil && a.Cfg.OneStepToken != "" {
-		var err error
-		mapped, err = client.ListDevices(ctx)
-		if err != nil {
-			return err
+		for _, d := range mapped {
+			if d.LinkedCarEFleetsID != nil && *d.LinkedCarEFleetsID != "" {
+				factoryToCar[d.FactoryID] = *d.LinkedCarEFleetsID
+			}
 		}
 	}
-	for _, d := range mapped {
-		if err := a.Store.UpsertDevice(ctx, d); err != nil {
-			return err
+
+	var devices []model.OneStepDevice
+	if client != nil && a.Cfg.OneStepToken != "" {
+		apiDevs, err := client.ListDevices(ctx)
+		if err != nil {
+			return 0, err
 		}
+		for _, d := range apiDevs {
+			devices = append(devices, onestep.LinkByFactoryID(d, factoryToCar))
+		}
+		// Keep map rows whose factory_id is absent from the live inventory (retired / offline boxes).
+		seen := make(map[string]bool, len(devices))
+		for _, d := range devices {
+			seen[d.FactoryID] = true
+		}
+		for _, d := range mapped {
+			if !seen[d.FactoryID] {
+				devices = append(devices, d)
+			}
+		}
+	} else {
+		devices = mapped
+	}
+
+	// One transaction: a bad map row aborts the whole import instead of leaving
+	// half the registry on the new snapshot and half on the old one.
+	if err := a.Store.UpsertDevices(ctx, devices); err != nil {
+		return 0, err
+	}
+	return len(devices), nil
+}
+
+// SyncOneStep loads the device registry then drive-stop miles-since after each car's trusted second.
+func (a *App) SyncOneStep(ctx context.Context, mapPath string, client *onestep.Client) error {
+	if _, err := a.SyncDevices(ctx, mapPath, client); err != nil {
+		return err
 	}
 	if client == nil {
 		return nil
 	}
+	var fetchErrors []error
 	cars, err := a.Store.ListCars(ctx)
 	if err != nil {
 		return err
@@ -200,6 +235,7 @@ func (a *App) SyncOneStep(ctx context.Context, mapPath string, client *onestep.C
 			}
 			n, err := client.DriveStopMilesFor(ctx, d, out.FillTime)
 			if err != nil {
+				fetchErrors = append(fetchErrors, fmt.Errorf("%s factory_id %s: %w", c.EFleetsID, d.FactoryID, err))
 				continue
 			}
 			if err := a.Store.SaveMilesSince(ctx, model.DriveStopMiles{FactoryID: d.FactoryID, Since: out.FillTime, Miles: n}); err != nil {
@@ -207,71 +243,96 @@ func (a *App) SyncOneStep(ctx context.Context, mapPath string, client *onestep.C
 			}
 		}
 	}
-	return nil
+	return errors.Join(fetchErrors...)
 }
 
 // Compute runs Last Reading + HOLD for every car. Returns exit 2 if any open HOLD remains.
+//
+// Invariant after a Compute that returns nil error: every car has either
+// hold_reason set (with exactly one open hold event) or a full
+// last_reading_{miles,at,source} triple — never both NULL. Each car is decided
+// in its own store transaction, so a failure on one car leaves that car exactly
+// as it was and the loop moves on; the joined error and exit 1 tell the
+// operator which cars were not decided this run. Context cancellation stops
+// the loop immediately (the current car's transaction rolls back as a unit).
 func (a *App) Compute(ctx context.Context, overrideLower bool) (int, error) {
 	cars, err := a.Store.ListCars(ctx)
 	if err != nil {
 		return model.ExitError, err
 	}
 	open := 0
+	var carErrs []error
 	for _, c := range cars {
-		fills, err := a.Store.ListFills(ctx, c.EFleetsID)
-		if err != nil {
+		if err := ctx.Err(); err != nil {
 			return model.ExitError, err
 		}
-		ros, err := a.Store.ListShopROs(ctx, c.EFleetsID)
+		held, err := a.computeCar(ctx, c, overrideLower)
 		if err != nil {
-			return model.ExitError, err
-		}
-		devs, err := a.Store.ListDevicesForCar(ctx, c.EFleetsID)
-		if err != nil {
-			return model.ExitError, err
-		}
-		var ids []string
-		for _, d := range devs {
-			ids = append(ids, d.FactoryID)
-		}
-		miles, err := a.Store.ListMilesSince(ctx, ids)
-		if err != nil {
-			return model.ExitError, err
-		}
-		out := oil.EvaluateHolds(oil.ComputeIn{
-			Nickname:          c.Nickname,
-			Fills:             fills,
-			ShopROs:           ros,
-			Devices:           devs,
-			MilesSince:        miles,
-			StoredLastReading: c.LastReadingMiles,
-			OverrideLower:     overrideLower,
-		})
-		if out.SkipWrite {
-			reason := model.HoldNoTrustedFill
-			detail := ""
-			if len(out.Holds) > 0 {
-				reason = out.Holds[0].Code
-				detail = out.Holds[0].Detail
-			}
-			if err := a.Store.SetHold(ctx, c.EFleetsID, reason, detail); err != nil {
+			if ctx.Err() != nil {
 				return model.ExitError, err
 			}
-			open++
-			fmt.Fprintf(os.Stderr, "HOLD %s %s %s\n", c.EFleetsID, reason, detail)
+			fmt.Fprintf(os.Stderr, "ERROR %s not decided: %v\n", c.EFleetsID, err)
+			carErrs = append(carErrs, fmt.Errorf("%s: %w", c.EFleetsID, err))
 			continue
 		}
-		if err := a.Store.WriteLastReading(ctx, c.EFleetsID, out.Reading, out.FillTime, out.Source); err != nil {
-			return model.ExitError, err
+		if held {
+			open++
 		}
-		if err := a.Store.ClearHolds(ctx, c.EFleetsID); err != nil {
-			return model.ExitError, err
-		}
+	}
+	if len(carErrs) > 0 {
+		return model.ExitError, errors.Join(carErrs...)
 	}
 	if open > 0 {
 		return model.ExitHolds, nil
 	}
 	return model.ExitOK, nil
+}
+
+// computeCar decides one car: exactly one of SetHold / WriteLastReading commits.
+func (a *App) computeCar(ctx context.Context, c model.Car, overrideLower bool) (held bool, err error) {
+	fills, err := a.Store.ListFills(ctx, c.EFleetsID)
+	if err != nil {
+		return false, err
+	}
+	ros, err := a.Store.ListShopROs(ctx, c.EFleetsID)
+	if err != nil {
+		return false, err
+	}
+	devs, err := a.Store.ListDevicesForCar(ctx, c.EFleetsID)
+	if err != nil {
+		return false, err
+	}
+	var ids []string
+	for _, d := range devs {
+		ids = append(ids, d.FactoryID)
+	}
+	miles, err := a.Store.ListMilesSince(ctx, ids)
+	if err != nil {
+		return false, err
+	}
+	out := oil.EvaluateHolds(oil.ComputeIn{
+		Nickname:          c.Nickname,
+		Fills:             fills,
+		ShopROs:           ros,
+		Devices:           devs,
+		MilesSince:        miles,
+		StoredLastReading: c.LastReadingMiles,
+		OverrideLower:     overrideLower,
+	})
+	if out.SkipWrite {
+		reason := model.HoldNoTrustedFill
+		detail := ""
+		if len(out.Holds) > 0 {
+			reason = out.Holds[0].Code
+			detail = out.Holds[0].Detail
+		}
+		if err := a.Store.SetHold(ctx, c.EFleetsID, reason, detail); err != nil {
+			return false, err
+		}
+		fmt.Fprintf(os.Stderr, "HOLD %s %s %s\n", c.EFleetsID, reason, detail)
+		return true, nil
+	}
+	return false, a.Store.WriteLastReading(ctx, c.EFleetsID, out.Reading, out.FillTime, out.Source)
 }
 
 // OilDone records an operator oil change without touching Last Reading.

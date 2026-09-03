@@ -38,6 +38,8 @@ func run(args []string) int {
 		return cmdReport(ctx, cfg, args[1:])
 	case "holds":
 		return cmdHolds(ctx, cfg, args[1:])
+	case "sync", "sync-supabase":
+		return cmdSyncSupabase(ctx, cfg, args[1:])
 	case "env":
 		return cmdEnv(cfg)
 	default:
@@ -56,6 +58,7 @@ func usage() {
   oilchange oil-done --efleets-id ID --miles N --date YYYY-MM-DD [--location NAME]
   oilchange report [--interval 5000] [--due-within N] [--out PATH.csv]
   oilchange holds
+  oilchange sync [--interval 5m] [--mirror web/data/cars.json]
   oilchange env
 
 Secrets: paste into oilchange.env (gitignored). See oilchange.env.example.

@@ -259,6 +259,83 @@ func retryableAlloc(err error) bool {
 	return false
 }
 
+// retryableBusy is a cross-process lock collision (a second Store or CLI on the
+// same SQLite file, or a serialization failure on pgx). The statement itself is
+// fine; the transaction just has to be replayed.
+func retryableBusy(err error) bool {
+	if err == nil {
+		return false
+	}
+	var se *sqlite.Error
+	if errors.As(err, &se) {
+		switch se.Code() & 0xff {
+		case sqlite3.SQLITE_BUSY, sqlite3.SQLITE_LOCKED:
+			return true
+		}
+		return false
+	}
+	var pe *pgconn.PgError
+	if errors.As(err, &pe) {
+		// serialization_failure, deadlock_detected
+		return pe.Code == "40001" || pe.Code == "40P01"
+	}
+	return false
+}
+
+// ErrUnknownCar is returned when a HOLD or Last Reading write targets an
+// efleets_id that has no cars row. Silently affecting zero rows would leave a
+// car that compute believes it handled with neither hold_reason nor a reading.
+var ErrUnknownCar = errors.New("store: unknown efleets_id")
+
+// writeTx runs fn in one write transaction under the in-process mutex and
+// replays it a bounded number of times on cross-process lock collisions.
+// Every multi-statement mutation (HOLD, Last Reading, oil change, device
+// import) goes through here so a second Store on the same file can never
+// observe half of one.
+func (s *Store) writeTx(ctx context.Context, fn func(tx *sql.Tx) error) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var err error
+	for attempt := 0; attempt < 16; attempt++ {
+		if attempt > 0 {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(time.Duration(attempt) * 5 * time.Millisecond):
+			}
+		}
+		err = s.runTx(ctx, fn)
+		if err == nil || !retryableBusy(err) {
+			return err
+		}
+	}
+	return err
+}
+
+func (s *Store) runTx(ctx context.Context, fn func(tx *sql.Tx) error) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	if err := fn(tx); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// requireCarTx fails the transaction when the UPDATE on cars matched nothing.
+func requireCarTx(res sql.Result, efleetsID string) error {
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return fmt.Errorf("%w: %s", ErrUnknownCar, efleetsID)
+	}
+	return nil
+}
+
 // CarByEFleets loads one car. EFleetsID is the join key.
 func (s *Store) CarByEFleets(ctx context.Context, id string) (*model.Car, error) {
 	s.mu.Lock()
@@ -441,18 +518,50 @@ func (s *Store) ClearCardLink(ctx context.Context, cardID string) error {
 	return err
 }
 
-// UpsertDevice pairs by factory_id. Display_name is stored as a label only.
+// UpsertDevice pairs by factory_id only. Display_name is stored as a label, never used as a join key.
+//
+// Link semantics (COALESCE keep-link): a row whose LinkedCarEFleetsID is nil —
+// the live OneStep API inventory never carries an eFleets ID — refreshes
+// device_id / display_name / dead but keeps the existing car link. A row with
+// a non-nil link (device map CSV) relinks the box to that car. There is
+// deliberately no unlink path through this method; a device can only stop
+// counting toward a car by being marked dead.
 func (s *Store) UpsertDevice(ctx context.Context, d model.OneStepDevice) error {
+	return s.writeTx(ctx, func(tx *sql.Tx) error { return s.upsertDeviceTx(ctx, tx, d) })
+}
+
+// UpsertDevices imports a whole registry snapshot in one transaction. A map
+// row that fails (for example an efleets_id that has no cars row under the FK)
+// aborts the entire import, so a second Store or a `devices` reader never sees
+// half of a device map applied. The error names the offending factory_id.
+func (s *Store) UpsertDevices(ctx context.Context, devs []model.OneStepDevice) error {
+	if len(devs) == 0 {
+		return nil
+	}
+	return s.writeTx(ctx, func(tx *sql.Tx) error {
+		for _, d := range devs {
+			if err := s.upsertDeviceTx(ctx, tx, d); err != nil {
+				return fmt.Errorf("device factory_id %s: %w", d.FactoryID, err)
+			}
+		}
+		return nil
+	})
+}
+
+func (s *Store) upsertDeviceTx(ctx context.Context, tx *sql.Tx, d model.OneStepDevice) error {
+	if d.FactoryID == "" {
+		return errors.New("empty factory_id")
+	}
 	var link any
-	if d.LinkedCarEFleetsID != nil {
+	if d.LinkedCarEFleetsID != nil && *d.LinkedCarEFleetsID != "" {
 		link = *d.LinkedCarEFleetsID
 	}
-	_, err := s.exec(ctx, `INSERT INTO onestep_devices (factory_id, device_id, display_name, linked_car_efleets_id, dead) VALUES (?,?,?,?,?)
+	_, err := tx.ExecContext(ctx, s.pg(`INSERT INTO onestep_devices (factory_id, device_id, display_name, linked_car_efleets_id, dead) VALUES (?,?,?,?,?)
 		ON CONFLICT (factory_id) DO UPDATE SET
 			device_id=excluded.device_id,
 			display_name=excluded.display_name,
 			linked_car_efleets_id=COALESCE(excluded.linked_car_efleets_id, onestep_devices.linked_car_efleets_id),
-			dead=excluded.dead`,
+			dead=excluded.dead`),
 		d.FactoryID, d.DeviceID, d.DisplayName, link, d.Dead)
 	return err
 }
@@ -519,51 +628,95 @@ func (s *Store) ListMilesSince(ctx context.Context, factoryIDs []string) ([]mode
 }
 
 // WriteLastReading is the only SQL that stores Last Reading miles. Callers must not write on HOLD.
+//
+// The three last_reading_* columns, hold_reason=NULL, and closing every open
+// hold event happen in one transaction: a reader never sees miles without
+// at/source, and never sees a cleared hold_reason beside an open event.
+// miles must be positive; "no reading" is NULL, never 0.
 func (s *Store) WriteLastReading(ctx context.Context, efleetsID string, miles int, at time.Time, source string) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	tx, err := s.db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
+	if miles <= 0 {
+		return fmt.Errorf("store: refusing last_reading_miles %d for %s; no reading is NULL, not 0", miles, efleetsID)
 	}
-	defer func() { _ = tx.Rollback() }()
-	now := time.Now().UTC().Format(time.RFC3339)
-	if _, err := tx.ExecContext(ctx, s.pg(`UPDATE cars SET last_reading_miles=?, last_reading_at=?, last_reading_source=?, hold_reason=NULL, updated_at=? WHERE efleets_id=?`),
-		miles, at.UTC().Format(time.RFC3339), source, now, efleetsID); err != nil {
-		return err
+	if source != model.SourceFuelDetails && source != model.SourceShopRO {
+		return fmt.Errorf("store: last_reading_source %q for %s is not fuel_details or shop_ro", source, efleetsID)
 	}
-	if _, err := tx.ExecContext(ctx, s.pg(`UPDATE hold_events SET open=FALSE WHERE efleets_id=? AND open=TRUE`), efleetsID); err != nil {
-		return err
+	if at.IsZero() {
+		return fmt.Errorf("store: last_reading_at is required for %s", efleetsID)
 	}
-	return tx.Commit()
+	return s.writeTx(ctx, func(tx *sql.Tx) error {
+		now := time.Now().UTC().Format(time.RFC3339)
+		res, err := tx.ExecContext(ctx, s.pg(`UPDATE cars SET last_reading_miles=?, last_reading_at=?, last_reading_source=?, hold_reason=NULL, updated_at=? WHERE efleets_id=?`),
+			miles, at.UTC().Format(time.RFC3339), source, now, efleetsID)
+		if err != nil {
+			return err
+		}
+		if err := requireCarTx(res, efleetsID); err != nil {
+			return err
+		}
+		_, err = tx.ExecContext(ctx, s.pg(`UPDATE hold_events SET open=FALSE WHERE efleets_id=? AND open=TRUE`), efleetsID)
+		return err
+	})
 }
 
-// SetHold skips Last Reading. Prior last_reading_* stay put so operators do not trust a flagged number.
+// SetHold skips Last Reading. It touches hold_reason only; last_reading_miles,
+// last_reading_at and last_reading_source are left exactly as the last
+// WriteLastReading committed them (the exporter blanks them while a HOLD is
+// open so a stale number is never shown as current odo).
+//
+// SetHold is idempotent per (efleets_id, reason, detail): the car ends the
+// transaction with exactly one open hold_events row, which matches
+// cars.hold_reason. A repeated NO_DEVICE compute therefore does not stack a
+// new open event every tick, and a changed reason closes the previous one
+// instead of leaving two "current" holds.
 func (s *Store) SetHold(ctx context.Context, efleetsID, reason, detail string) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	tx, err := s.db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
+	if reason == "" {
+		return fmt.Errorf("store: empty hold reason for %s", efleetsID)
 	}
-	defer func() { _ = tx.Rollback() }()
-	now := time.Now().UTC().Format(time.RFC3339)
-	if _, err := tx.ExecContext(ctx, s.pg(`UPDATE cars SET hold_reason=?, updated_at=? WHERE efleets_id=?`), reason, now, efleetsID); err != nil {
+	return s.writeTx(ctx, func(tx *sql.Tx) error {
+		now := time.Now().UTC().Format(time.RFC3339)
+		res, err := tx.ExecContext(ctx, s.pg(`UPDATE cars SET hold_reason=?, updated_at=? WHERE efleets_id=?`), reason, now, efleetsID)
+		if err != nil {
+			return err
+		}
+		if err := requireCarTx(res, efleetsID); err != nil {
+			return err
+		}
+		// Close every open event except the oldest one that already says the
+		// same thing. COALESCE(...,-1) keeps the predicate true when there is
+		// no such event (id <> NULL would match nothing).
+		if _, err := tx.ExecContext(ctx, s.pg(`UPDATE hold_events SET open=FALSE
+			WHERE efleets_id=? AND open=TRUE
+			  AND id <> COALESCE((SELECT MIN(id) FROM hold_events
+			                      WHERE efleets_id=? AND open=TRUE AND reason=? AND COALESCE(detail,'')=?), -1)`),
+			efleetsID, efleetsID, reason, detail); err != nil {
+			return err
+		}
+		var open int
+		if err := tx.QueryRowContext(ctx, s.pg(`SELECT COUNT(*) FROM hold_events WHERE efleets_id=? AND open=TRUE`), efleetsID).Scan(&open); err != nil {
+			return err
+		}
+		if open > 0 {
+			return nil
+		}
+		_, err = tx.ExecContext(ctx, s.pg(`INSERT INTO hold_events (efleets_id, reason, detail, at, open) VALUES (?,?,?,?,?)`),
+			efleetsID, reason, detail, now, true)
 		return err
-	}
-	if _, err := tx.ExecContext(ctx, s.pg(`INSERT INTO hold_events (efleets_id, reason, detail, at, open) VALUES (?,?,?,?,?)`),
-		efleetsID, reason, detail, now, true); err != nil {
-		return err
-	}
-	return tx.Commit()
+	})
 }
 
-// ClearHolds closes open events after a successful write.
+// ClearHolds is the operator escape hatch: it closes open events and clears
+// hold_reason in one transaction so the car never has a hold_reason with no
+// open event (or vice versa). It does not write a Last Reading; the car goes
+// back to "never computed" until the next compute decides.
 func (s *Store) ClearHolds(ctx context.Context, efleetsID string) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	_, err := s.exec(ctx, `UPDATE hold_events SET open=FALSE WHERE efleets_id=? AND open=TRUE`, efleetsID)
-	return err
+	return s.writeTx(ctx, func(tx *sql.Tx) error {
+		now := time.Now().UTC().Format(time.RFC3339)
+		if _, err := tx.ExecContext(ctx, s.pg(`UPDATE cars SET hold_reason=NULL, updated_at=? WHERE efleets_id=?`), now, efleetsID); err != nil {
+			return err
+		}
+		_, err := tx.ExecContext(ctx, s.pg(`UPDATE hold_events SET open=FALSE WHERE efleets_id=? AND open=TRUE`), efleetsID)
+		return err
+	})
 }
 
 // OpenHolds is the holds command.
@@ -591,15 +744,19 @@ func (s *Store) OpenHolds(ctx context.Context) ([]model.HoldEvent, error) {
 }
 
 // InsertOilChange records last oil. It does not change Last Reading.
+// The history row and the cars.last_oil_* denormalisation commit together so
+// a crash between them cannot leave an oil_changes row the car does not reflect.
 func (s *Store) InsertOilChange(ctx context.Context, o model.OilChange) error {
-	if _, err := s.exec(ctx, `INSERT INTO oil_changes (efleets_id, miles, date, location, source) VALUES (?,?,?,?,?)`,
-		o.EFleetsID, o.Miles, o.Date.Format("2006-01-02"), o.Location, o.Source); err != nil {
+	return s.writeTx(ctx, func(tx *sql.Tx) error {
+		if _, err := tx.ExecContext(ctx, s.pg(`INSERT INTO oil_changes (efleets_id, miles, date, location, source) VALUES (?,?,?,?,?)`),
+			o.EFleetsID, o.Miles, o.Date.Format("2006-01-02"), o.Location, o.Source); err != nil {
+			return err
+		}
+		now := time.Now().UTC().Format(time.RFC3339)
+		_, err := tx.ExecContext(ctx, s.pg(`UPDATE cars SET last_oil_miles=?, last_oil_date=?, updated_at=? WHERE efleets_id=?`),
+			o.Miles, o.Date.Format(time.RFC3339), now, o.EFleetsID)
 		return err
-	}
-	now := time.Now().UTC().Format(time.RFC3339)
-	_, err := s.exec(ctx, `UPDATE cars SET last_oil_miles=?, last_oil_date=?, updated_at=? WHERE efleets_id=?`,
-		o.Miles, o.Date.Format(time.RFC3339), now, o.EFleetsID)
-	return err
+	})
 }
 
 // HasOilChange avoids double-seeding the same shop RO oil service.

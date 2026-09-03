@@ -174,6 +174,17 @@ func (s *Store) upsertCarTx(ctx context.Context, c model.Car) error {
 	if err != nil && err != sql.ErrNoRows {
 		return err
 	}
+	if c.PDIID != "" {
+		inUse, err := s.pdiInUseTx(ctx, tx, c.PDIID)
+		if err != nil {
+			return err
+		}
+		if inUse {
+			// Fleet Summary derives row-order PDI values. A newly inserted car
+			// can therefore arrive with an ID already owned by a different car.
+			c.PDIID = ""
+		}
+	}
 	if c.PDIID == "" {
 		id, err := s.nextPDITx(ctx, tx)
 		if err != nil {
@@ -204,7 +215,26 @@ func (s *Store) nextPDITx(ctx context.Context, tx *sql.Tx) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf("PDI-%04d", n+1), nil
+	for {
+		n++
+		id := fmt.Sprintf("PDI-%04d", n)
+		inUse, err := s.pdiInUseTx(ctx, tx, id)
+		if err != nil {
+			return "", err
+		}
+		if !inUse {
+			return id, nil
+		}
+	}
+}
+
+func (s *Store) pdiInUseTx(ctx context.Context, tx *sql.Tx, id string) (bool, error) {
+	var one int
+	err := tx.QueryRowContext(ctx, s.pg(`SELECT 1 FROM cars WHERE pdi_id=?`), id).Scan(&one)
+	if err == sql.ErrNoRows {
+		return false, nil
+	}
+	return err == nil, err
 }
 
 func retryableAlloc(err error) bool {

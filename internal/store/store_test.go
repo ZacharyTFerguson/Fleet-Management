@@ -70,6 +70,39 @@ func TestOpaquePDINoStatePrefix(t *testing.T) {
 	}
 }
 
+func TestUpsertCarAllocatesPastPDIConflictsAndGaps(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "pdi-gaps.sqlite")
+	s, err := Open("sqlite", p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := s.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
+	ctx := context.Background()
+	if err := s.UpsertCar(ctx, model.Car{PDIID: "PDI-0002", EFleetsID: "A"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.UpsertCar(ctx, model.Car{EFleetsID: "B"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.UpsertCar(ctx, model.Car{PDIID: "PDI-0002", EFleetsID: "C"}); err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]string{"A": "PDI-0002", "B": "PDI-0003", "C": "PDI-0004"}
+	for efleetsID, pdiID := range want {
+		car, err := s.CarByEFleets(ctx, efleetsID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if car.PDIID != pdiID {
+			t.Fatalf("%s PDI %s want %s", efleetsID, car.PDIID, pdiID)
+		}
+	}
+}
+
 func TestConcurrentUpsertCarUniquePDI(t *testing.T) {
 	p := filepath.Join(t.TempDir(), "race.sqlite")
 	s, err := Open("sqlite", p)

@@ -225,7 +225,7 @@ func TestLiveFleetHasMoreVehiclesThanTwoCarDemo(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(demoCars) != 2 {
-		t.Fatalf("old demo fleet: got %d want 2", len(demoCars))
+		t.Fatalf("old demo fleet got %d want 2", len(demoCars))
 	}
 
 	livePath := testdata("enterprise", "fleetsummary_live.csv")
@@ -256,7 +256,7 @@ func TestLiveFleetHasMoreVehiclesThanTwoCarDemo(t *testing.T) {
 	defer st.Close()
 	a := &App{Cfg: config.Config{SQLitePath: p}, Store: st}
 	ctx := context.Background()
-	if err := a.SyncEnterprise(ctx, livePath, "", "", ""); err != nil {
+	if err := a.SyncEnterprise(ctx, livePath, "","",""); err != nil {
 		t.Fatal(err)
 	}
 	got, err := st.ListCars(ctx)
@@ -288,5 +288,64 @@ func TestOilDoneDoesNotChangeLastReading(t *testing.T) {
 	}
 	if c.LastOilMiles == nil || *c.LastOilMiles != 50 {
 		t.Fatal("last oil")
+	}
+}
+
+func TestSyncDevicesLinksAPIByFactoryIDNotDisplayName(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "link.sqlite")
+	st, err := store.Open("sqlite", p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	ctx := context.Background()
+	if err := st.UpsertCar(ctx, model.Car{EFleetsID: "27TESTA", Nickname: "VA19"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.UpsertCar(ctx, model.Car{EFleetsID: "OTHER", Nickname: "WrongCar"}); err != nil {
+		t.Fatal(err)
+	}
+
+	mapPath := filepath.Join(t.TempDir(), "map.csv")
+	if err := os.WriteFile(mapPath, []byte("factory_id,device_id,efleets_id,display_name\nFACT1,OLDDEV,27TESTA,ignored\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.Contains(r.URL.Path, "/device"):
+			// display_name matches OTHER's nickname — must not join on that.
+			_, _ = w.Write([]byte(`[{"factory_id":"FACT1","device_id":"DEVLIVE","display_name":"WrongCar","odometer":999}]`))
+		case strings.Contains(r.URL.Path, "drive-stop"):
+			_, _ = w.Write([]byte(`{"miles":1}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer srv.Close()
+
+	client := onestep.NewClient(srv.URL, "tok")
+	client.HTTP = srv.Client()
+	a := &App{Cfg: config.Config{OneStepToken: "tok"}, Store: st}
+	n, err := a.SyncDevices(ctx, mapPath, client)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n != 1 {
+		t.Fatalf("devices upserted %d", n)
+	}
+	devs, err := st.ListDevicesForCar(ctx, "27TESTA")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(devs) != 1 || devs[0].FactoryID != "FACT1" || devs[0].DeviceID != "DEVLIVE" {
+		t.Fatalf("want FACT1 linked to 27TESTA from API inventory, got %+v", devs)
+	}
+	wrong, err := st.ListDevicesForCar(ctx, "OTHER")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(wrong) != 0 {
+		t.Fatalf("must not join display_name WrongCar: %+v", wrong)
 	}
 }

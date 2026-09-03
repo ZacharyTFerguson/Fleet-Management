@@ -11,7 +11,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -25,6 +27,11 @@ import (
 const (
 	CarsTable  = "fleet_cars"
 	CardsTable = "fleet_cards"
+
+	// fleetProjectRef is the only Supabase project oil/fleet data may target.
+	fleetProjectRef = "hdtwfdjdvdzdxfdriyzn"
+	xrayProjectRef  = "chjqcznyxvtjbamttqdj"
+	fleetHost       = fleetProjectRef + ".supabase.co"
 )
 
 // Config is the remote + optional local mirror. Empty URL/key means mock-only.
@@ -135,12 +142,115 @@ func FromCards(cs []model.Card) []CardRow {
 	return out
 }
 
-func refuseXRAY(url string) error {
-	lu := strings.ToLower(url)
-	if strings.Contains(lu, "xray") || strings.Contains(lu, "chjqcznyxvtjbamttqdj") {
+// refuseXRAY is the remote-target gate: allowlist the fleet project (or loopback
+// for tests) and deny XRAY / any other host, including case variants and
+// credentialed URLs.
+func refuseXRAY(raw string) error {
+	return validateFleetTarget(raw)
+}
+
+func validateFleetTarget(raw string) error {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return fmt.Errorf("refusing empty Supabase URL")
+	}
+	lowered := strings.ToLower(raw)
+	if strings.Contains(lowered, "xray") || strings.Contains(lowered, xrayProjectRef) {
 		return fmt.Errorf("refusing XRAY Supabase project for fleet oil data")
 	}
-	return nil
+	u, err := parseHTTPURL(raw)
+	if err != nil {
+		return fmt.Errorf("refusing invalid Supabase URL")
+	}
+	host := strings.ToLower(strings.TrimSuffix(u.Hostname(), "."))
+	if strings.Contains(host, "xray") || strings.Contains(host, xrayProjectRef) {
+		return fmt.Errorf("refusing XRAY Supabase project for fleet oil data")
+	}
+	if u.User != nil {
+		return fmt.Errorf("refusing URL with embedded credentials")
+	}
+	if isLoopbackHost(host) {
+		return nil
+	}
+	if host == fleetHost {
+		if !strings.EqualFold(u.Scheme, "https") {
+			return fmt.Errorf("refusing non-https fleet Supabase URL")
+		}
+		return nil
+	}
+	return fmt.Errorf("refusing non-fleet Supabase host for fleet oil data")
+}
+
+func parseHTTPURL(raw string) (*url.URL, error) {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return nil, err
+	}
+	if u.Scheme == "" || u.Host == "" {
+		u, err = url.Parse("https://" + strings.TrimPrefix(raw, "//"))
+		if err != nil {
+			return nil, err
+		}
+	}
+	switch strings.ToLower(u.Scheme) {
+	case "http", "https":
+	default:
+		return nil, fmt.Errorf("unsupported scheme")
+	}
+	if u.Hostname() == "" {
+		return nil, fmt.Errorf("missing host")
+	}
+	return u, nil
+}
+
+func isLoopbackHost(host string) bool {
+	switch host {
+	case "localhost", "127.0.0.1", "::1":
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
+}
+
+func fleetHTTPClient() *http.Client {
+	return &http.Client{
+		Timeout: 60 * time.Second,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			if req.URL != nil {
+				if err := validateFleetTarget(req.URL.String()); err != nil {
+					return err
+				}
+			}
+			if len(via) >= 10 {
+				return errors.New("stopped after 10 redirects")
+			}
+			return nil
+		},
+	}
+}
+
+func redactSecrets(msg string, secrets ...string) string {
+	for _, s := range secrets {
+		s = strings.TrimSpace(s)
+		if s == "" || len(s) < 6 {
+			continue
+		}
+		msg = strings.ReplaceAll(msg, s, "[redacted]")
+		msg = strings.ReplaceAll(msg, url.QueryEscape(s), "[redacted]")
+		msg = strings.ReplaceAll(msg, url.PathEscape(s), "[redacted]")
+	}
+	return msg
+}
+
+func redactErr(err error, secrets ...string) error {
+	if err == nil {
+		return nil
+	}
+	msg := redactSecrets(err.Error(), secrets...)
+	if msg == err.Error() {
+		return err
+	}
+	return errors.New(msg)
 }
 
 // runMu serializes Run. Concurrent oilchange sync --interval ticks and a
@@ -175,7 +285,7 @@ func Run(ctx context.Context, cfg Config, cars []CarRow, holds []HoldRow, cards 
 	if cfg.MirrorPath != "" {
 		mirrorErr = writeMirror(cfg.MirrorPath, snap)
 	}
-	return snap, errors.Join(syncErr, mirrorErr)
+	return snap, redactErr(errors.Join(syncErr, mirrorErr), cfg.ServiceRole, cfg.SyncSecret)
 }
 
 func writeMirror(path string, snap *Snapshot) error {
@@ -205,34 +315,24 @@ func writeMirror(path string, snap *Snapshot) error {
 	return os.Rename(tmp, path)
 }
 
-var errRedirectRefused = errors.New("supabase push refused HTTP redirect")
-
-func pushClient() *http.Client {
-	return &http.Client{
-		Timeout: 60 * time.Second,
-		CheckRedirect: func(*http.Request, []*http.Request) error {
-			return errRedirectRefused
-		},
-	}
-}
-
 func pushSupabase(ctx context.Context, cfg Config, snap *Snapshot) error {
 	base := strings.TrimRight(cfg.URL, "/")
-	client := pushClient()
+	client := fleetHTTPClient()
 
 	// Prefer service-role PostgREST when available; else fleet-sync edge function.
+	var err error
 	if cfg.ServiceRole != "" {
-		if err := upsert(ctx, client, base, cfg.ServiceRole, CarsTable, snap.Cars, "pdi_id"); err != nil {
-			return fmt.Errorf("%s: %w", CarsTable, err)
-		}
-		if len(snap.Cards) > 0 {
-			if err := upsert(ctx, client, base, cfg.ServiceRole, CardsTable, snap.Cards, "id"); err != nil {
-				return fmt.Errorf("%s: %w", CardsTable, err)
+		if err = upsert(ctx, client, base, cfg.ServiceRole, CarsTable, snap.Cars, "pdi_id"); err != nil {
+			err = fmt.Errorf("%s: %w", CarsTable, err)
+		} else if len(snap.Cards) > 0 {
+			if err = upsert(ctx, client, base, cfg.ServiceRole, CardsTable, snap.Cards, "id"); err != nil {
+				err = fmt.Errorf("%s: %w", CardsTable, err)
 			}
 		}
-		return nil
+	} else {
+		err = pushEdgeSync(ctx, client, base, cfg.SyncSecret, snap)
 	}
-	return pushEdgeSync(ctx, client, base, cfg.SyncSecret, snap)
+	return redactErr(err, cfg.ServiceRole, cfg.SyncSecret)
 }
 
 func pushEdgeSync(ctx context.Context, client *http.Client, base, secret string, snap *Snapshot) error {
@@ -244,8 +344,8 @@ func pushEdgeSync(ctx context.Context, client *http.Client, base, secret string,
 	if err != nil {
 		return err
 	}
-	url := base + "/functions/v1/fleet-sync"
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
+	endpoint := base + "/functions/v1/fleet-sync"
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
 	if err != nil {
 		return err
 	}
@@ -258,7 +358,8 @@ func pushEdgeSync(ctx context.Context, client *http.Client, base, secret string,
 	defer func() { _ = res.Body.Close() }()
 	if res.StatusCode >= 300 {
 		b, _ := io.ReadAll(io.LimitReader(res.Body, 4096))
-		return fmt.Errorf("fleet-sync HTTP %d: %s", res.StatusCode, strings.TrimSpace(string(b)))
+		body := redactSecrets(strings.TrimSpace(string(b)), secret)
+		return fmt.Errorf("fleet-sync HTTP %d: %s", res.StatusCode, body)
 	}
 	return nil
 }
@@ -271,8 +372,8 @@ func upsert(ctx context.Context, client *http.Client, base, key, table string, r
 	if string(body) == "null" || string(body) == "[]" {
 		return nil
 	}
-	url := fmt.Sprintf("%s/rest/v1/%s?on_conflict=%s", base, table, onConflict)
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
+	endpoint := fmt.Sprintf("%s/rest/v1/%s?on_conflict=%s", base, table, onConflict)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
 	if err != nil {
 		return err
 	}
@@ -287,7 +388,8 @@ func upsert(ctx context.Context, client *http.Client, base, key, table string, r
 	defer func() { _ = res.Body.Close() }()
 	if res.StatusCode >= 300 {
 		b, _ := io.ReadAll(io.LimitReader(res.Body, 4096))
-		return fmt.Errorf("HTTP %d: %s", res.StatusCode, strings.TrimSpace(string(b)))
+		body := redactSecrets(strings.TrimSpace(string(b)), key)
+		return fmt.Errorf("HTTP %d: %s", res.StatusCode, body)
 	}
 	return nil
 }

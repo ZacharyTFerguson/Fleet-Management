@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -160,33 +161,45 @@ func Run(ctx context.Context, cfg Config, cars []CarRow, holds []HoldRow, cards 
 		Holds:    holds,
 		Cards:    cards,
 	}
+	var syncErr error
 	if cfg.URL != "" && (cfg.ServiceRole != "" || cfg.SyncSecret != "") {
 		if err := refuseXRAY(cfg.URL); err != nil {
-			return nil, err
+			syncErr = err
+		} else if err := pushSupabase(ctx, cfg, snap); err != nil {
+			syncErr = err
+		} else {
+			snap.Source = "supabase"
 		}
-		if err := pushSupabase(ctx, cfg, snap); err != nil {
-			return nil, err
-		}
-		snap.Source = "supabase"
 	}
+	var mirrorErr error
 	if cfg.MirrorPath != "" {
-		if err := writeMirror(cfg.MirrorPath, snap); err != nil {
-			return nil, err
-		}
+		mirrorErr = writeMirror(cfg.MirrorPath, snap)
 	}
-	return snap, nil
+	return snap, errors.Join(syncErr, mirrorErr)
 }
 
 func writeMirror(path string, snap *Snapshot) error {
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
 	b, err := json.MarshalIndent(snap, "", "  ")
 	if err != nil {
 		return err
 	}
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, b, 0o644); err != nil {
+	f, err := os.CreateTemp(dir, "."+filepath.Base(path)+".tmp-*")
+	if err != nil {
+		return err
+	}
+	tmp := f.Name()
+	defer func() { _ = os.Remove(tmp) }()
+	if err := f.Chmod(0o644); err != nil {
+		return errors.Join(err, f.Close())
+	}
+	if _, err := f.Write(b); err != nil {
+		return errors.Join(err, f.Close())
+	}
+	if err := f.Close(); err != nil {
 		return err
 	}
 	return os.Rename(tmp, path)

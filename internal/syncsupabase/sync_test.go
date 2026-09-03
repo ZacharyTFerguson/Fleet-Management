@@ -2,6 +2,8 @@ package syncsupabase
 
 import (
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"sync"
 	"testing"
@@ -76,6 +78,79 @@ func TestConcurrentRunSerializesMirror(t *testing.T) {
 	}
 	if len(got.Cars) != 1 {
 		t.Fatalf("mirror cars %d", len(got.Cars))
+	}
+}
+
+func TestConcurrentWriteMirrorUsesIndependentTempFiles(t *testing.T) {
+	dir := t.TempDir()
+	path := dir + "/cars.json"
+	const n = 32
+	start := make(chan struct{})
+	errCh := make(chan error, n)
+	var wg sync.WaitGroup
+	for i := 0; i < n; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start
+			errCh <- writeMirror(path, &Snapshot{
+				Source: "mock-mirror",
+				Cars:   []CarRow{{PDIID: "PDI-0001", EFleetsID: "CAR"}},
+			})
+		}()
+	}
+	close(start)
+	wg.Wait()
+	close(errCh)
+	for err := range errCh {
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	b, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got Snapshot
+	if err := json.Unmarshal(b, &got); err != nil {
+		t.Fatalf("torn mirror: %v", err)
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 1 || entries[0].Name() != "cars.json" {
+		t.Fatalf("temporary files leaked: %+v", entries)
+	}
+}
+
+func TestRemoteFailureStillRefreshesMirror(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, "remote unavailable", http.StatusServiceUnavailable)
+	}))
+	defer srv.Close()
+	path := t.TempDir() + "/cars.json"
+	out, err := Run(t.Context(), Config{
+		URL:         srv.URL,
+		ServiceRole: "test-key",
+		MirrorPath:  path,
+	}, []CarRow{{PDIID: "PDI-0001", EFleetsID: "CAR1"}}, nil, nil)
+	if err == nil {
+		t.Fatal("expected remote error")
+	}
+	if out == nil || out.Source != "mock-mirror" {
+		t.Fatalf("fallback snapshot: %+v", out)
+	}
+	b, readErr := os.ReadFile(path)
+	if readErr != nil {
+		t.Fatal(readErr)
+	}
+	var got Snapshot
+	if err := json.Unmarshal(b, &got); err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Cars) != 1 || got.Cars[0].EFleetsID != "CAR1" {
+		t.Fatalf("fallback mirror: %+v", got)
 	}
 }
 

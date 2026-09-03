@@ -103,6 +103,73 @@ func TestUpsertCarAllocatesPastPDIConflictsAndGaps(t *testing.T) {
 	}
 }
 
+
+func TestOpenAppliesAdditiveMigrations(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "migrations.sqlite")
+	s, err := Open("sqlite", p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := s.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
+	for _, query := range []string{
+		`SELECT card_id FROM card_transactions LIMIT 0`,
+		`SELECT card_id FROM card_pairings LIMIT 0`,
+		`SELECT linked_car_pdi_id, active, retired_at, last_synced_at FROM onestep_devices LIMIT 0`,
+	} {
+		rows, err := s.db.Query(query)
+		if err != nil {
+			t.Fatalf("%s: %v", query, err)
+		}
+		if err := rows.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func TestDeviceRefreshPreservesFactoryIDPairing(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "device.sqlite")
+	s, err := Open("sqlite", p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := s.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
+	ctx := context.Background()
+	if err := s.UpsertCar(ctx, model.Car{EFleetsID: "CAR1"}); err != nil {
+		t.Fatal(err)
+	}
+	carID := "CAR1"
+	if err := s.UpsertDevice(ctx, model.OneStepDevice{
+		FactoryID:          "FACT1",
+		DeviceID:           "DEV1",
+		DisplayName:        "old label",
+		LinkedCarEFleetsID: &carID,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.UpsertDevice(ctx, model.OneStepDevice{
+		FactoryID:   "FACT1",
+		DeviceID:    "DEV2",
+		DisplayName: "new label",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	devices, err := s.ListDevicesForCar(ctx, carID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(devices) != 1 || devices[0].FactoryID != "FACT1" || devices[0].DeviceID != "DEV2" {
+		t.Fatalf("live refresh erased factory_id pairing: %+v", devices)
+	}
+}
+
 func TestConcurrentUpsertCarUniquePDI(t *testing.T) {
 	p := filepath.Join(t.TempDir(), "race.sqlite")
 	s, err := Open("sqlite", p)

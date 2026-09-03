@@ -328,17 +328,9 @@ func (s *Store) UpsertFill(ctx context.Context, f model.Fill) error {
 	_, err := s.exec(ctx, `INSERT INTO fills (efleets_id, card_company_vehicle_number, odometer, unusual_y, provider_transaction_time, provider_company_vehicle_number, merchant_name, merchant_address, source)
 		VALUES (?,?,?,?,?,?,?,?,?)
 		ON CONFLICT (efleets_id, provider_transaction_time, odometer) DO NOTHING`,
-		f.EFleetsID, f.CardCompanyVehicleNumber, odo, boolToInt(f.UnusualY), f.ProviderTransactionTime.UTC().Format(time.RFC3339),
+		f.EFleetsID, f.CardCompanyVehicleNumber, odo, f.UnusualY, f.ProviderTransactionTime.UTC().Format(time.RFC3339),
 		f.ProviderCompanyVehicleNumber, f.MerchantName, f.MerchantAddress, nz(f.Source, "fuel_details"))
 	return err
-}
-
-// boolToInt is sqlite's stand-in for BOOLEAN; postgres still gets 0/1 which it coerces.
-func boolToInt(b bool) int {
-	if b {
-		return 1
-	}
-	return 0
 }
 
 // nz fills source='fuel_details' when the CSV omitted it so the CHECK constraint stays honest.
@@ -361,13 +353,13 @@ func (s *Store) ListFills(ctx context.Context, efleetsID string) ([]model.Fill, 
 	for rows.Next() {
 		var f model.Fill
 		var odo sql.NullInt64
-		var unusual int
+		var unusual bool
 		var ts string
 		if err := rows.Scan(&f.EFleetsID, &f.CardCompanyVehicleNumber, &odo, &unusual, &ts, &f.ProviderCompanyVehicleNumber, &f.MerchantName, &f.MerchantAddress, &f.Source); err != nil {
 			return nil, err
 		}
 		f.Odometer = scanIntPtr(odo)
-		f.UnusualY = unusual != 0
+		f.UnusualY = unusual
 		if t, err := time.Parse(time.RFC3339, ts); err == nil {
 			f.ProviderTransactionTime = t
 		}
@@ -445,8 +437,12 @@ func (s *Store) UpsertDevice(ctx context.Context, d model.OneStepDevice) error {
 		link = *d.LinkedCarEFleetsID
 	}
 	_, err := s.exec(ctx, `INSERT INTO onestep_devices (factory_id, device_id, display_name, linked_car_efleets_id, dead) VALUES (?,?,?,?,?)
-		ON CONFLICT (factory_id) DO UPDATE SET device_id=excluded.device_id, display_name=excluded.display_name, linked_car_efleets_id=excluded.linked_car_efleets_id, dead=excluded.dead`,
-		d.FactoryID, d.DeviceID, d.DisplayName, link, boolToInt(d.Dead))
+		ON CONFLICT (factory_id) DO UPDATE SET
+			device_id=excluded.device_id,
+			display_name=excluded.display_name,
+			linked_car_efleets_id=COALESCE(excluded.linked_car_efleets_id, onestep_devices.linked_car_efleets_id),
+			dead=excluded.dead`,
+		d.FactoryID, d.DeviceID, d.DisplayName, link, d.Dead)
 	return err
 }
 
@@ -461,12 +457,12 @@ func (s *Store) ListDevicesForCar(ctx context.Context, efleetsID string) ([]mode
 	for rows.Next() {
 		var d model.OneStepDevice
 		var link sql.NullString
-		var dead int
+		var dead bool
 		if err := rows.Scan(&d.FactoryID, &d.DeviceID, &d.DisplayName, &link, &dead); err != nil {
 			return nil, err
 		}
 		d.LinkedCarEFleetsID = scanStrPtr(link)
-		d.Dead = dead != 0
+		d.Dead = dead
 		out = append(out, d)
 	}
 	return out, rows.Err()
@@ -500,7 +496,13 @@ func (s *Store) ListMilesSince(ctx context.Context, factoryIDs []string) ([]mode
 			}
 			out = append(out, m)
 		}
-		rows.Close()
+		if err := rows.Err(); err != nil {
+			_ = rows.Close()
+			return nil, err
+		}
+		if err := rows.Close(); err != nil {
+			return nil, err
+		}
 	}
 	return out, nil
 }
@@ -541,14 +543,14 @@ func (s *Store) OpenHolds(ctx context.Context) ([]model.HoldEvent, error) {
 	for rows.Next() {
 		var h model.HoldEvent
 		var ts string
-		var open int
+		var open bool
 		if err := rows.Scan(&h.EFleetsID, &h.Reason, &h.Detail, &ts, &open); err != nil {
 			return nil, err
 		}
 		if t, err := time.Parse(time.RFC3339, ts); err == nil {
 			h.At = t
 		}
-		h.Open = open != 0
+		h.Open = open
 		out = append(out, h)
 	}
 	return out, rows.Err()

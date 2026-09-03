@@ -26,7 +26,7 @@ func TestDriveStopSumsMilesIgnoresOdometerJSON(t *testing.T) {
 		if r.URL.Query().Get("factory_id") != "FACT1" {
 			t.Errorf("factory_id %s", r.URL.Query().Get("factory_id"))
 		}
-		_, _ = w.Write([]byte(`{\"odometer\":999999,\"stops\":[{\"miles\":3.2,\"odometer\":111},{\"distance\":1.3}]}`))
+		_, _ = w.Write([]byte(`{"odometer":999999,"stops":[{"miles":3.2,"odometer":111},{"distance":1.3}]}`))
 	}))
 	defer srv.Close()
 	c := NewClient(srv.URL, "tok")
@@ -42,24 +42,24 @@ func TestDriveStopSumsMilesIgnoresOdometerJSON(t *testing.T) {
 
 
 func TestDriveStopRejectsRowsWithoutDistance(t *testing.T) {
-	_, err := sumDriveStop([]byte(`{\"stops\":[{\"odometer\":999999}]}`))
+	_, err := sumDriveStop([]byte(`{"stops":[{"odometer":999999}]}`))
 	if err == nil {
 		t.Fatal("device odometer must not become zero drive-stop miles")
 	}
-	n, err := sumDriveStop([]byte(`{\"stops\":[],\"odometer\":999999}`))
+	n, err := sumDriveStop([]byte(`{"stops":[],"odometer":999999}`))
 	if err != nil || n != 0 {
 		t.Fatalf("empty measured trip list: miles=%v err=%v", n, err)
 	}
 }
 
 func TestDriveStopRejectsNonObjectRows(t *testing.T) {
-	if _, err := sumDriveStop([]byte(`{\"stops\":[null]}`)); err == nil {
+	if _, err := sumDriveStop([]byte(`{"stops":[null]}`)); err == nil {
 		t.Fatal("null stop row must not become zero miles")
 	}
 }
 
 func TestParseDevicesResultList(t *testing.T) {
-	devs, err := parseDevices([]byte(`{\"result_list\":[{\"factory_id\":\"FACT1\",\"device_id\":\"DEV1\",\"display_name\":\"VA19\",\"odometer\":50}]}`))
+	devs, err := parseDevices([]byte(`{"result_list":[{"factory_id":"FACT1","device_id":"DEV1","display_name":"VA19","odometer":50}]}`))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -83,7 +83,7 @@ func TestJWTAuthHeaderNotRawKey(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		sawAuth = r.Header.Get("Authorization")
 		sawQuery = r.URL.RawQuery
-		_, _ = w.Write([]byte(`[{\"factory_id\":\"FACT1\",\"device_id\":\"DEV1\"}]`))
+		_, _ = w.Write([]byte(`[{"factory_id":"FACT1","device_id":"DEV1"}]`))
 	}))
 	defer srv.Close()
 	c := NewClient(srv.URL, "raw-api-key-must-not-appear")
@@ -106,7 +106,7 @@ func TestAPIKeyQueryWhenNoPEM(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		sawAuth = r.Header.Get("Authorization")
 		sawQuery = r.URL.RawQuery
-		_, _ = w.Write([]byte(`[{\"factory_id\":\"FACT1\",\"device_id\":\"DEV1\"}]`))
+		_, _ = w.Write([]byte(`[{"factory_id":"FACT1","device_id":"DEV1"}]`))
 	}))
 	defer srv.Close()
 	c := NewClient(srv.URL, "query-key")
@@ -124,7 +124,7 @@ func TestAPIKeyQueryWhenNoPEM(t *testing.T) {
 
 func TestListDevicesFactoryID(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, _ = w.Write([]byte(`[{\"factory_id\":\"FACT1\",\"device_id\":\"DEV1\",\"display_name\":\"VA19\",\"odometer\":50}]`))
+		_, _ = w.Write([]byte(`[{"factory_id":"FACT1","device_id":"DEV1","display_name":"VA19","odometer":50}]`))
 	}))
 	defer srv.Close()
 	c := NewClient(srv.URL, "tok")
@@ -179,6 +179,44 @@ func TestHTTPErrorBodyRedactsAPIKey(t *testing.T) {
 		t.Fatal("expected error")
 	}
 	if strings.Contains(err.Error(), "super-secret-token") {
+		t.Fatalf("leaked api key in error: %v", err)
+	}
+	if !strings.Contains(err.Error(), "[redacted]") {
+		t.Fatalf("expected redaction marker: %v", err)
+	}
+}
+
+func TestHTTPErrorBodyRedactsJWT(t *testing.T) {
+	priv, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatal(err)
+	}
+	der, err := x509.MarshalPKCS8PrivateKey(priv)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pemBytes := pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: der})
+	var sawJWT string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		auth := r.Header.Get("Authorization")
+		sawJWT = strings.TrimPrefix(auth, "Bearer ")
+		http.Error(w, "invalid token "+sawJWT, http.StatusUnauthorized)
+	}))
+	defer srv.Close()
+	client := NewClient(srv.URL, "raw-api-key-must-not-appear")
+	client.PrivateKeyPEM = string(pemBytes)
+	client.HTTP = srv.Client()
+	_, err = client.ListDevices(context.Background())
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if sawJWT == "" || !strings.HasPrefix(sawJWT, "eyJ") {
+		t.Fatalf("expected JWT auth, got %q", sawJWT)
+	}
+	if strings.Contains(err.Error(), sawJWT) {
+		t.Fatalf("leaked JWT in error: %v", err)
+	}
+	if strings.Contains(err.Error(), "raw-api-key-must-not-appear") {
 		t.Fatalf("leaked api key in error: %v", err)
 	}
 	if !strings.Contains(err.Error(), "[redacted]") {

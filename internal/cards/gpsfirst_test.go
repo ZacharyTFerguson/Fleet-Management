@@ -304,6 +304,119 @@ func TestGPSFirstPicksCarSittingAtSharedPump(t *testing.T) {
 	}
 }
 
+func TestGPSFirstTwoBoxesAtPumpStayUnnamedWithoutFuel(t *testing.T) {
+	at := ny(2026, 8, 30, 10)
+	lat, lng := 37.54, -77.43
+	visits := append(pumpClusterSeeds(lat, lng, at),
+		model.StopVisit{EFleetsID: "27VA15", FactoryID: "FACT-A", HasPos: true, Lat: lat, Lng: lng, From: at, To: at.Add(10 * time.Minute)},
+		model.StopVisit{EFleetsID: "27VA19", FactoryID: "FACT-B", HasPos: true, Lat: lat, Lng: lng, From: at, To: at.Add(8 * time.Minute)},
+	)
+	txs := []model.CardTx{{
+		CardID: "CARD-COLLIDE", At: at.Add(3 * time.Minute),
+		StationName: "SHELL", StationAddress: "1 MAIN ST, TOWN, VA",
+		RecordedEFleetsID: "WRONG",
+	}}
+	fleet := []model.Car{
+		{EFleetsID: "27VA15", Nickname: "VA15", Region: "VA"},
+		{EFleetsID: "27VA19", Nickname: "VA19", Region: "VA"},
+	}
+	got := MatchGPSFirst(visits, txs, fleet, DefaultStopSlack)
+	if len(got.Calls) != 0 {
+		t.Fatalf("two linked boxes in 350 m must stay unnamed without fuel history: %+v", got.Calls)
+	}
+	empty := MatchGPSFirstWithFuel(visits, txs, fleet, DefaultStopSlack, SeriesFuelLook(nil, nil))
+	if len(empty.Calls) != 0 {
+		t.Fatalf("empty fuel series must not invent a gauge: %+v", empty.Calls)
+	}
+}
+
+func TestGPSFirstFuelJumpNamesUniqueRise(t *testing.T) {
+	at := ny(2026, 8, 30, 10)
+	lat, lng := 37.54, -77.43
+	visits := append(pumpClusterSeeds(lat, lng, at),
+		model.StopVisit{EFleetsID: "27VA15", FactoryID: "FACT-A", HasPos: true, Lat: lat, Lng: lng, From: at, To: at.Add(10 * time.Minute)},
+		model.StopVisit{EFleetsID: "27VA19", FactoryID: "FACT-B", HasPos: true, Lat: lat, Lng: lng, From: at, To: at.Add(8 * time.Minute)},
+	)
+	txs := []model.CardTx{{
+		CardID: "CARD-COLLIDE", At: at.Add(3 * time.Minute),
+		StationName: "SHELL", StationAddress: "1 MAIN ST, TOWN, VA",
+		RecordedEFleetsID: "WRONG",
+	}}
+	fleet := []model.Car{
+		{EFleetsID: "27VA15", Nickname: "VA15", Region: "VA"},
+		{EFleetsID: "27VA19", Nickname: "VA19", Region: "VA"},
+	}
+	fill := txs[0].At
+	look := SeriesFuelLook([]FuelPoint{
+		{FactoryID: "FACT-A", At: fill.Add(-time.Hour), Level: 15},
+		{FactoryID: "FACT-A", At: fill.Add(time.Hour), Level: 88},
+		{FactoryID: "FACT-B", At: fill.Add(-time.Hour), Level: 62},
+		{FactoryID: "FACT-B", At: fill.Add(time.Hour), Level: 48},
+	}, map[string]float64{"FACT-A": 3, "FACT-B": 11})
+	got := MatchGPSFirstWithFuel(visits, txs, fleet, DefaultStopSlack, look)
+	if len(got.Calls) != 1 || got.Calls[0].CalledCar != "27VA15" {
+		t.Fatalf("unique fuel rise must name VA15: %+v", got.Calls)
+	}
+	if got.Calls[0].EnterpriseCar != "WRONG" {
+		t.Fatalf("Enterprise Vehicle is not identity: %+v", got.Calls[0])
+	}
+}
+
+func TestGPSFirstFuelJumpBothRoseStaysUnnamed(t *testing.T) {
+	at := ny(2026, 8, 30, 10)
+	lat, lng := 37.54, -77.43
+	visits := append(pumpClusterSeeds(lat, lng, at),
+		model.StopVisit{EFleetsID: "27VA15", FactoryID: "FACT-A", HasPos: true, Lat: lat, Lng: lng, From: at, To: at.Add(10 * time.Minute)},
+		model.StopVisit{EFleetsID: "27VA19", FactoryID: "FACT-B", HasPos: true, Lat: lat, Lng: lng, From: at, To: at.Add(8 * time.Minute)},
+	)
+	txs := []model.CardTx{{
+		CardID: "CARD-COLLIDE", At: at.Add(3 * time.Minute),
+		StationName: "SHELL", StationAddress: "1 MAIN ST, TOWN, VA",
+	}}
+	fill := txs[0].At
+	look := SeriesFuelLook([]FuelPoint{
+		{FactoryID: "FACT-A", At: fill.Add(-time.Hour), Level: 20},
+		{FactoryID: "FACT-A", At: fill.Add(time.Hour), Level: 80},
+		{FactoryID: "FACT-B", At: fill.Add(-time.Hour), Level: 30},
+		{FactoryID: "FACT-B", At: fill.Add(time.Hour), Level: 90},
+	}, map[string]float64{"FACT-A": 1, "FACT-B": 1})
+	got := MatchGPSFirstWithFuel(visits, txs, []model.Car{
+		{EFleetsID: "27VA15", Nickname: "VA15", Region: "VA"},
+		{EFleetsID: "27VA19", Nickname: "VA19", Region: "VA"},
+	}, DefaultStopSlack, look)
+	if len(got.Calls) != 0 {
+		t.Fatalf("both rose must stay unnamed: %+v", got.Calls)
+	}
+}
+
+func TestGPSFirstFuelJumpDoesNotLoosen350m(t *testing.T) {
+	at := ny(2026, 8, 30, 10)
+	visits := []model.StopVisit{
+		{EFleetsID: "27VA15", FactoryID: "FACT-A", HasPos: true, Lat: 37.54, Lng: -77.43, From: at, To: at.Add(10 * time.Minute)},
+		{EFleetsID: "27VA19", FactoryID: "FACT-B", HasPos: true, Lat: 38.85, Lng: -77.05, From: at, To: at.Add(10 * time.Minute)},
+	}
+	txs := []model.CardTx{{
+		CardID: "CARD-FAR", At: at.Add(2 * time.Minute),
+		StationName: "WAWA", StationAddress: "1 ST, RICHMOND, VA",
+	}}
+	fill := txs[0].At
+	look := SeriesFuelLook([]FuelPoint{
+		{FactoryID: "FACT-A", At: fill.Add(-time.Hour), Level: 70},
+		{FactoryID: "FACT-A", At: fill.Add(time.Hour), Level: 40},
+		{FactoryID: "FACT-B", At: fill.Add(-time.Hour), Level: 10},
+		{FactoryID: "FACT-B", At: fill.Add(time.Hour), Level: 95},
+	}, map[string]float64{"FACT-A": 20, "FACT-B": 5})
+	got := MatchGPSFirstWithFuel(visits, txs, []model.Car{
+		{EFleetsID: "27VA15", Nickname: "VA15", Region: "VA"},
+		{EFleetsID: "27VA19", Nickname: "VA19", Region: "VA"},
+	}, DefaultStopSlack, look)
+	for _, c := range got.Calls {
+		if c.CalledCar == "27VA19" {
+			t.Fatalf("fuel jump must not name a box outside 350 m: %+v", got.Calls)
+		}
+	}
+}
+
 func TestFillsWithFleetSightDropsOneBoxAugustFetch(t *testing.T) {
 	var linked []model.OneStepDevice
 	ids := []string{"F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8"}

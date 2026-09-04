@@ -20,6 +20,7 @@ Each locked rule has a fixture. Live eFleets/OneStep/Supabase are never required
 | Card history one-path CLI + backprop eras | `internal/app` TestCardsHistory* + `internal/cards` TestBackprop* |
 | Devices CSV display_name is a label only | `internal/onestep` TestWriteDevicesCSVDisplayNameIsLabelOnly |
 | Device Information JSON file-drop VIN pair (imei=factory_id; params.vin ignored) | `testdata/onestep/device_information.json` + `internal/onestep` TestParseDevicesDeviceInformation* + `internal/app` TestApplyDeviceInformation* |
+| Two-box 350 m pump collision unnamed without fuel history; unique rise only with synthetic series | `internal/cards` TestGPSFirstTwoBoxesAtPumpStayUnnamedWithoutFuel, TestPickFuelJumpCollision* |
 | Same-second different odo → SAME_SECOND_FILL | `internal/oil` TestSameSecondDifferentOdo |
 | Dead factory_id not summed | `internal/oil` TestDeadFactoryIDNotSummed |
 | Header trim (`Cust Name `) not column I/J | `enterprise/details.csv` |

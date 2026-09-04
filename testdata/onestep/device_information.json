@@ -7,6 +7,7 @@
       "vin": "1HGCM82633A004352",
       "decoded_vin": {"vehicle_vin": "1HGCM82633A004352", "vehicle_make": "HONDA", "vehicle_model": "Civic", "vehicle_year": 2003},
       "odometer": {"value": 999999, "unit": "mi", "display": "999999 mi"},
+      "fuel_type": "Gasoline",
       "license_plate": "ABC1234",
       "latest_device_point": {"params": {"vin": "1HGCM82633A000099"}}
     },

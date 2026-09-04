@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
+	"encoding/json"
 	"encoding/pem"
 	"errors"
 	"net/http"
@@ -39,6 +40,32 @@ func TestParseDriveStopVisitsStopsOnly(t *testing.T) {
 	}
 	if v[0].To.Sub(v[0].From) != 15*time.Minute {
 		t.Fatalf("window %s %s", v[0].From, v[0].To)
+	}
+}
+
+func TestParseDriveStopVisitsDoesNotInventFuel(t *testing.T) {
+	body := []byte(`{
+		"distance":{"value":8,"unit":"mi"},
+		"drive_stop_list":[
+			{"type":"drive","time_from":"2026-08-30T10:00:00Z","time_to":"2026-08-30T10:20:00Z","distance":{"value":8,"unit":"mi"},"fuel_level":12},
+			{"type":"stop","time_from":"2026-08-30T10:20:00Z","time_to":"2026-08-30T10:28:00Z",
+			 "lat_lng_best_first":{"lat":37.54,"lng":-77.43},"fuel_level":77,"device_state":{"fuel":{"percent":77}}}
+		]
+	}`)
+	v, err := parseDriveStopVisits(body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(v) != 1 || !v[0].HasPos {
+		t.Fatalf("stop only: %+v", v)
+	}
+	b, err := json.Marshal(v[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := strings.ToLower(string(b))
+	if strings.Contains(s, "fuel") || strings.Contains(s, "percent") {
+		t.Fatalf("drive-stop must not invent a fuel gauge: %s", b)
 	}
 }
 
@@ -208,6 +235,28 @@ func TestDriveStopChunksOnHTTP500(t *testing.T) {
 	}
 }
 
+func TestParseDevicesDoesNotCaptureFuelGauge(t *testing.T) {
+	devs, err := parseDevices([]byte(`[{
+		"factory_id":"FACT1","device_id":"DEV1","display_name":"VA19",
+		"fuel_type":"Gasoline","fuel_level":41,
+		"latest_device_point":{"device_state":{"vin":"1HGCM82633A004352","fuel_level":77,"fuel":{"percent":77}},"params":{"vin":"IGNORED"}}
+	}]`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(devs) != 1 || devs[0].FactoryID != "FACT1" || devs[0].VIN != "1HGCM82633A004352" {
+		t.Fatalf("%+v", devs)
+	}
+	b, err := json.Marshal(devs[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := strings.ToLower(string(b))
+	if strings.Contains(s, "fuel") || strings.Contains(s, "41") || strings.Contains(s, "77") {
+		t.Fatalf("device parse must not keep a fuel gauge (now-snapshot is not fill±1h history): %s", b)
+	}
+}
+
 func TestParseDevicesResultList(t *testing.T) {
 	devs, err := parseDevices([]byte(`{"result_list":[{"factory_id":"FACT1","device_id":"DEV1","display_name":"VA19","odometer":50}]}`))
 	if err != nil {
@@ -298,6 +347,15 @@ func TestParseDevicesDeviceInformationIMEIAndReportVIN(t *testing.T) {
 	}
 	if by["KEEP"].FactoryID != "KEEP" || by["KEEP"].VIN != "1HGCM82633A004352" {
 		t.Fatalf("KEEP %+v", by["KEEP"])
+	}
+	for _, d := range devs {
+		b, err := json.Marshal(d)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(strings.ToLower(string(b)), "fuel") {
+			t.Fatalf("Device Information parse must not keep fuel_type as a gauge: %s", b)
+		}
 	}
 }
 

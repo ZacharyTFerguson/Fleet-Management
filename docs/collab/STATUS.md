@@ -45,6 +45,16 @@ Cache: `data/runtime/gps-stops.json` (gitignored). `--no-gps` rematches from cac
 
 2026-09-04 later run (real Drive `DETAILS_583424_30-Days` + live OneStep stops, May 16–Jun 17 window, then VIN-linked boxes filled into the cache): **35,404** stop windows (`with_pos=35389`), **1,421** pump clusters, **214** GPS-first matches, **63** BEST, **1,098** calls, **119** geocoded stations. Adding boxes reduced exclusive sits (251 → 214) and still raised known cars. Nearby `--live` later filled 260 uncovered boxes into the same gitignored cache (**72,074** visits / **1,737** pumps) without rewriting `card_eras`. Watch `--live` then filled **watched** boxes only (cache **77,785** → **146,771** visits / **2,547** pumps). `cards history --no-gps` rematch: **522** GPS-first matches, **92** BEST, known **92 / 205 (44.9%)**. Synthetic TRACKER 10:00 AM file-drop is no longer the coverage input.
 
+## Fuel-gauge collision breaker (fail closed)
+
+Operator intent: when **exactly two** linked boxes sit in the GPS exclusive-sit circle (~350 m, short stop at fill ± slack), name the swipe from the box whose fuel **rose** ~1 hour after vs ~1 hour before, using drive-stop `distance.value` in that window (not odo) so a drive-down is not a fill. Missing fuel, both rose, or both fell → still unnamed. Does not loosen 350 m. Does not write Last Reading. Join on `factory_id`.
+
+**Current dumps cannot do this.** Saved Device Information (`data/runtime/device-information.json`, 223 rows) has `fuel_type` (Gasoline / 87 Regular / empty) and **no** `latest_device_point`, `device_state.fuel`, or `fuel_level` — same gap as VIN (`latest_device_point.device_state.vin` is absent on this export). `gps-stops.json` visits are `factory_id` + stop window + lat/lng only (146,771 rows, no fuel, no per-drive miles). Drive-stop parser keeps stop times/positions; trip miles are summed for Last Reading, not stored per fill±1h. Do **not** send `return_points` (hung fleet). `GET /device?latest_point=true` is a **now** snapshot; even if `device_state` later had a gauge, it cannot sample a past fill−1h vs fill+1h.
+
+Needed (not proven here — do not invent params): a fuel-level **history** keyed by `factory_id` (or `device_id`) at those two times, plus existing drive-stop distance for **those two boxes** in the same window, paced (`--pace`). First proof: one `GET /v3/api/public/report-type` (not a fleet pull) to see whether a fuel/breadcrumb/device-point history report exists; copy only a proven `report_output_field_list`. Do not re-run nearby `--live` or a second watch. Do not compete with live VIN-ask HTTP.
+
+Code: `internal/cards/fueljump.go` (`PickFuelJumpCollision`). Production `MatchGPSFirst` passes a nil look. Tests use a synthetic series and lock that parsers do not invent a gauge.
+
 ## Station ladder (3 / 5 / 10) — this wave
 
 `oilchange devices csv [--live] [--out data/runtime/onestep-devices.csv]` dumps `factory_id,device_id,display_name,linked_car_efleets_id,status`. `display_name` is a label only.
@@ -128,6 +138,7 @@ sqlite after rematch: cars=205, `onestep_devices`=264 (204 linked rows, 60 unpai
 ## Next (reasonable)
 
 - Watch GPS + VIN-ask + history rematch for this 30-day window is done. Do not start another `cards watch --live`. Do not re-run 260-box nearby `--live`.
+- Two-at-pump collisions stay unnamed until a proven fuel-level **history** endpoint (fill±1h) exists. Do not treat Device Information `fuel_type` or a `/device` now-snapshot as that history. First proof is one `report-type` catalog GET, not a fleet pull.
 - Leftover unpaired boxes: live `/device` OBD VIN was empty or not on the roster (**0** new links). Do not join on `display_name` / plate / nickname / `params.vin`. If OneStep is cooling down, apply a saved Device Information JSON (`devices vin --from`) rather than another live ask.
 - Nearby likely `292NCX` / `7000335987` / card `57770` still needs more exclusive fill days for a *certain* persist from the hunt; GPS-first rematch already named that car on the card. A **90-day** DETAILS file-drop is the next card-era path, not loosening 1-mile to a join.
 - File-drop a **90-day** (or current 30-day) Fuel DETAILS CSV — June 2026 30-day already proved the matcher. Do not ask for an eFleets password or MFA code in chat. Optional: `EFLEETS_DETAILS_URL` + CDP on an already-logged-in tab.

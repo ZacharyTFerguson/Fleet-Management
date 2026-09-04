@@ -100,7 +100,7 @@ A strict 15–30 s gap between each of 260 boxes would take hours; that cadence 
 4. Every `factory_id` in that window is a **watch**. One hit is not a join.
 5. Prefer devices whose stop **overlaps the fill second** (±20 min slack). Those are “at the pump when it filled up.”
 6. Repeat fills. Same exclusive `factory_id` at fill time on **2** days = likely; **3** = certain enough to name the card as that box’s **linked car** (if the box already has a `factory_id`→car link). Unpaired boxes stay on the watch list unless exact 17-char OBD VIN matches `cars.vin` (existing `LinkByVIN`, not this hunt).
-7. Two boxes at fill time → not exclusive; keep watching.
+7. Two boxes at fill time → not exclusive; keep watching. Fuel-gauge hour-before/after is the intended extra signal for an exact **two** linked boxes in the **350 m** exclusive-sit circle (not the 1-mile hunt). Current Device Information dump and gps-stops cache do **not** carry fuel history (`fuel_type` is Gasoline, not a gauge; no `latest_device_point`). Fail closed (still unnamed) until a proven history endpoint exists. Do not invent `fuel_level`. Do not loosen 350 m to 1 mile.
 8. Never invent a `factory_id`. Never join on `near_address_entity` / `display_name` / plate.
 
 ## Code
@@ -109,7 +109,7 @@ A strict 15–30 s gap between each of 260 boxes would take hours; that cadence 
 - `internal/cards/nearby.go` — fill-day window, 1-mile haversine on stop visits, watch/likely/certain.
 - CLI: `oilchange cards nearby [--card ID] [--live] [--report] [--persist] [--report-cap N]`
 - CLI: `oilchange cards watch [--card ID] [--live] [--persist] [--fills 10] [--pace 35s]` — newest 10 punches per unknown card, drive-stop **only watched** `factory_id`s, 35s (or `Retry-After`) between GETs. Virginia DETAILS vehicles seed which box to ask about; GPS exclusive days still required to persist.
-- Tests: parse fixture, httptest generate/poll/mutex, fill-day bounds, exclusive vs collision, same-day watch, incomplete coverage, PERSON persist veto. Never live OneStep in `go test`.
+- Tests: parse fixture, httptest generate/poll/mutex, fill-day bounds, exclusive vs collision, same-day watch, incomplete coverage, PERSON persist veto. Fuel-gauge collision breaker: `internal/cards/fueljump.go` (fail closed without a series). Never live OneStep in `go test`.
 
 ## Rewrite (review loop 1)
 
@@ -178,11 +178,27 @@ One process (`/tmp/oilchange cards watch --live --persist --fills 10 --pace 35s`
 - Then `cards history --no-gps` rematch (no live GPS, no live `/device`): `coverage roster=205 device_link=196 (95.6%) card_era=92 (44.9%) known=92 (44.9%) ladder_locked=90`. Cache **146,771** visits / **2,547** pumps. Artifacts: `/opt/cursor/artifacts/history_no_gps.err`, `history_no_gps.out`.
 - Do not start a second watch. Do not `cards coverage --no-gps` as a metrics shortcut (it ReplaceEras).
 
+## Fuel-gauge collision (intended, not live yet)
+
+When GPS-first sees **exactly two** linked `factory_id`s in the 350 m exclusive-sit circle, the operator wants the car whose fuel **rose** ~1h after vs ~1h before, after accounting for drive-stop miles in that window (a drop is consumption, not a fill). Missing / both rose / both fell → unnamed.
+
+This repo does not have that history:
+
+| Source | What it has | Fuel at fill±1h? |
+|---|---|---|
+| `data/runtime/device-information.json` | 223 rows: `imei`, `vin`, `odometer`, `engine_hours`, **`fuel_type`** (Gasoline). No `latest_device_point` | No |
+| `data/runtime/gps-stops.json` | stop `from`/`to` + lat/lng | No |
+| `GET /route/drive-stop` | stop windows + `distance.value` on drives. Do not send `return_points` | No gauge |
+| `GET /device?latest_point=true` | **now** OBD VIN snapshot | Not history |
+
+Needed: a proven time-series of fuel level keyed by `factory_id` (or `device_id`) plus existing drive-stop miles for those two boxes in [fill−1h, fill+1h], paced (`--pace`). First check: one `GET /v3/api/public/report-type` (not a fleet pull); do not invent report fields. Code: `internal/cards/fueljump.go`. Production matcher passes a nil look.
+
 ## Do not
 
 - Use bank posting time.
 - Auto-join from a single 1-mile hit.
 - Loosen GPS-first exclusive-sit (350 m / short stop) to 1 mile.
+- Invent `fuel_level` / miles / MPG to break a two-box sit.
 - Write Last Reading from this hunt.
 - Commit `oilchange.env`, sqlite, or `data/runtime/`.
 - Re-run a 260-box `cards nearby --live` to chase leftovers — use `cards watch`.

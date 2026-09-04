@@ -72,6 +72,25 @@ Do **not** send top-level `address` / `radius` / `dt_from` — those never land 
 
 JSON download: the job carries `OutputFilePath` on the OneStep webfiles volume. Public `GET` siblings (`/download`, `/file`, `/data`, `/csv`, …) were **404**. `{id}.json` was **403** (controller `ReportGeneratedAPIController.Fetch`, not a row payload). oilchange still generates+polls so the spec stays honest; **rows used for the hunt come from drive-stop stop windows** (same 1 mile / fill-day ±1 contract) which this repo already fetches with mutex-serialized HTTP.
 
+## OneStep API rate / batching (support.php)
+
+From OneStep support **Data and Functionality** ([track.onestepgps.com/support.php](https://track.onestepgps.com/support.php)):
+
+- API is **real-time**.
+- Recommended pull cadence: **15–30 seconds or more** between routine polls of the same live feed.
+- Hourly API limit: **5,000** calls (~120,000/day theoretical). In practice even large customers land **5,000–10,000 calls/day**.
+- 5,000/hour is more than 1/second (3,600 s/hour).
+- **Recommend batching requests for multiple devices** when the endpoint supports it.
+
+How oilchange applies that:
+
+| Path | Batching? | Pace |
+|---|---|---|
+| `near_address` generate-reports | **Yes** — one job with `all_user_devices: true` covers the fleet | `--report-cap` (default 3) so we never spam generate |
+| `GET /route/drive-stop` | **No** — live contract is a single `device_id` query param (`dt_tracker_from` / `dt_tracker_to` / `stop_duration`). Comma-lists / multi-id params are **not** proven; do not invent them | `Client.mu` serializes HTTP; nearby `--live` also enforces **≥1 s** between boxes and logs progress every **25** devices so a ~260-box fill-day pull stays under the hourly ceiling without looking hung |
+
+A strict 15–30 s gap between each of 260 boxes would take hours; that cadence is for routine realtime polling, not a one-shot coverage backfill. Prefer the batched `near_address` job when JSON download works; until then, paced one-device drive-stop is the honest path.
+
 ## Hunt rules (watch → certain)
 
 1. Unknown cards only (no GPS-named **car** era yet, or coverage `unknown remaining`). Driver-kept / logistics PERSON cards never create a device↔car join.
@@ -113,7 +132,7 @@ Station lookup prefers name + full street. Two SHELL pumps in the same city stay
 
 Cache-only: `certain=0 likely=0 watch=45 cards=20 coverage_complete=false` (linked-box cache only).
 
-Live `oilchange cards nearby --live` (no `--report`, no `--persist`): fetched **260** uncovered boxes, ~20.4 min, exit 0.
+Live `oilchange cards nearby --live` (no `--report`, no `--persist`): fetched **260** uncovered boxes one-at-a-time under `Client.mu`, ~20.4 min, exit 0. That run predated the ≥1 s nearby pace + progress logs; it already averaged ~4.7 s/box from network time alone. **Do not re-run a full 260-box live fetch** unless batching is proven on drive-stop (it is not).
 
 ```
 nearby certain=0 likely=1 watch=47 cards=20 radius=1mi window=fill-day±1 coverage_complete=true
@@ -124,6 +143,7 @@ nearby certain=0 likely=1 watch=47 cards=20 radius=1mi window=fill-day±1 covera
 - **Watch = 47** across 12 cards (print lists at most 5 watch devices per card). 8 cards had no 1-mile hit.
 - Unpaired `factory_id` `4572242789` and `3271251658` appeared in the mile list and stayed unpaired.
 - After the fetch, `cards coverage --no-gps` is **known 62 / 205 (30.2%)** vs the VIN-wave **63 / 205**. Extra stop visits did not raise exclusive GPS-first eras.
+- Artifact: `/opt/cursor/artifacts/nearby_live_summary.txt`.
 
 ## Do not
 

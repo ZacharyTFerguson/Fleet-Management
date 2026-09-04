@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -277,6 +278,81 @@ func TestCardsNearbyIncompleteCoverageDoesNotPersist(t *testing.T) {
 	}
 	if len(eras) != 0 {
 		t.Fatalf("persist must skip incomplete coverage: %+v", eras)
+	}
+}
+
+func TestCardsNearbyLiveStopsPacesOneDevicePerRequest(t *testing.T) {
+	prev := nearbyDriveStopMinInterval
+	nearbyDriveStopMinInterval = 40 * time.Millisecond
+	defer func() { nearbyDriveStopMinInterval = prev }()
+
+	p := filepath.Join(t.TempDir(), "oil.sqlite")
+	st, err := store.Open("sqlite", p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+
+	var hits int32
+	var lastDevice string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.Contains(r.URL.Path, "/device"):
+			_, _ = w.Write([]byte(`{"result_list":[
+				{"factory_id":"FACT-A","device_id":"DEV-A","active":true},
+				{"factory_id":"FACT-B","device_id":"DEV-B","active":true},
+				{"factory_id":"FACT-C","device_id":"DEV-C","active":true}
+			]}`))
+		case strings.Contains(r.URL.Path, "/route/drive-stop"):
+			atomic.AddInt32(&hits, 1)
+			did := r.URL.Query().Get("device_id")
+			if did == "" {
+				t.Error("drive-stop missing device_id")
+			}
+			if strings.Contains(did, ",") {
+				t.Errorf("must not invent multi-device_id batch param: %q", did)
+			}
+			if lastDevice != "" && did == lastDevice {
+				// ok to retry same box; just ensure one id per call
+			}
+			lastDevice = did
+			_, _ = w.Write([]byte(`{"drive_stop_list":[]}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer srv.Close()
+
+	c := onestep.NewClient(srv.URL, "tok")
+	c.HTTP = srv.Client()
+	cache := filepath.Join(t.TempDir(), "gps-stops.json")
+	a := &App{Store: st, GPSStopsPath: cache, OneStep: c}
+	ctx := context.Background()
+	ny := enterprise.NY()
+	for _, id := range []string{"FACT-A", "FACT-B", "FACT-C"} {
+		if err := st.UpsertDevice(ctx, model.OneStepDevice{
+			FactoryID: id, DeviceID: "DEV-" + id[len(id)-1:], Active: true,
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	fill := time.Date(2026, 6, 16, 14, 0, 0, 0, ny)
+	if err := st.UpsertCardTx(ctx, nearbySheetzTx("CARD-HOME", fill)); err != nil {
+		t.Fatal(err)
+	}
+	// Empty cache → all three boxes need a spanning fetch.
+	start := time.Now()
+	if _, err := a.CardsNearby(ctx, CardsNearbyOpts{LiveStops: true}); err != nil {
+		t.Fatal(err)
+	}
+	elapsed := time.Since(start)
+	got := atomic.LoadInt32(&hits)
+	if got < 3 {
+		t.Fatalf("expected ≥3 single-device drive-stop GETs, got %d", got)
+	}
+	// 3 calls with 40ms min gap → at least two waits (~80ms).
+	if elapsed < 70*time.Millisecond {
+		t.Fatalf("live multi-box pull must pace (~1/s class); elapsed=%s hits=%d", elapsed, got)
 	}
 }
 

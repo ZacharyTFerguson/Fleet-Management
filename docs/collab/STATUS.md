@@ -1,6 +1,6 @@
 # Shared status
 
-Updated: 2026-09-04 (UTC) after live nearby fill-day hunt (certain **0**, likely **1**, **0** eras persisted). Known on this sqlite is still **62 / 205 (30.2%)**, vs **63 / 205 (30.7%)** recorded after the OBD VIN GPS fill — nearby did not raise it.
+Updated: 2026-09-04 (UTC) after live nearby fill-day hunt (certain **0**, likely **1**, **0** eras persisted) + OneStep support.php rate/batch note. Known on this sqlite is still **62 / 205 (30.2%)**, vs **63 / 205 (30.7%)** recorded after the OBD VIN GPS fill — nearby did not raise it.
 
 ## True now
 
@@ -83,7 +83,9 @@ Tests lock the ladder with synthetic exclusive pumps (`internal/cards/ladder_tes
 
 Live generate-reports type **`near_address`** exists. Spec that actually echoes: `report_options_near_address.search_address_string` + `range: {value:1, unit:mi}`, `datetime_from`/`datetime_to` = Eastern **fill day ±1** (provider swipe, not bank posting), `all_user_devices` + `exclude_inactive_devices`, `time_zone=America/New_York`, JSON output fields including `near_address_factory_id`. Top-level `address`/`radius` are dropped. Public JSON download 404s; hunt rows use drive-stop stops at 1 mile. CLI: `oilchange cards nearby [--live] [--report] [--persist] [--report-cap N]`. GPS-called fills and car-era fills are skipped. Exclusive **Eastern days** (1=watch, 2=likely, 3=certain). Incomplete GPS coverage is watch-only. `--persist` writes **certain linked** car eras only; never unpaired boxes, never PERSON cards, never Last Reading. Method: `docs/collab/NEAR-ADDRESS.md`.
 
-**Live `--live` run (2026-09-04T18:55:55Z–19:16:20Z, exit 0, ~20.4 min).** Cache-only first: `certain=0 likely=0 watch=45 cards=20 coverage_complete=false`. Then mutex-serialized drive-stop for **260** boxes not covered in the fill-day window (no `--report`, no `--persist`).
+**OneStep support rate note** ([support.php](https://track.onestepgps.com/support.php) Data and Functionality): real-time API; recommend **15–30 s+** between routine pulls; **5,000 calls/hour** (~120k/day theoretical; large fleets often 5k–10k/day); prefer **batching multi-device** requests. `near_address` already batches via `all_user_devices`. Drive-stop is still **one `device_id` per GET** (no proven multi-id param) — nearby `--live` now paces ≥1 s between boxes + progress every 25; do not invent comma-lists. Do not spam `--report` (`--report-cap`). Do not re-fetch all 260 boxes unless drive-stop batching is proven.
+
+**Live `--live` run (2026-09-04T18:55:55Z–19:16:20Z, exit 0, ~20.4 min).** Cache-only first: `certain=0 likely=0 watch=45 cards=20 coverage_complete=false`. Then mutex-serialized drive-stop for **260** boxes not covered in the fill-day window (no `--report`, no `--persist`). Summary artifact: `/opt/cursor/artifacts/nearby_live_summary.txt`.
 
 | Metric | Cache-only | Live `--live` |
 |---|---|---|

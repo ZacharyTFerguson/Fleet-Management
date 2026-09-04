@@ -167,7 +167,10 @@ func (a *App) fillMissingNearbyStops(ctx context.Context, visits []model.StopVis
 	if len(missing) == 0 {
 		return visits, 0
 	}
-	fmt.Fprintf(os.Stderr, "nearby live-stops fetching %d boxes not covered in fill-day window\n", len(missing))
+	// drive-stop is one device_id per GET (no proven multi-device batch param).
+	// Cap at ~1 req/s so a fleet pull stays under the 5,000/hour support ceiling.
+	fmt.Fprintf(os.Stderr, "nearby live-stops fetching %d boxes not covered in fill-day window (1 device_id/req, min_interval=%s, progress every %d)\n",
+		len(missing), nearbyDriveStopMinInterval, nearbyLiveStopProgressEvery)
 	extra, failed := a.pullDriveStopVisitsCounted(ctx, missing, from, to)
 	visits = append(visits, extra...)
 	if err := cards.SaveStopVisits(a.gpsStopsCacheFile(), visits); err != nil {
@@ -176,33 +179,70 @@ func (a *App) fillMissingNearbyStops(ctx context.Context, visits []model.StopVis
 	return visits, failed
 }
 
+// nearbyDriveStopMinInterval keeps serialized multi-box drive-stop under ~1 req/s.
+// Support (track.onestepgps.com/support.php) allows 5,000/hour and recommends
+// batching when possible; this route only accepts a single device_id, so pace
+// instead of inventing multi-id query params. 15–30s would be too slow for ~260 boxes.
+var nearbyDriveStopMinInterval = time.Second
+
+const nearbyLiveStopProgressEvery = 25
+
 func (a *App) pullDriveStopVisitsCounted(ctx context.Context, devs []model.OneStepDevice, from, to time.Time) ([]model.StopVisit, int) {
 	if a == nil || a.OneStep == nil {
 		return nil, len(devs)
 	}
 	var visits []model.StopVisit
 	failed := 0
-	for _, d := range devs {
+	var lastCall time.Time
+	total := len(devs)
+	for i, d := range devs {
+		if err := nearbyPaceDriveStop(ctx, lastCall); err != nil {
+			return visits, failed + (total - i)
+		}
+		started := time.Now()
 		v, err := a.OneStep.DriveStopVisitsFor(ctx, d, from, to)
+		lastCall = started
 		if err != nil {
 			failed++
 			fmt.Fprintf(os.Stderr, "nearby gps-stops factory_id %s: %v\n", d.FactoryID, err)
-			continue
-		}
-		sentinel := model.StopVisit{
-			FactoryID: d.FactoryID,
-			DeviceID:  d.DeviceID,
-			From:      from,
-			To:        to,
-		}
-		if len(v) == 0 {
-			v = []model.StopVisit{sentinel}
 		} else {
-			v = append(v, sentinel)
+			sentinel := model.StopVisit{
+				FactoryID: d.FactoryID,
+				DeviceID:  d.DeviceID,
+				From:      from,
+				To:        to,
+			}
+			if len(v) == 0 {
+				v = []model.StopVisit{sentinel}
+			} else {
+				v = append(v, sentinel)
+			}
+			visits = append(visits, v...)
 		}
-		visits = append(visits, v...)
+		n := i + 1
+		if n == 1 || n == total || n%nearbyLiveStopProgressEvery == 0 {
+			fmt.Fprintf(os.Stderr, "nearby live-stops progress %d/%d failed=%d\n", n, total, failed)
+		}
 	}
 	return visits, failed
+}
+
+func nearbyPaceDriveStop(ctx context.Context, lastCall time.Time) error {
+	if lastCall.IsZero() || nearbyDriveStopMinInterval <= 0 {
+		return nil
+	}
+	wait := nearbyDriveStopMinInterval - time.Since(lastCall)
+	if wait <= 0 {
+		return nil
+	}
+	t := time.NewTimer(wait)
+	defer t.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-t.C:
+		return nil
+	}
 }
 
 func nearbyUnionWindow(txs []model.CardTx) (time.Time, time.Time) {

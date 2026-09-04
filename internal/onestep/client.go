@@ -234,6 +234,8 @@ func (c *Client) driveStopMiles(ctx context.Context, factoryID, deviceID string,
 
 // Live apidoc names (alexbeattie/OneStepGPS + portal): device_id, dt_tracker_from, dt_tracker_to, stop_duration.
 // Do not send factory_id or from — those 500. Do not request return_points (map UI only; it hung fleet sync).
+// One device_id per request only — multi-device batch query params are not proven on this route
+// (support.php recommends batching when an endpoint allows it; nearby paces serial calls instead).
 func (c *Client) fetchDriveStopWindow(ctx context.Context, deviceID string, from, to time.Time) (float64, error) {
 	b, err := c.fetchDriveStopBytes(ctx, deviceID, from, to)
 	if err != nil {

@@ -31,7 +31,7 @@ type CardsHistoryResult struct {
 
 // CardsHistory runs the card/vehicle history finder end to end:
 //  1. Fleet Summary roster (file-drop) so factory_id map can FK to cars
-//  2. OneStep devices inventory (optional --live / --map) and CSV dump
+//  2. OneStep devices inventory (optional --live / --map) and CSV dump, then VIN-ask unpaired boxes
 //  3. eFleets DETAILS ingest (file-drop or live when EFLEETS_* is in env)
 //  4. GPS stop cache + cards rebuild (pairings + card_eras)
 //  5. Station ladder 3 / 5 / 10 and coverage metrics
@@ -64,6 +64,14 @@ func (a *App) CardsHistory(ctx context.Context, opt CardsHistoryOpts) (CardsHist
 		}
 		res.DevicesN = n
 		fmt.Fprintf(os.Stderr, "history: devices sync upserted %d by factory_id\n", n)
+		a.OneStep = client
+		if client != nil {
+			pr, perr := a.PairDevicesByVIN(ctx, PairVINOpts{AskEmpty: true})
+			if perr != nil {
+				return empty, fmt.Errorf("devices VIN: %w", perr)
+			}
+			fmt.Fprintf(os.Stderr, "history: %s", pr.Format())
+		}
 	}
 
 	outPath := strings.TrimSpace(opt.DevicesOutPath)

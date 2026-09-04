@@ -483,6 +483,11 @@ func (a *App) CardsRebuild(ctx context.Context, fuelPath string) (int, error) {
 		return 0, err
 	}
 	ladder := cards.ClassifyLadder(gps, txs, fleet, devs, cards.DefaultLadderRungs)
+	existingEras, err := a.Store.ListEras(ctx)
+	if err != nil {
+		return 0, err
+	}
+	ladder.Eras = cards.PreserveUnladderedCarEras(ladder.Eras, existingEras)
 	if err := a.Store.ReplacePairings(ctx, ps); err != nil {
 		return 0, err
 	}

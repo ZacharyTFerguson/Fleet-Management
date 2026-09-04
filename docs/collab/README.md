@@ -42,7 +42,7 @@ Code: `internal/onestep/client.go`. Ingest: `oilchange sync-onestep --map data/r
 
 ## Nearby Address (unknown cards)
 
-Fill-day ±1 (provider swipe, not bank posting), 1 mile, watch `factory_id` until exclusive. Live spec: `docs/collab/NEAR-ADDRESS.md`. CLI: `oilchange cards nearby`.
+Fill-day ±1 (provider swipe, not bank posting), 1 mile, watch `factory_id` until exclusive. Live spec: `docs/collab/NEAR-ADDRESS.md`. CLI: `oilchange cards nearby`. Targeted follow-up: `oilchange cards watch --live --persist` (newest 10 fills, watched boxes only, 35s pace).
 
 ## Talk to the session that wrote this
 

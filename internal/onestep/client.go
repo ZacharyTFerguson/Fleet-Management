@@ -705,15 +705,7 @@ func (c *Client) post(ctx context.Context, path string, body []byte) ([]byte, er
 		return nil, safeHTTPError(path, "read response", err, c.Token, sentAuth)
 	}
 	if res.StatusCode >= 300 {
-		msg := strings.TrimSpace(string(b))
-		msg = sanitizeAuthError(msg, c.Token, sentAuth)
-		if len(msg) > 400 {
-			msg = msg[:400] + "…"
-		}
-		if msg == "" {
-			return nil, fmt.Errorf("onestep %s: HTTP %s", path, res.Status)
-		}
-		return nil, fmt.Errorf("onestep %s: HTTP %s: %s", path, res.Status, msg)
+		return nil, httpStatusError(path, res, b, 400, c.Token, sentAuth)
 	}
 	return b, nil
 }
@@ -763,16 +755,8 @@ func (c *Client) get(ctx context.Context, path string, q url.Values) ([]byte, er
 		return nil, safeHTTPError(path, "read response", err, c.Token, sentAuth)
 	}
 	if res.StatusCode >= 300 {
-		msg := strings.TrimSpace(string(b))
-		msg = sanitizeAuthError(msg, c.Token, sentAuth)
-		if len(msg) > 240 {
-			msg = msg[:240] + "…"
-		}
 		// Never echo query strings (api-key) or Authorization material.
-		if msg == "" {
-			return nil, fmt.Errorf("onestep %s: HTTP %s", path, res.Status)
-		}
-		return nil, fmt.Errorf("onestep %s: HTTP %s: %s", path, res.Status, msg)
+		return nil, httpStatusError(path, res, b, 240, c.Token, sentAuth)
 	}
 	return b, nil
 }

@@ -88,6 +88,7 @@ How oilchange applies that:
 |---|---|---|
 | `near_address` generate-reports | **Yes** — one job with `all_user_devices: true` covers the fleet | `--report-cap` (default 3) so we never spam generate |
 | `GET /route/drive-stop` | **No** — live contract is a single `device_id` query param (`dt_tracker_from` / `dt_tracker_to` / `stop_duration`). Comma-lists / multi-id params are **not** proven; do not invent them | `Client.mu` serializes HTTP; nearby `--live` also enforces **≥1 s** between boxes and logs progress every **25** devices so a ~260-box fill-day pull stays under the hourly ceiling without looking hung |
+| `cards watch --live` | **Batch by shrinking the set** — one drive-stop per **watched** `factory_id` covering the union of the newest 10 fill-day windows (not 260 boxes, not 10 GETs per fill) | **35 s** between GETs unless `Retry-After` is longer. Do not re-run nearby `--live`. |
 
 A strict 15–30 s gap between each of 260 boxes would take hours; that cadence is for routine realtime polling, not a one-shot coverage backfill. Prefer the batched `near_address` job when JSON download works; until then, paced one-device drive-stop is the honest path.
 
@@ -107,6 +108,7 @@ A strict 15–30 s gap between each of 260 boxes would take hours; that cadence 
 - `internal/onestep/nearaddress.go` — generate + poll + JSON parse; each HTTP call holds `Client.mu` (do not lock inside `get()`).
 - `internal/cards/nearby.go` — fill-day window, 1-mile haversine on stop visits, watch/likely/certain.
 - CLI: `oilchange cards nearby [--card ID] [--live] [--report] [--persist] [--report-cap N]`
+- CLI: `oilchange cards watch [--card ID] [--live] [--persist] [--fills 10] [--pace 35s]` — newest 10 punches per unknown card, drive-stop **only watched** `factory_id`s, 35s (or `Retry-After`) between GETs. Virginia DETAILS vehicles seed which box to ask about; GPS exclusive days still required to persist.
 - Tests: parse fixture, httptest generate/poll/mutex, fill-day bounds, exclusive vs collision, same-day watch, incomplete coverage, PERSON persist veto. Never live OneStep in `go test`.
 
 ## Rewrite (review loop 1)
@@ -145,6 +147,25 @@ nearby certain=0 likely=1 watch=47 cards=20 radius=1mi window=fill-day±1 covera
 - After the fetch, `cards coverage --no-gps` is **known 62 / 205 (30.2%)** vs the VIN-wave **63 / 205**. Extra stop visits did not raise exclusive GPS-first eras.
 - Artifact: `/opt/cursor/artifacts/nearby_live_summary.txt`.
 
+## Watch loop (newest 10, watched boxes only)
+
+A second full-fleet nearby `--live` is the wrong next step. After the 2026-09-04 260-box pull the leftover work is: **ask only the cars already on the watch list** (plus Virginia recorded vehicles, which this fleet treats as the right seed).
+
+`oilchange cards watch [--live] [--persist] [--fills 10] [--pace 35s]`:
+
+1. GPS-first uses the stop cache only (`OneStep` is niled around that call). Watch `--live` must not fleet-fetch linked boxes through `cards rebuild` GPS-first.
+2. Unknown fills only (same `EligibleUnknownFills` as nearby). PERSON stays watch-only.
+3. Card order: highest exclusive-day count first (the prior likely card), then Virginia recorded vehicles, then newest swipe.
+4. Per card: take the **newest 10** provider swipes. Seed `factory_id`s from cache 1-mile hits, plus the VA car’s linked box, plus one hypothesis roster car if the list is still empty. Never invent an unpaired `factory_id`.
+5. `--live` drive-stop those boxes for the **union** of those 10 fill-day ±1 windows, skipping a box already spanning-covered. One `device_id` per GET. Default **35 s** between calls; a `429`/`503` `Retry-After` waits that long and retries once.
+6. Hunt still scores **all** eligible fills for that card (May exclusive days + August fetches). Persist if watched-set coverage is complete, exactly one certain **linked** car, not PERSON, not unpaired.
+7. `cards rebuild --no-gps` keeps nearby-certain car eras the ladder did not replace, so a rematch cannot wipe a watch persist.
+8. After the hunt, **ask OneStep for VIN** on unpaired watched boxes: `GET /device?device_id=&latest_point=true` (OBD `device_state.vin` only). Exact 17-char match to `cars.vin` writes the factory_id→Enterprise link. `display_name` is never a join. CLI: `oilchange devices vin`. Then `cards history --no-gps` rematches GPS-at-the-pump.
+
+Maintenance VIN remains exact 17-char OBD `device_state.vin` = `cars.vin` from the roster (Fleet Summary / shop-backed VIN). A Fuel DETAILS drop is not a shop RO; do not `--shop-ro` a DETAILS file.
+
+The Aug–Sep 2026 DETAILS file (`DETAILS_583424_30-Days` (14)/(13) and the identically hashed `.xls`) is a new swipe window, not a duplicate of the May–June ingest.
+
 ## Do not
 
 - Use bank posting time.
@@ -152,3 +173,4 @@ nearby certain=0 likely=1 watch=47 cards=20 radius=1mi window=fill-day±1 covera
 - Loosen GPS-first exclusive-sit (350 m / short stop) to 1 mile.
 - Write Last Reading from this hunt.
 - Commit `oilchange.env`, sqlite, or `data/runtime/`.
+- Re-run a 260-box `cards nearby --live` to chase leftovers — use `cards watch`.

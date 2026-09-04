@@ -25,6 +25,7 @@ Sit-still / important-location Node app lives in a separate PR (`cursor/importan
 | `devices sync` | Upsert durable `onestep_devices` registry (`factory_id` PK, `device_id` history id, `display_name` label only). Optional `--map PATH`. Unpaired boxes may attach by exact 17-char OBD VIN (`device_state.vin` = `cars.vin`). Does not fetch miles. |
 | `devices list` | Print registry rows (status + optional `efleets_id` car link). `--csv` writes the inventory CSV. |
 | `devices csv` | Write `factory_id,device_id,display_name,linked_car_efleets_id,status`. `display_name` is a label only. `[--out PATH]` `[--live]` `[--map PATH]`. `--live` refreshes from OneStep if a token is present (no miles). |
+| `devices vin` | Ask OneStep `GET /device?device_id=&latest_point=true` for OBD VIN on unpaired boxes; join exact 17-char `device_state.vin` = `cars.vin`. `[--factory-id ID]` `[--pace 35s]`. Never display_name. Never Last Reading. |
 | `compute` | Last Reading + HOLD. `[--override-lower]` is the only way to write a lower reading. |
 | `oil-done` | `--efleets-id ID --miles N --date YYYY-MM-DD [--location NAME]` |
 | `report` | `[--interval 5000] [--due-within N] [--out PATH.csv]` |
@@ -43,6 +44,7 @@ Sit-still / important-location Node app lives in a separate PR (`cursor/importan
 | `cards ladder` | Exclusive GPS pump sits → cards at 3, then 5, then 10 stations. Buckets Cars / People / Offices. Persists `card_eras`. Prints coverage (device link + GPS-named card era). Never Last Reading. |
 | `cards coverage` | Coverage one-liner only (`cards ladder` metric). |
 | `cards nearby` | Fill-day ±1, 1 mile: watch GPS boxes at unknown-card pumps (provider swipe time, not bank posting). `--live` / `--report` / `--persist`. Never Last Reading. |
+| `cards watch` | Loop unknown cards: newest `--fills` (default 10) punches, **watched boxes only**, `--pace 35s` (Retry-After wins). Virginia recorded vehicles seed which `factory_id` to ask about. `--live` / `--persist`. Do not re-run a 260-box nearby `--live`. |
 | `env` | which `oilchange.env` keys loaded (presence only; never prints values) |
 
 Exit: `0` ok, `1` error, `2` compute finished with open HOLDs (report still allowed).

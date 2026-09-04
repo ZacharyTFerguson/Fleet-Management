@@ -109,6 +109,22 @@ Exclusivity is per **swipe** (only one `factory_id` overlapping fill ±20 min), 
 
 Station lookup prefers name + full street. Two SHELL pumps in the same city stay separate.
 
+## Live hunt results (2026-09-04)
+
+Cache-only: `certain=0 likely=0 watch=45 cards=20 coverage_complete=false` (linked-box cache only).
+
+Live `oilchange cards nearby --live` (no `--report`, no `--persist`): fetched **260** uncovered boxes, ~20.4 min, exit 0.
+
+```
+nearby certain=0 likely=1 watch=47 cards=20 radius=1mi window=fill-day±1 coverage_complete=true
+```
+
+- **Certain = 0** → did not `--persist`. Zero car eras added. Last Reading untouched.
+- **Likely = 1:** card `xxxxxxxxxxxxx57770`, `factory_id=7000335987` already linked to `292NCX`, exclusive at fill time on **2** Eastern days (need 3). Watch list, not a join.
+- **Watch = 47** across 12 cards (print lists at most 5 watch devices per card). 8 cards had no 1-mile hit.
+- Unpaired `factory_id` `4572242789` and `3271251658` appeared in the mile list and stayed unpaired.
+- After the fetch, `cards coverage --no-gps` is **known 62 / 205 (30.2%)** vs the VIN-wave **63 / 205**. Extra stop visits did not raise exclusive GPS-first eras.
+
 ## Do not
 
 - Use bank posting time.

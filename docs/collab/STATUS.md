@@ -1,6 +1,6 @@
 # Shared status
 
-Updated: 2026-09-04 (UTC) after OneStep-first devices CSV + station ladder (3/5/10).
+Updated: 2026-09-04 (UTC) after real named DETAILS file-drop + live GPS (known 25.4%, not 95%).
 
 ## True now
 
@@ -42,7 +42,7 @@ Portal `EFLEETS_MAINT_URL` is still the HTML tab, not a CSV. Next live pull need
 
 Cache: `data/runtime/gps-stops.json` (gitignored). `--no-gps` rematches from cache without hitting OneStep.
 
-2026-09-04 (prior GPS-first run with named merchants): 117,547 stop windows, **15** GPS-best cars, **49** matched swipes, 9 of those BEST cards disagree with Enterprise.
+2026-09-04 later run (real Drive `DETAILS_583424_30-Days` + live OneStep stops, May 16–Jun 17 window): **28,583** stop windows (`with_pos=28582`), **1,187** pump clusters, **251** GPS-first matches, **58** BEST, **1,172** calls, **138** geocoded stations. Synthetic TRACKER 10:00 AM file-drop is no longer the coverage input.
 
 ## Station ladder (3 / 5 / 10) — this wave
 
@@ -52,19 +52,24 @@ Cache: `data/runtime/gps-stops.json` (gitignored). `--no-gps` rematches from cac
 
 **Known** = factory_id link **and** a GPS-named **car** card era. Target 95%.
 
-This Cloud Agent live run (2026-09-04), `--no-gps` cache **107,118** stops / **148** GPS cars / **2,503** pump clusters:
+This Cloud Agent live run (2026-09-04): file-drop Drive `DETAILS_583424_30-Days` (2,076 named punches, 0 TRACKER, 1,175 distinct times) + Automations sheet factory_id map (155 links) + `--devices-live`. Do **not** invent punches. Matcher was **not** rewritten — unknown fell.
 
 | Metric | Value |
 |---|---|
-| sqlite roster | 207 (205 live + 2 demo) |
-| device_link | **148 / 207 (71.5%)** |
-| card_era | **0 / 207 (0.0%)** |
-| known | **0 / 207 (0.0%)** |
-| ladder cars at 3/5/10 | 0 |
-| missing device | 59 |
+| sqlite roster | 205 (fleetsummary_live) |
+| device_link | **155 / 205 (75.6%)** |
+| card_era | **52 / 205 (25.4%)** |
+| known | **52 / 205 (25.4%)** |
+| gps-first matches | 251 |
+| ladder cars at 3/5/10 | 4 / 1 / 0 |
+| ladder locked | 39 |
+| PERSON (driver-kept) cards | 96 |
+| missing device | 50 |
 | Last Reading written | no |
 
-**Blocked:** file-drop `details_live.csv` (and this sqlite `card_transactions`) is **201 TRACKER + 3 named demo SHELL/MARATHON**. TRACKER is not a pump. Do not invent punches. A real 90-day DETAILS export with merchant names is required before unknown cars can drop. GPS cache is not empty; the join is waiting on named stations.
+**Ceiling without more factory_id links:** 155/205 = **75.6%**. 95% known is impossible until ~40 more boxes are mapped (not via `display_name`). Remaining card-era gap is the June 30-day window plus driver-kept PERSON cards, not empty GPS.
+
+**Live eFleets:** this pod injects `enterprise_login_name` / `enterprise_password` (PR #22). `oilchange env` shows username+password set. `EFLEETS_CUST_NUM` and `EFLEETS_DETAILS_URL` still missing. Login with portal field `userId` reaches `/fleetweb/mfaRegistration` — fail closed (no MFA in chat). HTTPAdapter still posts `username`/`j_username`; portal form is `userId`. CDP / captured export URL / a 90-day DETAILS file-drop is the live path.
 
 Tests lock the ladder with synthetic exclusive pumps (`internal/cards/ladder_test.go`).
 
@@ -76,8 +81,9 @@ Tests lock the ladder with synthetic exclusive pumps (`internal/cards/ladder_tes
 
 ## Next (reasonable)
 
-- Capture a real Fuel & Charging DETAILS export (not TRACKER placeholders) so the 3/5/10 ladder can name cards. File-drop still works; do not ask for eFleets login in chat.
-- Map the remaining unpaired OneStep boxes (40 unlinked of 188) onto the 59 roster cars without a factory_id, then `devices sync --map` + `sync-onestep --map` + `compute`. Do not join on `display_name`.
+- File-drop a **90-day** (or current 30-day) Fuel DETAILS CSV — June 2026 30-day already proved the matcher. Do not ask for an eFleets password or MFA code in chat. Optional: `EFLEETS_DETAILS_URL` + CDP on an already-logged-in tab.
+- Map the remaining unpaired OneStep boxes (~38 unlinked of 193 live) onto the **50** roster cars without a factory_id, then `devices sync --map`. Do not join on `display_name`. Known cannot pass 75.6% until those links exist.
+- Do not rewrite the GPS matcher to chase 95% — unknown already fell with staggered real punch times.
 - Enterprise DETAILS for the 4 `NO_TRUSTED_FILL` cars.
 - Capture a real Maintenance Detail export URL (or CDP) so last oil is not stuck on Downloads CSVs.
 - Optional: collapse stacked `hold_events` so event count matches cars on HOLD.
@@ -86,6 +92,6 @@ Tests lock the ladder with synthetic exclusive pumps (`internal/cards/ladder_tes
 
 ## Env (presence only)
 
-Canonical file: repo-root `oilchange.env` (gitignored). Nested `Fleet-Management/oilchange.env` had a blank template above real secrets — first assignment wins (`setEnvIfEmpty`). Names: `ONE_STEP_FULL_API_KEY` / `ONESTEP_API_KEY`, OneStep PEMs, eFleets user/pass/cust (`EFLEETS_*` or Cloud Agent `EFleetsUsername` / `EFleetsPassword` / `EFleetsCustNum`), `SUPABASE_GROK_BUILD_KEY`, `DATABASE_URL` unpooled Neon, `OILCHANGE_DB`. This Cloud Agent currently injects OneStep only — eFleets keys are missing until added as secrets or written locally.
+Canonical file: repo-root `oilchange.env` (gitignored). Nested `Fleet-Management/oilchange.env` had a blank template above real secrets — first assignment wins (`setEnvIfEmpty`). Names: `ONE_STEP_FULL_API_KEY` / `ONESTEP_API_KEY`, OneStep PEMs, eFleets user/pass/cust (`EFLEETS_*` or Cloud Agent `EFleetsUsername` / `enterprise_login_name`, `EFleetsPassword` / `enterprise_password`, `EFleetsCustNum`), `SUPABASE_GROK_BUILD_KEY`, `DATABASE_URL` unpooled Neon, `OILCHANGE_DB`. This Cloud Agent injects OneStep plus `enterprise_login_name` / `enterprise_password`. Cust num and DETAILS URL are still missing; live portal then hits MFA.
 
 `oilchange env` prints presence, never values.

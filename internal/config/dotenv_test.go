@@ -202,6 +202,63 @@ func TestLoadReadsOilchangeEnv(t *testing.T) {
 	}
 }
 
+func TestLoadEnterpriseJSONBundle(t *testing.T) {
+	dir := t.TempDir()
+	prev, _ := os.Getwd()
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(prev) })
+	unsetEFleetsEnv(t)
+	_ = os.Unsetenv("OILCHANGE_ENV")
+	t.Setenv("Enterprise secrets", `{"username":"portal-user","password":"portal-pass","cust_num":583424}`)
+	cfg := Load()
+	if cfg.EFleetsUser != "portal-user" {
+		t.Fatalf("user %q", cfg.EFleetsUser)
+	}
+	if cfg.EFleetsPass != "portal-pass" {
+		t.Fatalf("pass %q", cfg.EFleetsPass)
+	}
+	if cfg.EFleetsCust != "583424" {
+		t.Fatalf("cust %q", cfg.EFleetsCust)
+	}
+}
+
+func TestLoadEfleetsDotenvBundle(t *testing.T) {
+	dir := t.TempDir()
+	prev, _ := os.Getwd()
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(prev) })
+	unsetEFleetsEnv(t)
+	_ = os.Unsetenv("OILCHANGE_ENV")
+	t.Setenv("efleets", "EFLEETS_USERNAME=envuser\nEFLEETS_PASSWORD=envpass\nEFLEETS_CUST_NUM=999999\n")
+	cfg := Load()
+	if cfg.EFleetsUser != "envuser" || cfg.EFleetsPass != "envpass" || cfg.EFleetsCust != "999999" {
+		t.Fatalf("user=%q pass set=%v cust=%q", cfg.EFleetsUser, cfg.EFleetsPass != "", cfg.EFleetsCust)
+	}
+}
+
+func TestExplicitEFleetsUsernameWinsOverBundle(t *testing.T) {
+	dir := t.TempDir()
+	prev, _ := os.Getwd()
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(prev) })
+	unsetEFleetsEnv(t)
+	_ = os.Unsetenv("OILCHANGE_ENV")
+	t.Setenv("EFleetsUsername", "from-alias")
+	t.Setenv("EFleetsPassword", "from-alias-pass")
+	t.Setenv("EFleetsCustNum", "111")
+	t.Setenv("efleets", `{"username":"bundle-user","password":"bundle-pass","cust":"222"}`)
+	cfg := Load()
+	if cfg.EFleetsUser != "from-alias" || cfg.EFleetsPass != "from-alias-pass" || cfg.EFleetsCust != "111" {
+		t.Fatalf("explicit names must win user=%q cust=%q", cfg.EFleetsUser, cfg.EFleetsCust)
+	}
+}
+
 func TestLoadEFleetsCloudAliases(t *testing.T) {
 	dir := t.TempDir()
 	prev, _ := os.Getwd()
@@ -276,6 +333,8 @@ func unsetEFleetsEnv(t *testing.T) {
 		"EFLEETS_DETAILS_URL", "EFleetsDetailsURL",
 		"EFLEETS_MAINT_URL", "EFleetsMaintURL",
 		"EFLEETS_FLEETSUMMARY_URL", "EFleetsFleetSummaryURL",
+		"efleets", "EFleets", "EFLEETS", "enterprise", "Enterprise", "ENTERPRISE",
+		"Enterprise secrets", "ENTERPRISE_SECRETS", "EnterpriseSecrets",
 	} {
 		_ = os.Unsetenv(k)
 	}

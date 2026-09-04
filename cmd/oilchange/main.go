@@ -52,7 +52,7 @@ func run(args []string) int {
 	case "pull-supabase":
 		return cmdPullSupabase(ctx, cfg, args[1:])
 	case "serve":
-		return cmdServe(args[1:])
+		return cmdServe(cfg, args[1:])
 	case "env":
 		return cmdEnv(cfg)
 	default:
@@ -83,14 +83,14 @@ func usage() {
   oilchange cards coverage [--no-gps]
   oilchange cards nearby [--card ID] [--live] [--report] [--persist] [--report-cap N]
   oilchange cards watch [--card ID] [--live] [--persist] [--fills 10] [--pace 35s]
-  oilchange devices sync [--map PATH]
+  oilchange devices sync [--map PATH] [--information PATH]
   oilchange devices list [--csv [--out PATH] [--live] [--map PATH]]
   oilchange devices csv [--out PATH] [--live] [--map PATH]
-  oilchange devices vin [--factory-id ID] [--pace 35s]
+  oilchange devices vin [--factory-id ID] [--pace 35s] [--from PATH]
   oilchange sync [--interval 5m] [--mirror web/data/cars.json] [--require-neon] [--no-remote]
   oilchange pull-supabase
   oilchange backup-neon
-  oilchange serve [--addr 127.0.0.1:4739] [--mirror web/data/cars.json] [--web-dir PATH]
+  oilchange serve [--addr 127.0.0.1:4739] [--mirror web/data/cars.json] [--web-dir PATH] [--device-information PATH]
   oilchange env
 
 Secrets: gitignored oilchange.env or Cloud Agent secrets — never chat. See oilchange.env.example.

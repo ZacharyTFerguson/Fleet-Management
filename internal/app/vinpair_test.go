@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync/atomic"
@@ -147,5 +148,90 @@ func TestPairDevicesByVINDoesNotJoinDisplayName(t *testing.T) {
 	}
 	if res.Linked != 0 {
 		t.Fatalf("display_name must not join: %+v", res)
+	}
+}
+
+func TestApplyDeviceInformationPairsFromFileNoHTTP(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "info.sqlite")
+	st, err := store.Open("sqlite", p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	ctx := context.Background()
+	keep := "MAPPED"
+	if err := st.UpsertCar(ctx, model.Car{EFleetsID: "27TESTA", VIN: "1HGCM82633A004352", Nickname: "WrongCar"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.UpsertCar(ctx, model.Car{EFleetsID: "OTHER", VIN: "1HGCM82633A000099", Nickname: "WrongCar"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.UpsertCar(ctx, model.Car{EFleetsID: keep, VIN: "1HGCM82633A000001"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.UpsertDevice(ctx, model.OneStepDevice{
+		FactoryID: "KEEP", DeviceID: "OLD", LinkedCarEFleetsID: &keep, Active: true,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	var hits int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&hits, 1)
+		http.Error(w, "no live /device during file apply", http.StatusTooManyRequests)
+	}))
+	defer srv.Close()
+	c := onestep.NewClient(srv.URL, "tok")
+	c.HTTP = srv.Client()
+	a := &App{Cfg: config.Config{OneStepToken: "tok"}, Store: st, OneStep: c}
+
+	res, err := a.ApplyDeviceInformation(ctx, testdata("onestep", "device_information.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if atomic.LoadInt32(&hits) != 0 {
+		t.Fatal("file apply must not GET /device")
+	}
+	if res.Asked != 0 {
+		t.Fatalf("asked live %+v", res)
+	}
+	if res.Linked != 1 || len(res.Links) != 1 || res.Links[0].FactoryID != "FACTVIN" || res.Links[0].EFleetsID != "27TESTA" {
+		t.Fatalf("OBD/report VIN must join unpaired box: %+v", res)
+	}
+	fact, err := st.ListDevicesForCar(ctx, "27TESTA")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(fact) != 1 || fact[0].FactoryID != "FACTVIN" {
+		t.Fatalf("FACTVIN %+v", fact)
+	}
+	kept, err := st.GetDevice(ctx, "KEEP")
+	if err != nil || kept == nil || kept.LinkedCarEFleetsID == nil || *kept.LinkedCarEFleetsID != keep {
+		t.Fatalf("existing factory_id map must not be stolen: %+v %v", kept, err)
+	}
+	nope, err := st.GetDevice(ctx, "NOPE")
+	if err != nil || nope == nil || nope.LinkedCarEFleetsID != nil {
+		t.Fatalf("display_name must not join: %+v %v", nope, err)
+	}
+	params, err := st.GetDevice(ctx, "PARAMSONLY")
+	if err != nil || params == nil || params.LinkedCarEFleetsID != nil {
+		t.Fatalf("params.vin must not join: %+v %v", params, err)
+	}
+}
+
+func TestApplyDeviceInformationMissingFile(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "miss.sqlite")
+	st, err := store.Open("sqlite", p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	a := &App{Store: st}
+	_, err = a.ApplyDeviceInformation(context.Background(), filepath.Join(t.TempDir(), "no-such-device-information.json"))
+	if err == nil || !strings.Contains(err.Error(), "not found") {
+		t.Fatalf("want honest missing-file error, got %v", err)
+	}
+	if os.IsNotExist(err) {
+		t.Fatal("error should wrap the path for the operator, not be a bare os.ErrNotExist")
 	}
 }

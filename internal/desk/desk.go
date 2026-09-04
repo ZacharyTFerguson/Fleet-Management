@@ -3,6 +3,7 @@
 package desk
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -21,10 +22,36 @@ import (
 
 // Options configures the local Oil Desk HTTP server.
 type Options struct {
-	Addr       string // e.g. 127.0.0.1:4739
-	WebDir     string // optional on-disk export; empty → embedded web/out
-	MirrorPath string // cars.json written by oilchange sync
-	CardsPath  string // cards.json from oilchange cards rebuild
+	Addr                   string // e.g. 127.0.0.1:4739
+	WebDir                 string // optional on-disk export; empty → embedded web/out
+	MirrorPath             string // cars.json written by oilchange sync
+	CardsPath              string // cards.json from oilchange cards rebuild
+	DeviceInformationPath  string // gitignored Device Information JSON (file apply; no live HTTP)
+	ApplyDeviceInformation func(ctx context.Context) (VINFromFileResult, error)
+}
+
+// VINFromFileLink is one factory_id → Enterprise car from the saved JSON.
+type VINFromFileLink struct {
+	FactoryID string `json:"factory_id"`
+	DeviceID  string `json:"device_id"`
+	VIN       string `json:"vin"`
+	EFleetsID string `json:"efleets_id"`
+}
+
+// VINFromFileResult is GET (exists) or POST (apply) for /api/devices/vin-from-file.
+type VINFromFileResult struct {
+	Path               string            `json:"path"`
+	Exists             bool              `json:"exists"`
+	Parsed             int               `json:"parsed,omitempty"`
+	Upserted           int               `json:"upserted,omitempty"`
+	Asked              int               `json:"asked"`
+	Linked             int               `json:"linked"`
+	Already            int               `json:"already"`
+	NoVIN              int               `json:"no_vin"`
+	NoRoster           int               `json:"no_roster"`
+	SkippedExistingMap int               `json:"skipped_existing_map"`
+	Links              []VINFromFileLink `json:"links,omitempty"`
+	Error              string            `json:"error,omitempty"`
 }
 
 // Handler returns the mux that serves static UI + /api/cars.
@@ -55,6 +82,9 @@ func Handler(opts Options) (http.Handler, error) {
 			return
 		}
 		serveJSONFile(w, r, cardsPath)
+	})
+	mux.HandleFunc("/api/devices/vin-from-file", func(w http.ResponseWriter, r *http.Request) {
+		serveVINFromFile(w, r, opts)
 	})
 	mux.Handle("/", spaFileServer(static))
 	return mux, nil
@@ -90,6 +120,58 @@ func staticFS(webDir string) (fs.FS, error) {
 		return nil, fmt.Errorf("embedded web/out: %w (rebuild with cd web && npm run build:static)", err)
 	}
 	return sub, nil
+}
+
+func serveVINFromFile(w http.ResponseWriter, r *http.Request, opts Options) {
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	path := strings.TrimSpace(opts.DeviceInformationPath)
+	if path == "" {
+		path = filepath.Join("data", "runtime", "device-information.json")
+	}
+	switch r.Method {
+	case http.MethodGet, http.MethodHead:
+		_, err := os.Stat(path)
+		out := VINFromFileResult{Path: path, Exists: err == nil}
+		if r.Method == http.MethodHead {
+			if out.Exists {
+				w.WriteHeader(http.StatusOK)
+			} else {
+				w.WriteHeader(http.StatusOK)
+			}
+			return
+		}
+		_ = json.NewEncoder(w).Encode(out)
+	case http.MethodPost:
+		if opts.ApplyDeviceInformation == nil {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			_ = json.NewEncoder(w).Encode(map[string]string{
+				"error": "oilchange serve has no sqlite store — set OILCHANGE_DB to apply saved Device Information",
+			})
+			return
+		}
+		res, err := opts.ApplyDeviceInformation(r.Context())
+		if err != nil {
+			code := http.StatusInternalServerError
+			if os.IsNotExist(err) || strings.Contains(err.Error(), "not found") {
+				code = http.StatusNotFound
+			}
+			w.WriteHeader(code)
+			msg := err.Error()
+			if res.Error != "" {
+				msg = res.Error
+			}
+			_ = json.NewEncoder(w).Encode(map[string]string{"error": msg, "path": path})
+			return
+		}
+		res.Path = path
+		res.Exists = true
+		enc := json.NewEncoder(w)
+		enc.SetIndent("", "  ")
+		_ = enc.Encode(res)
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
 }
 
 func serveJSONFile(w http.ResponseWriter, r *http.Request, path string) {

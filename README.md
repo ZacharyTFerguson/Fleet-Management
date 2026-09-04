@@ -22,10 +22,10 @@ Sit-still / important-location Node app lives in a separate PR (`cursor/importan
 |---|---|
 | `sync-enterprise` | Live eFleets if `EFLEETS_*` is set, or `--vehicles` `--fuel-details` `[--shop-ro]` `[--mileage-history]`. Oil/lube shop ROs seed last oil. Does not compute Last Reading. |
 | `sync-onestep` | OneStep API devices + drive-stop miles-since after the trusted fill second. Join `factory_id` only. Optional `--map PATH`. |
-| `devices sync` | Upsert durable `onestep_devices` registry (`factory_id` PK, `device_id` history id, `display_name` label only). Optional `--map PATH`. Unpaired boxes may attach by exact 17-char OBD VIN (`device_state.vin` = `cars.vin`). Does not fetch miles. |
+| `devices sync` | Upsert durable `onestep_devices` registry (`factory_id` PK, `device_id` history id, `display_name` label only). Optional `--map PATH`. `--information PATH` applies a saved Device Information JSON (no live `/device`). Unpaired boxes may attach by exact 17-char OBD VIN (`device_state.vin` = `cars.vin`). Does not fetch miles. |
 | `devices list` | Print registry rows (status + optional `efleets_id` car link). `--csv` writes the inventory CSV. |
 | `devices csv` | Write `factory_id,device_id,display_name,linked_car_efleets_id,status`. `display_name` is a label only. `[--out PATH]` `[--live]` `[--map PATH]`. `--live` refreshes from OneStep if a token is present (no miles). |
-| `devices vin` | Ask OneStep `GET /device?device_id=&latest_point=true` for OBD VIN on unpaired boxes; join exact 17-char `device_state.vin` = `cars.vin`. `[--factory-id ID]` `[--pace 35s]`. Never display_name. Never Last Reading. |
+| `devices vin` | Ask OneStep `GET /device?device_id=&latest_point=true` for OBD VIN on unpaired boxes; join exact 17-char `device_state.vin` = `cars.vin`. `[--factory-id ID]` `[--pace 35s]`. `--from PATH` reads a saved Device Information JSON instead (default drop: `data/runtime/device-information.json`) — no live `/device`. Never display_name. Never Last Reading. |
 | `compute` | Last Reading + HOLD. `[--override-lower]` is the only way to write a lower reading. |
 | `oil-done` | `--efleets-id ID --miles N --date YYYY-MM-DD [--location NAME]` |
 | `report` | `[--interval 5000] [--due-within N] [--out PATH.csv]` |
@@ -33,7 +33,7 @@ Sit-still / important-location Node app lives in a separate PR (`cursor/importan
 | `sync` | Push local SQLite cars/holds to **ZacharyTFerguson's Project** (`hdtwfdjdvdzdxfdriyzn`, table `fleet_cars`) when `SUPABASE_URL` + (`SUPABASE_SERVICE_ROLE` or `SUPABASE_SYNC_SECRET`) are set, and refresh `web/data/cars.json`. `[--interval 5m]` for throughout-the-day refresh. Never targets XRAY. After a successful sync, also runs a **best-effort** Neon backup when `DATABASE_URL` is set (`[--require-neon]` to fail if backup is down). |
 | `pull-supabase` | GET `fleet_cars` from Zachary’s project using `SUPABASE_GROK_BUILD_KEY` (or service role). Merges non-null last_reading/HOLD into sqlite. Does not compute Last Reading. Never XRAY. |
 | `backup-neon` | Copy sqlite oilchange tables into **Neon** (`Fleet_Management_Neon` / `Fleet_Manage_Oil`). SQLite stays the working store. Alias: `backup`. |
-| `serve` | Host Oil Desk UI + `/api/cars` on `127.0.0.1:4739` from the **embedded** static export (`web/out`). **No npm/Node required.** `[--addr]` `[--mirror]` `[--web-dir]`. |
+| `serve` | Host Oil Desk UI + `/api/cars` on `127.0.0.1:4739` from the **embedded** static export (`web/out`). **No npm/Node required.** `[--addr]` `[--mirror]` `[--web-dir]`. Button **Apply saved OneStep device information** reads `data/runtime/device-information.json` (no live `/device`). |
 | `cards rebuild` | ingest optional `--fuel-details` then score every swipe into `card_pairings` (never writes Last Reading). GPS-first: stop windows from OneStep unless `--no-gps` (rematch from `data/runtime/gps-stops.json`). Station lat/lng from exclusive GPS sits; later swipes match the car at that pump even when another box is sitting elsewhere. |
 | `cards history` | **One operator path** for card/vehicle history: devices CSV → ask OneStep OBD VIN on unpaired boxes (`device_state.vin` = `cars.vin`) → ingest DETAILS (file or live `EFLEETS_*` in env) → GPS stops + `cards rebuild` → ladder 3/5/10 → persist `card_eras` → print coverage. `[--vehicles PATH]` `[--fuel-details PATH]` `[--devices-live]` `[--map PATH]` `[--devices-out PATH]` `[--no-gps]`. Never Last Reading. Never `display_name`. |
 | `cards suspect` | cards whose latest Enterprise Vehicle is not the swipe-majority / GPS-called car |
@@ -149,7 +149,7 @@ Tests never hit live eFleets, OneStep, or Supabase.
 
 ## OneStep devices registry
 
-`onestep_devices` is the durable GPS-box store. Join cars on **`factory_id`** (and optional `linked_car_efleets_id` / `linked_car_pdi_id`). `device_id` is history identity; **`display_name` is never a join key**. Lifecycle: `active` / `dead` / `retired_at`, plus `last_synced_at` and timestamps. Ingest: `oilchange devices sync --map testdata/onestep/map.csv` or live API; `sync-onestep` also upserts then fetches drive-stop miles. Pairs to cars the same way Last Reading compute already does: devices linked by `efleets_id`, never by tracker label.
+`onestep_devices` is the durable GPS-box store. Join cars on **`factory_id`** (and optional `linked_car_efleets_id` / `linked_car_pdi_id`). `device_id` is history identity; **`display_name` is never a join key**. Lifecycle: `active` / `dead` / `retired_at`, plus `last_synced_at` and timestamps. Ingest: `oilchange devices sync --map testdata/onestep/map.csv` or live API; `sync-onestep` also upserts then fetches drive-stop miles. When OneStep is rate-limited, save the portal **Device Information** JSON to gitignored `data/runtime/device-information.json` and apply it with `oilchange devices vin --from data/runtime/device-information.json` or the Oil Desk button (Cards / Devices). That apply is file-parse + sqlite upsert — do not spam live `GET /device`. Pairs to cars the same way Last Reading compute already does: devices linked by `efleets_id`, never by tracker label.
 
 ## Bad-data / fuel-card debug
 

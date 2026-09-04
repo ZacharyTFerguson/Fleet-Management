@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -23,26 +24,30 @@ type PairVINOpts struct {
 
 // PairVINResult is how many boxes were asked and linked. It never writes Last Reading.
 type PairVINResult struct {
-	Asked        int
-	Linked       int
-	Already      int
-	NoVIN        int
-	NoRoster     int
-	SkippedSteal int
-	Links        []VINLink
+	Asked        int       `json:"asked"`
+	Linked       int       `json:"linked"`
+	Already      int       `json:"already"`
+	NoVIN        int       `json:"no_vin"`
+	NoRoster     int       `json:"no_roster"`
+	SkippedSteal int       `json:"skipped_existing_map"`
+	Links        []VINLink `json:"links"`
 }
 
 // VINLink is one factory_id → Enterprise car via exact 17-char VIN.
 type VINLink struct {
-	FactoryID string
-	DeviceID  string
-	VIN       string
-	EFleetsID string
+	FactoryID string `json:"factory_id"`
+	DeviceID  string `json:"device_id"`
+	VIN       string `json:"vin"`
+	EFleetsID string `json:"efleets_id"`
 }
 
 func (r PairVINResult) Format() string {
 	return fmt.Sprintf("vin-pair linked=%d asked=%d already=%d no_vin=%d no_roster=%d skipped_existing_map=%d\n",
 		r.Linked, r.Asked, r.Already, r.NoVIN, r.NoRoster, r.SkippedSteal)
+}
+
+func (r ApplyDeviceInfoResult) Format() string {
+	return fmt.Sprintf("vin-from-file path=%s parsed=%d upserted=%d %s", r.Path, r.Parsed, r.Upserted, r.PairVINResult.Format())
 }
 
 // PairDevicesByVIN asks OneStep what VIN is plugged into a GPS box, then joins
@@ -160,6 +165,9 @@ func (a *App) PairDevicesByVIN(ctx context.Context, opt PairVINOpts) (PairVINRes
 	}
 
 	if !opt.AskEmpty || a.OneStep == nil || len(pending) == 0 {
+		if !opt.AskEmpty {
+			out.NoVIN += len(pending)
+		}
 		return out, nil
 	}
 
@@ -240,6 +248,61 @@ func (a *App) PairDevicesByVIN(ctx context.Context, opt PairVINOpts) (PairVINRes
 		}
 		fmt.Fprintf(os.Stderr, "vin-pair progress %d/%d linked=%d factory_id=%s\n", i+1, len(pending), out.Linked, d.FactoryID)
 	}
+	return out, nil
+}
+
+// DefaultDeviceInformationPath is the gitignored OneStep Device Information file-drop.
+// Copy the portal export here when live GET /device is cooling down.
+func DefaultDeviceInformationPath() string {
+	return filepath.Join("data", "runtime", "device-information.json")
+}
+
+// ApplyDeviceInfoResult is a file-drop VIN pair. Asked is always 0 (no live HTTP).
+type ApplyDeviceInfoResult struct {
+	Path     string `json:"path"`
+	Parsed   int    `json:"parsed"`
+	Upserted int    `json:"upserted"`
+	PairVINResult
+}
+
+// ApplyDeviceInformation reads a saved Device Information JSON (or /device dump),
+// upserts the registry by factory_id (imei on the report), and pairs unpaired
+// boxes by exact 17-char VIN. It never GET /device. It never writes Last Reading.
+// Empty path uses DefaultDeviceInformationPath.
+func (a *App) ApplyDeviceInformation(ctx context.Context, path string) (ApplyDeviceInfoResult, error) {
+	out := ApplyDeviceInfoResult{}
+	if a == nil || a.Store == nil {
+		return out, fmt.Errorf("vin-from-file: no store")
+	}
+	path = strings.TrimSpace(path)
+	if path == "" {
+		path = DefaultDeviceInformationPath()
+	}
+	out.Path = path
+	live, err := onestep.LoadDevicesJSON(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return out, fmt.Errorf("saved OneStep device information not found at %s — drop the Device Information JSON there (OneStep cooling down; do not GET /device)", path)
+		}
+		return out, fmt.Errorf("saved OneStep device information %s: %w", path, err)
+	}
+	out.Parsed = len(live)
+	if len(live) == 0 {
+		return out, fmt.Errorf("saved OneStep device information %s: no factory_id rows (imei / factory_id required; display_name is not a join)", path)
+	}
+	for _, d := range live {
+		d.LinkedCarEFleetsID = nil
+		if err := a.Store.UpsertDevice(ctx, d); err != nil {
+			return out, err
+		}
+		out.Upserted++
+	}
+	// AskEmpty stays false: file-parse + sqlite only. Never live /device.
+	pair, err := a.PairDevicesByVIN(ctx, PairVINOpts{Live: live, AskEmpty: false})
+	if err != nil {
+		return out, err
+	}
+	out.PairVINResult = pair
 	return out, nil
 }
 

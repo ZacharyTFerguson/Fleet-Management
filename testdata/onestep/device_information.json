@@ -1,0 +1,49 @@
+{
+  "data": [
+    {
+      "device_name": "WrongCar",
+      "imei": "FACTVIN",
+      "device_id": "DEVVIN",
+      "vin": "1HGCM82633A004352",
+      "decoded_vin": {"vehicle_vin": "1HGCM82633A004352", "vehicle_make": "HONDA", "vehicle_model": "Civic", "vehicle_year": 2003},
+      "odometer": {"value": 999999, "unit": "mi", "display": "999999 mi"},
+      "license_plate": "ABC1234",
+      "latest_device_point": {"params": {"vin": "1HGCM82633A000099"}}
+    },
+    {
+      "device_name": "WrongCar",
+      "imei": "NOPE",
+      "device_id": "DNAME",
+      "vin": "",
+      "decoded_vin": {"vehicle_vin": ""},
+      "odometer": {"value": 50, "unit": "mi"}
+    },
+    {
+      "device_name": "AlreadyMapped",
+      "imei": "KEEP",
+      "device_id": "NEWKEEP",
+      "vin": "1HGCM82633A004352",
+      "decoded_vin": {"vehicle_vin": "1HGCM82633A004352"},
+      "latest_device_point": {"params": {"vin": "1HGCM82633A004352"}}
+    },
+    {
+      "device_name": "ParamsOnly",
+      "imei": "PARAMSONLY",
+      "device_id": "DPARAMS",
+      "vin": "",
+      "latest_device_point": {"params": {"vin": "1HGCM82633A004352"}}
+    },
+    {
+      "device_name": "OBDWins",
+      "imei": "OBDWIN",
+      "device_id": "DOBD",
+      "vin": "1HGCM82633A000001",
+      "settings": {"vin": "1HGCM82633A000001"},
+      "decoded_vin": {"vehicle_vin": "1HGCM82633A000001"},
+      "latest_device_point": {
+        "device_state": {"vin": "1HGCM82633A000002"},
+        "params": {"vin": "1HGCM82633A000099"}
+      }
+    }
+  ]
+}

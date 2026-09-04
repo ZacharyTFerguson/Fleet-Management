@@ -269,6 +269,52 @@ func TestParseDevicesPrefersOBDVINOverSettings(t *testing.T) {
 	}
 }
 
+func TestParseDevicesDeviceInformationIMEIAndReportVIN(t *testing.T) {
+	_, file, _, _ := runtime.Caller(0)
+	path := filepath.Join(filepath.Dir(file), "..", "..", "testdata", "onestep", "device_information.json")
+	devs, err := LoadDevicesJSON(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	by := map[string]model.OneStepDevice{}
+	for _, d := range devs {
+		by[d.FactoryID] = d
+	}
+	got, ok := by["FACTVIN"]
+	if !ok || got.DeviceID != "DEVVIN" || got.VIN != "1HGCM82633A004352" {
+		t.Fatalf("imei must be factory_id and report vin identity: %+v", by)
+	}
+	if got.DisplayName != "WrongCar" {
+		t.Fatalf("device_name is a label only, got %q", got.DisplayName)
+	}
+	if by["NOPE"].VIN != "" {
+		t.Fatalf("empty report vin must not invent a VIN: %+v", by["NOPE"])
+	}
+	if by["PARAMSONLY"].VIN != "" {
+		t.Fatalf("params.vin is not identity: %+v", by["PARAMSONLY"])
+	}
+	if by["OBDWIN"].VIN != "1HGCM82633A000002" {
+		t.Fatalf("OBD device_state.vin must win over report vin: %+v", by["OBDWIN"])
+	}
+	if by["KEEP"].FactoryID != "KEEP" || by["KEEP"].VIN != "1HGCM82633A004352" {
+		t.Fatalf("KEEP %+v", by["KEEP"])
+	}
+}
+
+func TestParseDevicesDeviceInformationIgnoresParamsVINOnIMEIRow(t *testing.T) {
+	devs, err := parseDevices([]byte(`{"data":[{
+		"device_name":"WrongCar","imei":"FACT1","device_id":"DEV1",
+		"vin":"","odometer":{"value":999999,"unit":"mi"},
+		"latest_device_point":{"params":{"vin":"1HGCM82633A004352"}}
+	}]}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(devs) != 1 || devs[0].FactoryID != "FACT1" || devs[0].VIN != "" {
+		t.Fatalf("params.vin is not identity on a Device Information row: %+v", devs)
+	}
+}
+
 func TestLinkByVINExactNotDisplayName(t *testing.T) {
 	vinToCar := VINToEFleets([]model.Car{
 		{EFleetsID: "CARVIN", VIN: "1HGCM82633A004352", Nickname: "WrongCar", Plate: "ABC1234"},

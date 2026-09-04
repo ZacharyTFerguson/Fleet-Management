@@ -162,6 +162,8 @@ A second full-fleet nearby `--live` is the wrong next step. After the 2026-09-04
 7. `cards rebuild --no-gps` keeps nearby-certain car eras the ladder did not replace, so a rematch cannot wipe a watch persist.
 8. After the GPS watch, **ask OneStep for VIN** on leftover unpaired boxes (not only hunt hits): `GET /device?device_id=&latest_point=true` (OBD `device_state.vin` only). Exact 17-char match to `cars.vin` writes the factory_id→Enterprise link. `display_name` is never a join. CLI: `oilchange devices vin`. Then `cards history --no-gps` rematches GPS-at-the-pump and keeps watch-persisted car eras in coverage.
 
+When OneStep is **cooling down** (429 / Retry-After), do **not** keep hitting live `/device`. Save the portal Device Information export to gitignored `data/runtime/device-information.json` (report rows use `imei` as `factory_id` and report `vin`; `params.vin` is ignored). Apply it later with `oilchange devices vin --from data/runtime/device-information.json` or the Oil Desk button **Apply saved OneStep device information** (`POST /api/devices/vin-from-file`). That path is file-parse + sqlite upsert only.
+
 Maintenance VIN remains exact 17-char OBD `device_state.vin` = `cars.vin` from the roster (Fleet Summary / shop-backed VIN). A Fuel DETAILS drop is not a shop RO; do not `--shop-ro` a DETAILS file.
 
 The Aug–Sep 2026 DETAILS file (`DETAILS_583424_30-Days` (14)/(13) and the identically hashed `.xls`) is a new swipe window, not a duplicate of the May–June ingest.

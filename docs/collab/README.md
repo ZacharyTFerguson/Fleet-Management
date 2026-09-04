@@ -11,7 +11,7 @@ Workspace: `C:\Users\Zacha\go\local9_3_2026` (repo root). Ignore nested `Fleet-M
 - Do not invent miles. Last Reading is only `internal/oil`: Enterprise odo at the trusted fill second + stored OneStep **drive-stop miles-since**. HOLD skips the Last Reading write.
 - OneStep join is **`factory_id` only**. `display_name` / nickname is never a join key. `device_id` is History / drive-stop identity.
 - Live device map is `data/runtime/onestep-map.csv` (gitignored). Do **not** use `testdata/onestep/map.csv` on the live roster.
-- SQLite (`OILCHANGE_DB`) is the daily driver. Neon is a backup. Supabase `fleet_cars` is the Oil Desk remote. `--no-remote` when you must not push null Last Reading.
+- SQLite (`OILCHANGE_DB`) is the daily driver. Neon is the AWS-hosted backup. Supabase `fleet_cars` is the Oil Desk remote today; that same project is the planned second full backup (do not add S3 / extra Neon / direct AWS). `--no-remote` when you must not push null Last Reading.
 
 ## Locked oil rules
 

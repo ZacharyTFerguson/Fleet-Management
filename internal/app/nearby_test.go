@@ -2,7 +2,11 @@ package app
 
 import (
 	"context"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -10,6 +14,7 @@ import (
 	"oilchange/internal/config"
 	"oilchange/internal/enterprise"
 	"oilchange/internal/model"
+	"oilchange/internal/onestep"
 	"oilchange/internal/store"
 )
 
@@ -54,8 +59,8 @@ func coverFactory(visits *[]model.StopVisit, factoryID, deviceID string) {
 	ny := enterprise.NY()
 	*visits = append(*visits, model.StopVisit{
 		FactoryID: factoryID, DeviceID: deviceID,
-		From: time.Date(2026, 6, 9, 0, 0, 0, 0, ny),
-		To:   time.Date(2026, 6, 20, 0, 0, 0, 0, ny),
+		From: time.Date(2026, 5, 1, 0, 0, 0, 0, ny),
+		To:   time.Date(2026, 7, 1, 0, 0, 0, 0, ny),
 	})
 }
 
@@ -101,6 +106,7 @@ func TestCardsNearbyPersistsCertainLinkedEraNotUnpaired(t *testing.T) {
 	}
 	coverFactory(&visits, unpaired, "DEV-LOOSE")
 	coverFactory(&visits, "FACT-GEO", "DEV-GEO")
+	coverFactory(&visits, "FACT-CAR", "DEV-CAR")
 	if err := cards.SaveStopVisits(cache, visits); err != nil {
 		t.Fatal(err)
 	}
@@ -164,6 +170,7 @@ func TestCardsNearbyPersonEraNotPersisted(t *testing.T) {
 		})
 	}
 	coverFactory(&visits, "FACT-GEO", "DEV-GEO")
+	coverFactory(&visits, "FACT-CAR", "DEV")
 	if err := cards.SaveStopVisits(cache, visits); err != nil {
 		t.Fatal(err)
 	}
@@ -251,8 +258,9 @@ func TestCardsNearbyIncompleteCoverageDoesNotPersist(t *testing.T) {
 			From: fill.Add(-5 * time.Minute), To: fill.Add(15 * time.Minute),
 		})
 	}
-	// FACT-GEO covered; FACT-LOOSE is not — incomplete cache must not invent exclusive.
+	// FACT-GEO and FACT-LOOSE span the window; FACT-CAR only has short sits — not a fetch.
 	coverFactory(&visits, "FACT-GEO", "DEV-GEO")
+	coverFactory(&visits, "FACT-LOOSE", "DEV-LOOSE")
 	if err := cards.SaveStopVisits(cache, visits); err != nil {
 		t.Fatal(err)
 	}
@@ -269,5 +277,224 @@ func TestCardsNearbyIncompleteCoverageDoesNotPersist(t *testing.T) {
 	}
 	if len(eras) != 0 {
 		t.Fatalf("persist must skip incomplete coverage: %+v", eras)
+	}
+}
+
+func TestCardsNearbyDoesNotHitOneStepWithoutLive(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "oil.sqlite")
+	st, err := store.Open("sqlite", p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	var hits int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&hits, 1)
+		http.Error(w, "unexpected", 500)
+	}))
+	defer srv.Close()
+	c := onestep.NewClient(srv.URL, "tok")
+	c.HTTP = srv.Client()
+	a := &App{Store: st, GPSStopsPath: filepath.Join(t.TempDir(), "missing-cache.json"), OneStep: c}
+	ctx := context.Background()
+	car := "26LSZW"
+	if err := st.UpsertCar(ctx, model.Car{EFleetsID: car}); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.UpsertDevice(ctx, model.OneStepDevice{
+		FactoryID: "FACT-CAR", DeviceID: "DEV", LinkedCarEFleetsID: &car, Active: true,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	ny := enterprise.NY()
+	fill := time.Date(2026, 6, 16, 14, 0, 0, 0, ny)
+	if err := st.UpsertCardTx(ctx, nearbySheetzTx("CARD-HOME", fill)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := a.CardsNearby(ctx, CardsNearbyOpts{LiveStops: false}); err != nil {
+		t.Fatal(err)
+	}
+	if atomic.LoadInt32(&hits) != 0 {
+		t.Fatalf("cards nearby without --live must not call OneStep, hits=%d", hits)
+	}
+}
+
+func TestCardsNearbyReportCapCountsFailedPosts(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "oil.sqlite")
+	st, err := store.Open("sqlite", p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	var posts int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			atomic.AddInt32(&posts, 1)
+			body, _ := io.ReadAll(r.Body)
+			_ = body
+			http.Error(w, "nope", 500)
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	defer srv.Close()
+	c := onestep.NewClient(srv.URL, "tok")
+	c.HTTP = srv.Client()
+	a := &App{Store: st, GPSStopsPath: filepath.Join(t.TempDir(), "gps.json"), OneStep: c}
+	ctx := context.Background()
+	ny := enterprise.NY()
+	for i, addr := range []string{"1 MAIN ST, A", "2 MAIN ST, B", "3 MAIN ST, C", "4 MAIN ST, D", "5 MAIN ST, E"} {
+		fill := time.Date(2026, 6, 10+i, 14, 0, 0, 0, ny)
+		if err := st.UpsertCardTx(ctx, model.CardTx{
+			CardID: "CARD-RPT", At: fill.UTC(), StationName: "SHELL", StationAddress: addr,
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := a.CardsNearby(ctx, CardsNearbyOpts{LiveReport: true, ReportCap: 2, LiveStops: false}); err != nil {
+		t.Fatal(err)
+	}
+	if got := atomic.LoadInt32(&posts); got != 2 {
+		t.Fatalf("report-cap must count failed generate posts, got %d", got)
+	}
+}
+
+func TestCardsNearbyTwoCertainDoesNotPersist(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "oil.sqlite")
+	st, err := store.Open("sqlite", p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	cache := filepath.Join(t.TempDir(), "gps-stops.json")
+	a := &App{Store: st, GPSStopsPath: cache}
+	ctx := context.Background()
+	ny := enterprise.NY()
+	carA, carB := "26LSZW", "27VA15"
+	if err := st.UpsertCar(ctx, model.Car{EFleetsID: carA}); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.UpsertCar(ctx, model.Car{EFleetsID: carB}); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.UpsertDevice(ctx, model.OneStepDevice{
+		FactoryID: "FACT-A", DeviceID: "DA", LinkedCarEFleetsID: &carA, Active: true,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.UpsertDevice(ctx, model.OneStepDevice{
+		FactoryID: "FACT-B", DeviceID: "DB", LinkedCarEFleetsID: &carB, Active: true,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	var visits []model.StopVisit
+	seedGeocodedSheetz(t, ctx, st, &visits)
+	for i := 0; i < 3; i++ {
+		fillA := time.Date(2026, 6, 1+i*2, 10, 0, 0, 0, ny)
+		fillB := time.Date(2026, 6, 2+i*2, 10, 0, 0, 0, ny)
+		if err := st.UpsertCardTx(ctx, nearbySheetzTx("CARD-TWO", fillA)); err != nil {
+			t.Fatal(err)
+		}
+		if err := st.UpsertCardTx(ctx, nearbySheetzTx("CARD-TWO", fillB)); err != nil {
+			t.Fatal(err)
+		}
+		visits = append(visits,
+			model.StopVisit{FactoryID: "FACT-A", DeviceID: "DA", HasPos: true, Lat: nearbyPumpLat, Lng: nearbyPumpLng, From: fillA.Add(-time.Minute), To: fillA.Add(time.Minute)},
+			model.StopVisit{FactoryID: "FACT-B", DeviceID: "DB", HasPos: true, Lat: nearbyPumpLat, Lng: nearbyPumpLng, From: fillB.Add(-time.Minute), To: fillB.Add(time.Minute)},
+		)
+	}
+	coverFactory(&visits, "FACT-GEO", "DEV-GEO")
+	coverFactory(&visits, "FACT-A", "DA")
+	coverFactory(&visits, "FACT-B", "DB")
+	if err := cards.SaveStopVisits(cache, visits); err != nil {
+		t.Fatal(err)
+	}
+	res, err := a.CardsNearby(ctx, CardsNearbyOpts{Persist: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Certain < 2 {
+		t.Fatalf("expected two certain boxes, got %+v", res)
+	}
+	eras, err := st.ListEras(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(eras) != 0 {
+		t.Fatalf("two certain factory_id must not persist a join: %+v", eras)
+	}
+}
+
+func TestCardsNearbyEraSpanSkipsNonExclusiveDay(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "oil.sqlite")
+	st, err := store.Open("sqlite", p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	cache := filepath.Join(t.TempDir(), "gps-stops.json")
+	a := &App{Store: st, GPSStopsPath: cache}
+	ctx := context.Background()
+	ny := enterprise.NY()
+	car := "26LSZW"
+	if err := st.UpsertCar(ctx, model.Car{EFleetsID: car}); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.UpsertDevice(ctx, model.OneStepDevice{
+		FactoryID: "FACT-CAR", DeviceID: "DEV-CAR", LinkedCarEFleetsID: &car, Active: true,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.UpsertDevice(ctx, model.OneStepDevice{
+		FactoryID: "FACT-OTHER", DeviceID: "DEV-OTHER", Active: true,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	var visits []model.StopVisit
+	seedGeocodedSheetz(t, ctx, st, &visits)
+	var lastFill time.Time
+	for i := 0; i < 3; i++ {
+		fill := time.Date(2026, 6, 10+i*3, 14, 20, 0, 0, ny)
+		if err := st.UpsertCardTx(ctx, nearbySheetzTx("CARD-HOME", fill)); err != nil {
+			t.Fatal(err)
+		}
+		visits = append(visits, model.StopVisit{
+			FactoryID: "FACT-CAR", DeviceID: "DEV-CAR",
+			HasPos: true, Lat: nearbyPumpLat, Lng: nearbyPumpLng,
+			From: fill.Add(-5 * time.Minute), To: fill.Add(15 * time.Minute),
+		})
+	}
+	other := time.Date(2026, 6, 28, 14, 0, 0, 0, ny)
+	lastFill = other
+	if err := st.UpsertCardTx(ctx, nearbySheetzTx("CARD-HOME", other)); err != nil {
+		t.Fatal(err)
+	}
+	visits = append(visits, model.StopVisit{
+		FactoryID: "FACT-OTHER", DeviceID: "DEV-OTHER",
+		HasPos: true, Lat: nearbyPumpLat, Lng: nearbyPumpLng,
+		From: other.Add(-time.Minute), To: other.Add(time.Minute),
+	})
+	coverFactory(&visits, "FACT-GEO", "DEV-GEO")
+	coverFactory(&visits, "FACT-CAR", "DEV-CAR")
+	coverFactory(&visits, "FACT-OTHER", "DEV-OTHER")
+	if err := cards.SaveStopVisits(cache, visits); err != nil {
+		t.Fatal(err)
+	}
+	res, err := a.CardsNearby(ctx, CardsNearbyOpts{Persist: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Certain != 1 {
+		t.Fatalf("certain %+v", res)
+	}
+	eras, err := st.ListEras(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(eras) != 1 {
+		t.Fatalf("eras %+v", eras)
+	}
+	if !eras[0].To.Before(lastFill) {
+		t.Fatalf("persisted era must not include the other box's exclusive day: %+v last=%s", eras[0], lastFill)
 	}
 }

@@ -97,7 +97,7 @@ func (c *Client) ListDevices(ctx context.Context) ([]model.OneStepDevice, error)
 	paths := []string{"/v3/api/public/device-info", "/v3/api/public/device", "/v3/api/public/devices"}
 	var last error
 	for _, p := range paths {
-		b, err := c.get(ctx, p, q)
+		b, err := c.lockedGet(ctx, p, q)
 		if err != nil {
 			last = err
 			continue

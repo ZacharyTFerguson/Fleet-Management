@@ -38,6 +38,7 @@ type NearbyDevice struct {
 	Fills          int      `json:"fills"`
 	AtFillFills    int      `json:"at_fill_fills"`
 	ExclusiveFills int      `json:"exclusive_fills"`
+	ExclusiveDays  []string `json:"exclusive_days,omitempty"`
 	MinMiles       float64  `json:"min_miles"`
 	HasMiles       bool     `json:"has_miles,omitempty"`
 	Stations       []string `json:"stations,omitempty"`
@@ -179,12 +180,13 @@ func HuntNearbyFull(visits []model.StopVisit, txs []model.CardTx, stations []Geo
 		}
 	}
 	type acc struct {
-		fills    map[string]struct{}
-		atFill   map[string]struct{} // Eastern YYYY-MM-DD
-		deviceID string
-		minMiles float64
-		hasMiles bool
-		stations map[string]struct{}
+		fills         map[string]struct{}
+		atFill        map[string]struct{} // Eastern YYYY-MM-DD at fill ±slack
+		exclusiveDays map[string]struct{} // days this factory_id was the only sit at a swipe
+		deviceID      string
+		minMiles      float64
+		hasMiles      bool
+		stations      map[string]struct{}
 	}
 	type cardAcc struct {
 		fills int
@@ -215,6 +217,7 @@ func HuntNearbyFull(visits []model.StopVisit, txs []model.CardTx, stations []Geo
 		}
 		ca.fills++
 		day := EasternDay(tx.At)
+		atThisFill := map[string]struct{}{}
 		for _, v := range visits {
 			if !v.HasPos || strings.TrimSpace(v.FactoryID) == "" {
 				continue
@@ -233,10 +236,11 @@ func HuntNearbyFull(visits []model.StopVisit, txs []model.CardTx, stations []Geo
 			a := ca.dev[fid]
 			if a == nil {
 				a = &acc{
-					fills:    map[string]struct{}{},
-					atFill:   map[string]struct{}{},
-					deviceID: strings.TrimSpace(v.DeviceID),
-					stations: map[string]struct{}{},
+					fills:         map[string]struct{}{},
+					atFill:        map[string]struct{}{},
+					exclusiveDays: map[string]struct{}{},
+					deviceID:      strings.TrimSpace(v.DeviceID),
+					stations:      map[string]struct{}{},
 				}
 				ca.dev[fid] = a
 			}
@@ -253,6 +257,17 @@ func HuntNearbyFull(visits []model.StopVisit, txs []model.CardTx, stations []Geo
 			}
 			if stopOverlapsFill(v, tx.At, slack) && day != "" {
 				a.atFill[day] = struct{}{}
+				atThisFill[fid] = struct{}{}
+			}
+		}
+		if len(atThisFill) == 1 && day != "" {
+			for fid := range atThisFill {
+				if a := ca.dev[fid]; a != nil {
+					if a.exclusiveDays == nil {
+						a.exclusiveDays = map[string]struct{}{}
+					}
+					a.exclusiveDays[day] = struct{}{}
+				}
 			}
 		}
 	}
@@ -260,27 +275,6 @@ func HuntNearbyFull(visits []model.StopVisit, txs []model.CardTx, stations []Geo
 	var out NearbyResult
 	for card, ca := range cardsAcc {
 		nc := NearbyCard{CardID: card, Fills: ca.fills}
-		fillFids := map[string]map[string]struct{}{}
-		for fid, a := range ca.dev {
-			for fk := range a.atFill {
-				set := fillFids[fk]
-				if set == nil {
-					set = map[string]struct{}{}
-					fillFids[fk] = set
-				}
-				set[fid] = struct{}{}
-			}
-		}
-		exclusiveN := map[string]int{}
-		for _, fids := range fillFids {
-			if len(fids) != 1 {
-				continue
-			}
-			for fid := range fids {
-				exclusiveN[fid]++
-			}
-		}
-
 		var devicesOut []NearbyDevice
 		for fid, a := range ca.dev {
 			d := NearbyDevice{
@@ -288,8 +282,12 @@ func HuntNearbyFull(visits []model.StopVisit, txs []model.CardTx, stations []Geo
 				DeviceID:       a.deviceID,
 				Fills:          len(a.fills),
 				AtFillFills:    len(a.atFill),
-				ExclusiveFills: exclusiveN[fid],
+				ExclusiveFills: len(a.exclusiveDays),
 			}
+			for day := range a.exclusiveDays {
+				d.ExclusiveDays = append(d.ExclusiveDays, day)
+			}
+			sort.Strings(d.ExclusiveDays)
 			if a.hasMiles {
 				d.MinMiles = a.minMiles
 				d.HasMiles = true
@@ -386,22 +384,48 @@ func HuntNearbyFull(visits []model.StopVisit, txs []model.CardTx, stations []Geo
 func indexGeocoded(stations []GeocodedStation) map[string]nearbyStation {
 	out := map[string]nearbyStation{}
 	for _, s := range stations {
-		k := stationKey(s.Name, s.Address)
-		if k == "" {
-			continue
+		full := nearbyStationKey(s.Name, s.Address)
+		city := stationKey(s.Name, s.Address)
+		st := nearbyStation{key: full, name: s.Name, addr: s.Address, lat: s.Lat, lng: s.Lng, hasPos: validStationPos(s.Lat, s.Lng)}
+		if full != "" {
+			if old, ok := out[full]; ok && old.hasPos && st.hasPos {
+				// Same name+address must not be averaged with a different pump.
+				st = old
+			}
+			out[full] = st
 		}
-		out[k] = nearbyStation{key: k, name: s.Name, addr: s.Address, lat: s.Lat, lng: s.Lng, hasPos: validStationPos(s.Lat, s.Lng)}
+		if city != "" && city != full {
+			if _, ok := out[city]; !ok {
+				out[city] = st
+			}
+		}
 	}
 	return out
 }
 
+func nearbyStationKey(name, addr string) string {
+	n := strings.ToLower(strings.TrimSpace(name))
+	if skipStationName(n) {
+		return ""
+	}
+	a := strings.ToLower(strings.TrimSpace(addr))
+	if a == "" {
+		return n
+	}
+	return n + "|" + a
+}
+
 func resolveStation(tx model.CardTx, geo map[string]nearbyStation) nearbyStation {
+	full := nearbyStationKey(tx.StationName, tx.StationAddress)
+	if s, ok := geo[full]; ok {
+		return s
+	}
 	k := stationKey(tx.StationName, tx.StationAddress)
 	if s, ok := geo[k]; ok {
 		return s
 	}
 	return nearbyStation{
-		key:  k,
+		key:  full,
 		name: strings.TrimSpace(tx.StationName),
 		addr: strings.TrimSpace(tx.StationAddress),
 	}

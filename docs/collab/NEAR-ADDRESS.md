@@ -99,7 +99,15 @@ A second pass found four bugs in the first wiring. They are closed:
 3. **Incomplete GPS cache.** Cache is often only the linked boxes. Likely/certain require every eligible active box to have a covering visit (positioned or `HasPos=false` placeholder) in the union fill-day window. `--persist` is skipped when coverage is incomplete.
 4. **PERSON persist.** Hard veto. `ReplaceEras` is a single `BEGIN`/`COMMIT` so a failed insert cannot leave eras deleted.
 
-`--live` fetches only boxes not already covering the union window. `--report` queues at most `--report-cap` jobs (default 3) and does **not** download rows (public download is 404). Rows come from cached/live 1-mile stops. `GET`/`POST /v3/api/public` go through the same mutex as generate/poll. `get()`/`post()` stay lock-free so drive-stop (which already holds `mu`) does not deadlock.
+## Rewrite (review loop 2)
+
+Coverage is a **full-window fetch**, not “one short stop somewhere in the union.” `--live` writes a spanning `HasPos=false` sentinel after each successful drive-stop pull. A cached 20-minute sit is not coverage. `--live` also refreshes the OneStep device list so a box missing from sqlite cannot be ignored.
+
+`--live` is required for live HTTP. Plain `cards nearby` uses the GPS cache only (it will not fetch linked boxes through GPS-first). `--report-cap` counts generate **attempts**, including failures.
+
+Exclusivity is per **swipe** (only one `factory_id` overlapping fill ±20 min), then unique Eastern days of those wins. Persist only if exactly one certain device and it already has a car link; the era span is those exclusive days only. Two certain boxes (even if one is unpaired) do not persist.
+
+Station lookup prefers name + full street. Two SHELL pumps in the same city stay separate.
 
 ## Do not
 

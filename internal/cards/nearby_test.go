@@ -262,3 +262,57 @@ func TestFormatNearbyDoesNotTreatDisplayNameAsJoin(t *testing.T) {
 		t.Fatal(s)
 	}
 }
+
+func TestHuntNearbySameDayMorningEveningEachWatch(t *testing.T) {
+	ny := enterprise.NY()
+	lat, lng := 40.61716, -79.722
+	morning := time.Date(2026, 6, 16, 10, 0, 0, 0, ny)
+	evening := time.Date(2026, 6, 16, 20, 0, 0, 0, ny)
+	txs := []model.CardTx{
+		{CardID: "CARD-SPLITDAY", At: morning.UTC(), StationName: "SHEETZ", StationAddress: "203 CRAIGDELL RD, LOWER BURRELL, PA"},
+		{CardID: "CARD-SPLITDAY", At: evening.UTC(), StationName: "SHEETZ", StationAddress: "203 CRAIGDELL RD, LOWER BURRELL, PA"},
+	}
+	visits := []model.StopVisit{
+		{FactoryID: "A", DeviceID: "DA", HasPos: true, Lat: lat, Lng: lng, From: morning.Add(-time.Minute), To: morning.Add(time.Minute)},
+		{FactoryID: "B", DeviceID: "DB", HasPos: true, Lat: lat, Lng: lng, From: evening.Add(-time.Minute), To: evening.Add(time.Minute)},
+	}
+	stations := []GeocodedStation{{Name: "SHEETZ", Address: "203 CRAIGDELL RD, LOWER BURRELL, PA", Lat: lat, Lng: lng}}
+	res := HuntNearby(visits, txs, stations, nil, DefaultStopSlack)
+	if res.Certain != 0 || res.Likely != 0 {
+		t.Fatalf("one exclusive swipe each is still watch: %+v", res)
+	}
+	if res.Watch < 2 {
+		t.Fatalf("both boxes should stay on the watch list: %+v", res)
+	}
+	var gotA, gotB bool
+	for _, d := range res.Cards[0].Watch {
+		if d.FactoryID == "A" && d.ExclusiveFills == 1 {
+			gotA = true
+		}
+		if d.FactoryID == "B" && d.ExclusiveFills == 1 {
+			gotB = true
+		}
+	}
+	if !gotA || !gotB {
+		t.Fatalf("per-fill exclusive days: %+v", res.Cards[0].Watch)
+	}
+}
+
+func TestHuntNearbyTwoStationsSameCityStaySeparate(t *testing.T) {
+	ny := enterprise.NY()
+	fill := time.Date(2026, 6, 16, 14, 0, 0, 0, ny)
+	shellA := GeocodedStation{Name: "SHELL", Address: "1 MAIN ST, PITTSBURGH, PA", Lat: 40.44, Lng: -80.00}
+	shellB := GeocodedStation{Name: "SHELL", Address: "900 EAST ST, PITTSBURGH, PA", Lat: 40.50, Lng: -79.85}
+	txs := []model.CardTx{{
+		CardID: "CARD-SHELL", At: fill.UTC(),
+		StationName: "SHELL", StationAddress: "1 MAIN ST, PITTSBURGH, PA",
+	}}
+	visits := []model.StopVisit{
+		{FactoryID: "NEAR-A", HasPos: true, Lat: shellA.Lat, Lng: shellA.Lng, From: fill.Add(-time.Minute), To: fill.Add(time.Minute)},
+		{FactoryID: "NEAR-B", HasPos: true, Lat: shellB.Lat, Lng: shellB.Lng, From: fill.Add(-time.Minute), To: fill.Add(time.Minute)},
+	}
+	res := HuntNearby(visits, txs, []GeocodedStation{shellA, shellB}, nil, DefaultStopSlack)
+	if res.Watch != 1 || res.Cards[0].Watch[0].FactoryID != "NEAR-A" {
+		t.Fatalf("must use 1 MAIN ST coords, not a city midpoint: %+v", res)
+	}
+}

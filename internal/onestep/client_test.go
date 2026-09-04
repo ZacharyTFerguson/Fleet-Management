@@ -523,8 +523,13 @@ func TestHTTPErrorBodyRedactsJWT(t *testing.T) {
 	pemBytes := pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: der})
 	var jwt string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		jwt = strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
-		http.Error(w, "invalid bearer "+jwt, http.StatusUnauthorized)
+		tok := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+		if strings.HasPrefix(tok, "eyJ") {
+			jwt = tok
+			http.Error(w, "invalid bearer "+tok, http.StatusUnauthorized)
+			return
+		}
+		http.Error(w, "denied api-key=raw-api-key reflected", http.StatusUnauthorized)
 	}))
 	defer srv.Close()
 	client := NewClient(srv.URL, "raw-api-key")

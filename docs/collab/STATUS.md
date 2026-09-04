@@ -23,6 +23,7 @@ Updated: 2026-09-04 (UTC) after live drive-stop → compute → Oil Desk mirror.
 - Push `sync --mirror` to Supabase unless asked (this wave used `--no-remote`).
 - Recreate the Neon project or point `DATABASE_URL` at pooled / XRAY / supabase.co.
 - Ask Zachary to paste the OneStep key. It is already in `oilchange.env`.
+- Ask Zachary to log into eFleets or paste `EFLEETS_PASSWORD` in chat. Put `EFLEETS_USERNAME` / `EFLEETS_PASSWORD` / `EFLEETS_CUST_NUM` in gitignored `oilchange.env` or Cloud Agent secrets (`EFleetsUsername` / `EFleetsPassword` / `EFleetsCustNum`).
 
 ## Last oil (Enterprise shop RO)
 
@@ -58,6 +59,6 @@ Cache: `data/runtime/gps-stops.json` (gitignored). `--no-gps` rematches from cac
 
 ## Env (presence only)
 
-Canonical file: repo-root `oilchange.env` (gitignored). Nested `Fleet-Management/oilchange.env` had a blank template above real secrets — first assignment wins (`setEnvIfEmpty`). Names: `ONE_STEP_FULL_API_KEY` / `ONESTEP_API_KEY`, OneStep PEMs, eFleets user/pass/cust, `SUPABASE_GROK_BUILD_KEY`, `DATABASE_URL` unpooled Neon, `OILCHANGE_DB`.
+Canonical file: repo-root `oilchange.env` (gitignored). Nested `Fleet-Management/oilchange.env` had a blank template above real secrets — first assignment wins (`setEnvIfEmpty`). Names: `ONE_STEP_FULL_API_KEY` / `ONESTEP_API_KEY`, OneStep PEMs, eFleets user/pass/cust (`EFLEETS_*` or Cloud Agent `EFleetsUsername` / `EFleetsPassword` / `EFleetsCustNum`), `SUPABASE_GROK_BUILD_KEY`, `DATABASE_URL` unpooled Neon, `OILCHANGE_DB`. This Cloud Agent currently injects OneStep only — eFleets keys are missing until added as secrets or written locally.
 
 `oilchange env` prints presence, never values.

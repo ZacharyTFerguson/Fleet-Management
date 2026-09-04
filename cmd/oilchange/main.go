@@ -85,7 +85,7 @@ func usage() {
   oilchange serve [--addr 127.0.0.1:4739] [--mirror web/data/cars.json] [--web-dir PATH]
   oilchange env
 
-Secrets: paste into oilchange.env (gitignored). See oilchange.env.example.
+Secrets: gitignored oilchange.env or Cloud Agent secrets — never chat. See oilchange.env.example.
 oilchange env prints which keys loaded; it never prints secret values.
 Desktop UI: oilchange serve hosts embedded Oil Desk + /api/cars (no npm).
 `)

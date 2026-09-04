@@ -115,7 +115,7 @@ cd web && npm ci && npm run dev          # App Router + /api/cars in Node
 
 | Where | Vars |
 |---|---|
-| CLI (`oilchange.env`) | `OILCHANGE_DB` (working sqlite), `DATABASE_URL` (Neon **unpooled** backup only — not the DSN while sqlite is set), `SUPABASE_URL`, then either `SUPABASE_SERVICE_ROLE` (PostgREST upsert into `fleet_cars`) or `SUPABASE_SYNC_SECRET` (`/functions/v1/fleet-sync`). Optional `FLEET_MIRROR_PATH`. |
+| CLI (`oilchange.env`) | `OILCHANGE_DB` (working sqlite), `DATABASE_URL` (Neon **unpooled** backup only — not the DSN while sqlite is set), `SUPABASE_URL`, then either `SUPABASE_SERVICE_ROLE` (PostgREST upsert into `fleet_cars`) or `SUPABASE_SYNC_SECRET` (`/functions/v1/fleet-sync`). Optional `FLEET_MIRROR_PATH`. Live eFleets: `EFLEETS_USERNAME` / `EFLEETS_PASSWORD` / `EFLEETS_CUST_NUM` (Cloud Agent aliases `EFleetsUsername`, `EFleetsPassword`, `EFleetsCustNum`). Never paste those into chat. |
 | Web (`web/.env.local`) | Only needed for `npm run dev`. `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`. Never put service role / sync secret in `NEXT_PUBLIC_*`. Templates: `oilchange.env.example`, `web/.env.local.example`. |
 
 Without Supabase credentials the CLI writes a **mock mirror** at `web/data/cars.json` and `oilchange serve` (or Next `/api/cars`) serves that. With credentials, sync upserts into `fleet_cars`. Schema/RLS: `supabase/migrations/` + `migrations/005_shared_project_fleet_prefix.sql` (anon SELECT on `fleet_cars` only).
@@ -132,11 +132,11 @@ Cadence: `oilchange sync --interval 5m` keeps the mirror (and Supabase) fresh wh
 
 ## Secrets (never commit)
 
-Paste live values into **`oilchange.env`** in this directory (gitignored). Template: `oilchange.env.example`.
+Paste live values into **`oilchange.env`** in this directory (gitignored), or into **Cloud Agent secrets** with the same names. Template: `oilchange.env.example`. Never paste passwords into chat, PRs, or Slack.
 
-The binary loads `oilchange.env` on startup (or `OILCHANGE_ENV`, `secrets/oilchange.env`, `.env`). Already-set process env wins.
+The binary loads `oilchange.env` on startup (or `OILCHANGE_ENV`, `secrets/oilchange.env`, `.env`). Already-set process env (including Cloud Agent injection) wins.
 
-`EFLEETS_CUST_NUM` has **no** hardcoded default — set it in env for live eFleets sync.
+`EFLEETS_CUST_NUM` has **no** hardcoded default — set it in env or Cloud Agent secrets for live eFleets sync. File-drop `--vehicles` / `--fuel-details` does not need a portal login.
 
 Tests never hit live eFleets, OneStep, or Supabase.
 

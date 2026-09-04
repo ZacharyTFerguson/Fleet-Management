@@ -16,6 +16,8 @@ onestep*.local
 /oilchange.exe
 *.sqlite
 *.sqlite-journal
+*.sqlite-shm
+*.sqlite-wal
 *.dcm
 /vendor/
 /bin/

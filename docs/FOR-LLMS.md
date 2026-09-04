@@ -27,7 +27,7 @@ eFleets / OneStep / compute  →  SQLite (OILCHANGE_DB)     ← daily driver
                                     └─ oilchange backup-neon → Neon Postgres (backup only)
 ```
 
-SQLite (`OILCHANGE_DB`) is the working store for ingest, compute, and serve. Neon is a durable copy of those sqlite tables — not the daily driver. The Oil Desk remote is this fleet’s Supabase `fleet_cars` table. Command cheat-sheet: [`README.md`](../README.md).
+SQLite (`OILCHANGE_DB`) is the working store for ingest, compute, and serve. Neon is a durable copy of those sqlite tables — not the daily driver. The Oil Desk remote is this fleet’s Supabase `fleet_cars` table. **Later**, that same project is a **full** sqlite-table copy so there is still a backup if Neon is down. Today `sync` is still desk cars/holds, not that full copy. Do **not** add S3, extra Neon, or direct AWS. Command cheat-sheet: [`README.md`](../README.md).
 
 | Cmd | Role |
 |---|---|
@@ -67,7 +67,7 @@ If a step would violate one of these, stop and HOLD. Full card: [`docs/collab/OI
 3. **HOLD skips the Last Reading write.** Do not seed a number to clear a HOLD. `WriteLastReading` must not “finish the desk.”
 4. **Join GPS on `factory_id` only.** `device_id` is History / drive-stop identity. **`display_name` is never a join key.** Never guess an unpaired `factory_id`.
 5. **Never invent miles.** A missing GPS sum is `NO_DRIVESTOP`, not zero. A measured empty trip list **is** stored as 0 on purpose — that is not a guess.
-6. **SQLite is the daily driver.** Neon is backup. Oil Desk remote is this fleet’s Supabase `fleet_cars`. Do not unset `OILCHANGE_DB` so desktop can keep working offline.
+6. **SQLite is the daily driver.** Neon is the backup. Oil Desk remote is this fleet’s Supabase `fleet_cars`. Later that same project is a second **full copy** if Neon is down. Do not add S3, extra Neon, or direct AWS. Do not unset `OILCHANGE_DB` so desktop can keep working offline.
 7. **Never write fleet oil to the other/wrong Supabase project** (the in-repo name is XRAY). Refuse it as `DATABASE_URL` too (also refuse `-pooler` and `supabase.co` as Neon). Exact project lock: OIL-LOCKS + README. Do not copy that lock from chat; copy it from those files.
 8. Live device map is gitignored `data/runtime/onestep-map.csv`. Fixture `testdata/onestep/map.csv` is not the fleet.
 9. **Never ask a human to log into eFleets in chat.** Secrets belong in gitignored `oilchange.env` or Cloud Agent secrets. File-drop CSVs do not need a portal login.

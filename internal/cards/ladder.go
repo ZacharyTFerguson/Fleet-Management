@@ -261,6 +261,10 @@ func ClassifyLadder(gps GPSFirstResult, txs []model.CardTx, fleet []model.Car, d
 	}
 
 	eras := mergeLadderEras(gps.Eras, classified, info, byCardCar, nick)
+	calls, backEras := Backpropagate(gps.assigned, txs, classified, nick)
+	gps.Calls = calls
+	gps.Eras = backEras
+	eras = mergeLadderEras(backEras, classified, info, byCardCar, nick)
 	cov := RosterCoverage(fleet, devices, eras, cars)
 	cov.Blocked = LadderBlocker(txs, nil)
 	return LadderResult{
@@ -355,6 +359,22 @@ func classifyCard(card string, inf *cardInfo, hits map[string]*carHit, rungs []i
 		lc.EvidenceN = a.h.evidence
 		lc.Rung = rungFor(a.n, rungs)
 		lc.Cars = []string{a.car}
+		return lc
+	}
+
+	// Below the first rung: GPS split (two cars) beats driver-kept person.
+	if len(any) >= 2 {
+		lc.Bucket = HolderCar
+		lc.Split = true
+		lc.HolderKey = any[0].car
+		lc.Nickname = any[0].h.nickname
+		lc.StationN = any[0].n
+		lc.Stations = sortedKeys(any[0].h.stations)
+		lc.EvidenceN = any[0].h.evidence
+		lc.Rung = rungFor(any[0].n, rungs)
+		for _, a := range any {
+			lc.Cars = append(lc.Cars, a.car)
+		}
 		return lc
 	}
 
@@ -754,4 +774,105 @@ func pct(n, d int) float64 {
 		return 0
 	}
 	return 100 * float64(n) / float64(d)
+}
+
+func cardInfoFromTxs(txs []model.CardTx) map[string]*cardInfo {
+	info := map[string]*cardInfo{}
+	for _, t := range txs {
+		card := strings.TrimSpace(t.CardID)
+		if card == "" {
+			continue
+		}
+		c := info[card]
+		if c == nil {
+			c = &cardInfo{stations: map[string]struct{}{}}
+			info[card] = c
+		}
+		c.n++
+		if c.from.IsZero() || t.At.Before(c.from) {
+			c.from = t.At
+		}
+		if c.to.IsZero() || t.At.After(c.to) {
+			c.to = t.At
+		}
+		if oil.HasLogisticsPersonnel(t.DriverFirst, t.DriverLast) {
+			c.logistics = true
+		}
+		if p := personKey(t.DriverFirst, t.DriverLast); p != "" {
+			if c.person == "" {
+				c.person = p
+			} else if c.person != p {
+				c.person = c.person + "|" + p
+			}
+		}
+		if off := officeHolder(t); off != "" {
+			c.office = off
+		}
+		if st := firstNonEmpty(t.StationName, stationKey(t.StationName, t.StationAddress)); st != "" && !skipStationName(st) {
+			c.stations[st] = struct{}{}
+		}
+	}
+	return info
+}
+
+func byCardCarFromGPS(gps GPSFirstResult, nick map[string]string) map[string]map[string]*carHit {
+	byCardCar := map[string]map[string]*carHit{}
+	for _, m := range gps.Matches {
+		card := strings.TrimSpace(m.CardID)
+		car := strings.TrimSpace(m.EFleetsID)
+		if card == "" || car == "" || isUnknownCar(car) {
+			continue
+		}
+		if byCardCar[card] == nil {
+			byCardCar[card] = map[string]*carHit{}
+		}
+		h := byCardCar[card][car]
+		if h == nil {
+			h = &carHit{stations: map[string]struct{}{}, nickname: nick[car]}
+			byCardCar[card][car] = h
+		}
+		h.evidence += m.EvidenceN
+		for _, s := range m.Stations {
+			s = strings.TrimSpace(s)
+			if s == "" || skipStationName(s) {
+				continue
+			}
+			h.stations[s] = struct{}{}
+		}
+	}
+	for _, e := range gps.Eras {
+		if eraHolderType(e) != HolderCar {
+			continue
+		}
+		card := strings.TrimSpace(e.CardID)
+		car := strings.TrimSpace(e.EFleetsID)
+		if card == "" || car == "" {
+			continue
+		}
+		if byCardCar[card] == nil {
+			byCardCar[card] = map[string]*carHit{}
+		}
+		h := byCardCar[card][car]
+		if h == nil {
+			h = &carHit{stations: map[string]struct{}{}, nickname: firstNonEmpty(e.Nickname, nick[car])}
+			byCardCar[card][car] = h
+		}
+		if h.from.IsZero() || e.From.Before(h.from) {
+			h.from = e.From
+		}
+		if h.to.IsZero() || e.To.After(h.to) {
+			h.to = e.To
+		}
+		if h.evidence < e.EvidenceN {
+			h.evidence = e.EvidenceN
+		}
+		for _, s := range e.Stations {
+			s = strings.TrimSpace(s)
+			if s == "" || skipStationName(s) {
+				continue
+			}
+			h.stations[s] = struct{}{}
+		}
+	}
+	return byCardCar
 }

@@ -73,6 +73,7 @@ func usage() {
   oilchange report [--interval 5000] [--due-within N] [--out PATH.csv]
   oilchange holds
   oilchange cards rebuild [--fuel-details PATH] [--no-gps]
+  oilchange cards history [--vehicles PATH] [--fuel-details PATH] [--devices-live] [--map PATH] [--devices-out PATH] [--no-gps]
   oilchange cards suspect
   oilchange cards trace --card ID [--window-days 2]
   oilchange cards pairings [--card ID]
@@ -256,7 +257,7 @@ func cmdHolds(ctx context.Context, cfg config.Config, args []string) int {
 
 func cmdCards(ctx context.Context, cfg config.Config, args []string) int {
 	if len(args) < 1 {
-		fmt.Fprintln(os.Stderr, "usage: oilchange cards rebuild|suspect|trace|pairings|split|call|ladder|coverage")
+		fmt.Fprintln(os.Stderr, "usage: oilchange cards rebuild|history|suspect|trace|pairings|split|call|ladder|coverage")
 		return model.ExitError
 	}
 	fs := flag.NewFlagSet("cards", flag.ContinueOnError)
@@ -267,6 +268,10 @@ func cmdCards(ctx context.Context, cfg config.Config, args []string) int {
 	noGPS := fs.Bool("no-gps", false, "skip OneStep stop windows (use gps-stops.json cache)")
 	disagree := fs.Bool("disagree", true, "cards call: only swipes where GPS name ≠ Enterprise Vehicle")
 	allCalls := fs.Bool("all", false, "cards call: print every GPS-named swipe")
+	vehicles := fs.String("vehicles", "", "Fleet Summary CSV (history)")
+	devicesLive := fs.Bool("devices-live", false, "refresh OneStep devices if token present (history)")
+	devicesMap := fs.String("map", "", "factory_id map CSV for devices sync (history)")
+	devicesOut := fs.String("devices-out", "data/runtime/onestep-devices.csv", "devices inventory CSV path (history)")
 	if err := fs.Parse(args[1:]); err != nil {
 		return model.ExitError
 	}
@@ -328,6 +333,21 @@ func cmdCards(ctx context.Context, cfg config.Config, args []string) int {
 			fmt.Fprintf(os.Stderr, "cards call: %v\n", err)
 			return model.ExitError
 		}
+		return model.ExitOK
+	case "history":
+		res, err := a.CardsHistory(ctx, app.CardsHistoryOpts{
+			VehiclesPath:    *vehicles,
+			FuelDetailsPath: *details,
+			DevicesLive:     *devicesLive,
+			DevicesMapPath:  *devicesMap,
+			DevicesOutPath:  *devicesOut,
+			NoGPS:           *noGPS,
+		})
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "cards history: %v\n", err)
+			return model.ExitError
+		}
+		fmt.Fprint(os.Stdout, cards.FormatLadder(res.Ladder))
 		return model.ExitOK
 	case "ladder", "coverage":
 		res, err := a.CardsLadder(ctx, true)

@@ -20,6 +20,7 @@ type GPSFirstResult struct {
 	Calls    []RecordCall
 	Stations []GeocodedStation
 	Pumps    int
+	assigned map[string]gpsHit // forward exclusive sits; same package only
 }
 
 // CardEra is the GPS / station-ladder history of where a card sat.
@@ -173,10 +174,9 @@ func MatchGPSFirst(visits []model.StopVisit, txs []model.CardTx, fleet []model.C
 	})
 
 	matches := collapseMatches(hits)
-	eras := splitEras(hits, nick)
-	calls := callRecords(txs, assigned, eras, nick)
+	calls, eras := Backpropagate(assigned, txs, nil, nick)
 	stations := flattenGeo(geo)
-	return GPSFirstResult{Matches: matches, Eras: eras, Calls: calls, Stations: stations, Pumps: len(pumps)}
+	return GPSFirstResult{Matches: matches, Eras: eras, Calls: calls, Stations: stations, Pumps: len(pumps), assigned: assigned}
 }
 
 // ApplyCalls copies GPS-called cars onto swipes. RecordedEFleetsID is unchanged.

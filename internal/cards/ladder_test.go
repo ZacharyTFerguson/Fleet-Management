@@ -113,6 +113,54 @@ func TestStationLadderSplitsCardSittingInTwoCars(t *testing.T) {
 	}
 }
 
+func TestStationLadderSingleCarGPSNamesDespiteDriver(t *testing.T) {
+	day := ny(2026, 8, 1, 10)
+	visits, txs := exclusiveSits("27VA15", "CARD-ONE", 1, day, 37.54, -77.43)
+	txs[0].DriverFirst, txs[0].DriverLast = "PAT", "TECH"
+	fleet := []model.Car{{EFleetsID: "27VA15", Nickname: "VA15", Region: "VA"}}
+	link := "27VA15"
+	devs := []model.OneStepDevice{{FactoryID: "F15", DeviceID: "D15", LinkedCarEFleetsID: &link, Active: true}}
+	got := ClimbStationLadder(visits, txs, fleet, devs, DefaultStopSlack, DefaultLadderRungs)
+	if got.Coverage.CardEraN != 1 || got.Coverage.KnownN != 1 {
+		t.Fatalf("GPS exclusive sit must name the car despite DETAILS driver: cars=%+v people=%+v cov=%+v", got.Cars, got.People, got.Coverage)
+	}
+	if len(got.People) != 0 {
+		t.Fatalf("single-car GPS must not be treated as person-kept: %+v", got.People)
+	}
+	found := false
+	for _, e := range got.Eras {
+		if e.CardID == "CARD-ONE" && eraHolderType(e) == HolderCar && e.EFleetsID == "27VA15" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("want car era for 27VA15, got %+v", got.Eras)
+	}
+}
+
+func TestStationLadderOneStrongGPSCarBeatsWeakStray(t *testing.T) {
+	day := ny(2026, 8, 1, 10)
+	v15, t15 := exclusiveSits("27VA15", "CARD-STR", 2, day, 37.54, -77.43)
+	v19, t19 := exclusiveSits("27VA19", "CARD-STR", 1, day.Add(48*time.Hour), 38.85, -77.05)
+	for i := range t15 {
+		t15[i].DriverFirst, t15[i].DriverLast = "PAT", "TECH"
+	}
+	t19[0].DriverFirst, t19[0].DriverLast = "PAT", "TECH"
+	fleet := []model.Car{
+		{EFleetsID: "27VA15", Nickname: "VA15", Region: "VA"},
+		{EFleetsID: "27VA19", Nickname: "VA19", Region: "VA"},
+	}
+	link := "27VA15"
+	devs := []model.OneStepDevice{{FactoryID: "F15", DeviceID: "D15", LinkedCarEFleetsID: &link, Active: true}}
+	got := ClimbStationLadder(append(v15, v19...), append(t15, t19...), fleet, devs, DefaultStopSlack, DefaultLadderRungs)
+	if got.Coverage.KnownN != 1 || got.Coverage.CardEraN < 1 {
+		t.Fatalf("strong GPS car must keep era despite one stray sit: cars=%+v people=%+v cov=%+v", got.Cars, got.People, got.Coverage)
+	}
+	if len(got.People) != 0 {
+		t.Fatalf("must not person-swallow the strong GPS car: %+v", got.People)
+	}
+}
+
 func TestStationLadderDriverKeptCardStaysOnPerson(t *testing.T) {
 	day := ny(2026, 8, 1, 10)
 	// One exclusive pump per car — below rung 3 — same driver holds the card.

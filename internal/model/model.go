@@ -152,10 +152,12 @@ type ShopRO struct {
 
 // OneStepDevice is a GPS box in the durable device registry.
 // Pair by factory_id only. device_id is history identity. display_name is label only (never a join key).
+// VIN is an optional factory_id-class identity from the public /device payload (exact match to cars.vin).
 type OneStepDevice struct {
 	FactoryID          string
 	DeviceID           string
 	DisplayName        string
+	VIN                string
 	LinkedCarEFleetsID *string
 	LinkedCarPDIID     *string
 	Dead               bool

@@ -277,6 +277,97 @@ func TestSyncDevicesLinksAPIByFactoryIDNotDisplayName(t *testing.T) {
 	}
 }
 
+func TestSyncDevicesLinksUnpairedBoxByExactVIN(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "vin.sqlite")
+	st, err := store.Open("sqlite", p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	ctx := context.Background()
+	if err := st.UpsertCar(ctx, model.Car{EFleetsID: "27TESTA", VIN: "1HGCM82633A004352", Nickname: "WrongCar"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.UpsertCar(ctx, model.Car{EFleetsID: "OTHER", VIN: "1HGCM82633A000099", Nickname: "WrongCar"}); err != nil {
+		t.Fatal(err)
+	}
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "/device") {
+			_, _ = w.Write([]byte(`[{
+				"factory_id":"FACTVIN","device_id":"DEVVIN","display_name":"WrongCar","odometer":50,
+				"latest_device_point":{"device_state":{"vin":"1HGCM82633A004352"}}
+			}]`))
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	defer srv.Close()
+
+	client := onestep.NewClient(srv.URL, "tok")
+	client.HTTP = srv.Client()
+	a := &App{Cfg: config.Config{OneStepToken: "tok"}, Store: st}
+	if _, err := a.SyncDevices(ctx, "", client); err != nil {
+		t.Fatal(err)
+	}
+	devs, err := st.ListDevicesForCar(ctx, "27TESTA")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(devs) != 1 || devs[0].FactoryID != "FACTVIN" {
+		t.Fatalf("exact VIN must map factory_id→efleets_id, got %+v", devs)
+	}
+	wrong, err := st.ListDevicesForCar(ctx, "OTHER")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(wrong) != 0 {
+		t.Fatalf("must not join display_name WrongCar: %+v", wrong)
+	}
+}
+
+func TestSyncDevicesVINDoesNotStealExistingFactoryMap(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "keep.sqlite")
+	st, err := store.Open("sqlite", p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	ctx := context.Background()
+	if err := st.UpsertCar(ctx, model.Car{EFleetsID: "MAPPED", VIN: "1HGCM82633A000001"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.UpsertCar(ctx, model.Car{EFleetsID: "VINTARGET", VIN: "1HGCM82633A004352"}); err != nil {
+		t.Fatal(err)
+	}
+	keep := "MAPPED"
+	if err := st.UpsertDevice(ctx, model.OneStepDevice{FactoryID: "FACT1", DeviceID: "OLD", LinkedCarEFleetsID: &keep, Active: true}); err != nil {
+		t.Fatal(err)
+	}
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "/device") {
+			_, _ = w.Write([]byte(`[{
+				"factory_id":"FACT1","device_id":"NEW",
+				"latest_device_point":{"device_state":{"vin":"1HGCM82633A004352"}}
+			}]`))
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	defer srv.Close()
+	client := onestep.NewClient(srv.URL, "tok")
+	client.HTTP = srv.Client()
+	a := &App{Cfg: config.Config{OneStepToken: "tok"}, Store: st}
+	if _, err := a.SyncDevices(ctx, "", client); err != nil {
+		t.Fatal(err)
+	}
+	got, err := st.GetDevice(ctx, "FACT1")
+	if err != nil || got == nil || got.LinkedCarEFleetsID == nil || *got.LinkedCarEFleetsID != "MAPPED" {
+		t.Fatalf("existing factory_id map must not be stolen by VIN: %+v %v", got, err)
+	}
+}
+
 func TestLiveFleetHasMoreVehiclesThanTwoCarDemo(t *testing.T) {
 	demo, err := os.Open(testdata("enterprise", "fleetsummary.csv"))
 	if err != nil {
@@ -454,5 +545,27 @@ func TestDevicesCSVFromStoreLabelOnly(t *testing.T) {
 	}
 	if !strings.Contains(got, "FACT1,DEV1,WrongCar,27TESTA,active") {
 		t.Fatalf("row %q", got)
+	}
+}
+
+func TestMissingLinkedDevicesSkipsCachedAndUnpaired(t *testing.T) {
+	a, b, c := "27A", "27B", "27C"
+	devs := []model.OneStepDevice{
+		{FactoryID: "FA", LinkedCarEFleetsID: &a, Active: true},
+		{FactoryID: "FB", LinkedCarEFleetsID: &b, Active: true},
+		{FactoryID: "FC", LinkedCarEFleetsID: &c, Active: true, Dead: true},
+		{FactoryID: "FD", Active: true}, // unpaired — no GPS fetch
+	}
+	cached := []model.StopVisit{{FactoryID: "FA", HasPos: true}}
+	got := missingLinkedDevices(devs, cached)
+	if len(got) != 1 || got[0].FactoryID != "FB" {
+		t.Fatalf("want only FB (VIN-linked, not in cache), got %+v", got)
+	}
+	marked := markFetched(got, nil)
+	if len(marked) != 1 || marked[0].FactoryID != "FB" || marked[0].HasPos {
+		t.Fatalf("empty fetch must still record factory_id: %+v", marked)
+	}
+	if n := missingLinkedDevices(devs, append(cached, marked...)); len(n) != 0 {
+		t.Fatalf("placeholder must prevent refetch: %+v", n)
 	}
 }

@@ -22,7 +22,7 @@ Sit-still / important-location Node app lives in a separate PR (`cursor/importan
 |---|---|
 | `sync-enterprise` | Live eFleets if `EFLEETS_*` is set, or `--vehicles` `--fuel-details` `[--shop-ro]` `[--mileage-history]`. Oil/lube shop ROs seed last oil. Does not compute Last Reading. |
 | `sync-onestep` | OneStep API devices + drive-stop miles-since after the trusted fill second. Join `factory_id` only. Optional `--map PATH`. |
-| `devices sync` | Upsert durable `onestep_devices` registry (`factory_id` PK, `device_id` history id, `display_name` label only). Optional `--map PATH`. Does not fetch miles. |
+| `devices sync` | Upsert durable `onestep_devices` registry (`factory_id` PK, `device_id` history id, `display_name` label only). Optional `--map PATH`. Unpaired boxes may attach by exact 17-char OBD VIN (`device_state.vin` = `cars.vin`). Does not fetch miles. |
 | `devices list` | Print registry rows (status + optional `efleets_id` car link). `--csv` writes the inventory CSV. |
 | `devices csv` | Write `factory_id,device_id,display_name,linked_car_efleets_id,status`. `display_name` is a label only. `[--out PATH]` `[--live]` `[--map PATH]`. `--live` refreshes from OneStep if a token is present (no miles). |
 | `compute` | Last Reading + HOLD. `[--override-lower]` is the only way to write a lower reading. |

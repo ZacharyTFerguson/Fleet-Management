@@ -195,9 +195,12 @@ func (c *Client) driveStopMiles(ctx context.Context, factoryID, deviceID string,
 	}
 	n, err := c.fetchDriveStopWindow(ctx, deviceID, from, to)
 	if err != nil && c.PrivateKeyPEM != "" && driveStopAuthFallback(err) {
-		// Do not copy c: that would copy mu. JWT-off fallback is a distinct client.
+		// Do not copy c: that would copy mu. Keep the distinct JWT-off client
+		// under the parent lock so all drive-stop HTTP remains serialized.
 		plain := &Client{Base: c.Base, Token: c.Token, HTTP: c.HTTP, now: c.now}
+		c.mu.Lock()
 		n, err = plain.fetchDriveStopWindow(ctx, deviceID, from, to)
+		c.mu.Unlock()
 	}
 	if err != nil && driveStopRetryChunked(err) {
 		n, err = c.fetchDriveStopChunked(ctx, deviceID, from, to)
@@ -250,8 +253,11 @@ func (c *Client) DriveStopVisitsFor(ctx context.Context, d model.OneStepDevice, 
 		}
 		b, err := c.fetchDriveStopBytes(ctx, did, start, end)
 		if err != nil && c.PrivateKeyPEM != "" && driveStopAuthFallback(err) {
+			// Same JWT-off fallback as driveStopMiles: do not copy mu; hold the parent lock.
 			plain := &Client{Base: c.Base, Token: c.Token, HTTP: c.HTTP, now: c.now}
+			c.mu.Lock()
 			b, err = plain.fetchDriveStopBytes(ctx, did, start, end)
+			c.mu.Unlock()
 		}
 		if err != nil {
 			return nil, err

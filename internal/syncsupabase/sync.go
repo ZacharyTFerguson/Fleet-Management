@@ -104,6 +104,11 @@ func FromCars(cars []model.Car) []CarRow {
 			s := c.LastReadingAt.UTC().Format(time.RFC3339)
 			row.LastReadingAt = &s
 		}
+		if c.HoldReason != nil && strings.TrimSpace(*c.HoldReason) != "" {
+			row.LastReadingMiles = nil
+			row.LastReadingAt = nil
+			row.LastReadingSource = nil
+		}
 		out = append(out, row)
 	}
 	return out

@@ -4,14 +4,17 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"oilchange/internal/model"
 )
 
+var visitsCacheMu sync.RWMutex
+
 type visitsFile struct {
-	SavedAt time.Time          `json:"saved_at"`
-	Visits  []model.StopVisit  `json:"visits"`
+	SavedAt time.Time         `json:"saved_at"`
+	Visits  []model.StopVisit `json:"visits"`
 }
 
 // SaveStopVisits writes GPS stop windows so card rematch does not re-hit OneStep.
@@ -26,12 +29,33 @@ func SaveStopVisits(path string, visits []model.StopVisit) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, b, 0o644)
+	f, err := os.CreateTemp(filepath.Dir(path), "."+filepath.Base(path)+".tmp-*")
+	if err != nil {
+		return err
+	}
+	tmp := f.Name()
+	defer func() { _ = os.Remove(tmp) }()
+	if _, err := f.Write(b); err != nil {
+		_ = f.Close()
+		return err
+	}
+	if err := f.Close(); err != nil {
+		return err
+	}
+	visitsCacheMu.Lock()
+	defer visitsCacheMu.Unlock()
+	if err := os.Rename(tmp, path); err == nil {
+		return nil
+	}
+	_ = os.Remove(path)
+	return os.Rename(tmp, path)
 }
 
 // LoadStopVisits reads a previous GPS stop dump.
 func LoadStopVisits(path string) ([]model.StopVisit, error) {
+	visitsCacheMu.RLock()
 	b, err := os.ReadFile(path)
+	visitsCacheMu.RUnlock()
 	if err != nil {
 		return nil, err
 	}

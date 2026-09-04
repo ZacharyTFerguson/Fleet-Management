@@ -103,6 +103,10 @@ func (s *Store) queryRow(ctx context.Context, q string, args ...any) *sql.Row {
 	return s.rawQueryRow(ctx, q, args...)
 }
 
+type rowsQueryer interface {
+	QueryContext(context.Context, string, ...any) (*sql.Rows, error)
+}
+
 // scanIntPtr keeps SQL NULL as Go nil so "no last reading" is not stored as 0 miles.
 func scanIntPtr(n sql.NullInt64) *int {
 	if !n.Valid {
@@ -290,7 +294,11 @@ func scanCar(row *sql.Row) (*model.Car, error) {
 
 // ListCars is the report/compute universe.
 func (s *Store) ListCars(ctx context.Context) ([]model.Car, error) {
-	rows, err := s.query(ctx, `SELECT pdi_id, efleets_id, nickname, plate, vin, region,
+	return listCars(ctx, s.db)
+}
+
+func listCars(ctx context.Context, q rowsQueryer) ([]model.Car, error) {
+	rows, err := q.QueryContext(ctx, `SELECT pdi_id, efleets_id, nickname, plate, vin, region,
 		last_oil_miles, last_oil_date, last_reading_miles, last_reading_at, last_reading_source, hold_reason, interval_miles
 		FROM cars ORDER BY efleets_id`)
 	if err != nil {
@@ -318,6 +326,34 @@ func (s *Store) ListCars(ctx context.Context) ([]model.Car, error) {
 		out = append(out, c)
 	}
 	return out, rows.Err()
+}
+
+// ListCarsAndOpenHolds reads both mirror surfaces from one database snapshot.
+func (s *Store) ListCarsAndOpenHolds(ctx context.Context) ([]model.Car, []model.HoldEvent, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	opts := &sql.TxOptions{}
+	if s.dialect == "pgx" {
+		opts.Isolation = sql.LevelRepeatableRead
+		opts.ReadOnly = true
+	}
+	tx, err := s.db.BeginTx(ctx, opts)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer func() { _ = tx.Rollback() }()
+	cars, err := listCars(ctx, tx)
+	if err != nil {
+		return nil, nil, err
+	}
+	holds, err := openHolds(ctx, tx)
+	if err != nil {
+		return nil, nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, nil, err
+	}
+	return cars, holds, nil
 }
 
 // UpsertFill is idempotent on eFleets ID + fill second + odo.
@@ -630,6 +666,9 @@ func (s *Store) SetHold(ctx context.Context, efleetsID, reason, detail string) e
 	if _, err := tx.ExecContext(ctx, s.pg(`UPDATE cars SET hold_reason=?, updated_at=? WHERE efleets_id=?`), reason, now, efleetsID); err != nil {
 		return err
 	}
+	if _, err := tx.ExecContext(ctx, s.pg(`UPDATE hold_events SET open=FALSE WHERE efleets_id=? AND open=TRUE`), efleetsID); err != nil {
+		return err
+	}
 	if _, err := tx.ExecContext(ctx, s.pg(`INSERT INTO hold_events (efleets_id, reason, detail, at, open) VALUES (?,?,?,?,?)`),
 		efleetsID, reason, detail, now, true); err != nil {
 		return err
@@ -647,7 +686,11 @@ func (s *Store) ClearHolds(ctx context.Context, efleetsID string) error {
 
 // OpenHolds is the holds command.
 func (s *Store) OpenHolds(ctx context.Context) ([]model.HoldEvent, error) {
-	rows, err := s.query(ctx, `SELECT efleets_id, reason, detail, at, open FROM hold_events WHERE open=TRUE ORDER BY at`)
+	return openHolds(ctx, s.db)
+}
+
+func openHolds(ctx context.Context, q rowsQueryer) ([]model.HoldEvent, error) {
+	rows, err := q.QueryContext(ctx, `SELECT efleets_id, reason, detail, at, open FROM hold_events WHERE open=TRUE ORDER BY at`)
 	if err != nil {
 		return nil, err
 	}

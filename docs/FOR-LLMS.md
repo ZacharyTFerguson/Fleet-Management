@@ -33,14 +33,13 @@ SQLite (`OILCHANGE_DB`) is the working store for ingest, compute, and serve. Neo
 |---|---|
 | `sync-enterprise` | Ingest eFleets roster, fuel DETAILS, optional shop ROs. Seeds last oil. Does **not** compute Last Reading. Live portal if `EFLEETS_*` is set; otherwise `--vehicles` / `--fuel-details` file drop. |
 | `sync-onestep` | Devices + drive-stop miles-since after the trusted fill second. Join on `factory_id` only. |
-| `devices sync` / `list` | Durable `onestep_devices` registry (`factory_id` PK, `device_id` history id, `display_name` label only). Does not fetch miles. |
+| `devices sync` / `list` / `csv` | Durable `onestep_devices` registry (`factory_id` PK, `device_id` history id, `display_name` label only). `csv` writes gitignored-friendly inventory. Does not fetch miles. |
+| `cards rebuild` | Score swipes into `card_pairings`. GPS-first stop windows from OneStep unless `--no-gps` (rematch from `data/runtime/gps-stops.json`). Persists `card_eras`. Never writes Last Reading. |
+| `cards split` / `call` / `ladder` / `coverage` | GPS eras (SPLIT / PERSON / OFFICE). Ladder: exclusive pumps at 3 then 5 then 10 stations. Coverage is % roster with factory_id **and** a GPS-named car card era (target 95%). |
 | `probe-onestep` | One-shot live drive-stop GET. Prints measured miles. Does **not** write Last Reading. |
 | `compute` | Last Reading + HOLD. `[--override-lower]` is the only way to write a lower reading. |
 | `oil-done` | Record an oil change (`--efleets-id` `--miles` `--date`). |
 | `serve` | Oil Desk UI + `/api/cars` from the embedded export. `[--addr]` `[--mirror]`. |
-| `cards rebuild` | Score swipes into `card_pairings`. GPS-first stop windows from OneStep unless `--no-gps` (rematch from `data/runtime/gps-stops.json`). Never writes Last Reading. |
-| `cards split` | GPS eras: which vehicle each card was in over time (`SPLIT` when one card sat in two cars). |
-| `cards call` | What to call each swipe (GPS-named car, not the DETAILS Vehicle column). Default: only rows where GPS ≠ Enterprise. `--all` prints every GPS-named swipe. |
 | `cards suspect` / `trace` / `pairings` | Wrong-car intel. Pairings are evidence, not Enterprise last-write-wins. |
 | `report` / `holds` | Due list / open HOLDs. |
 | `sync` | Push sqlite cars/holds to Oil Desk `fleet_cars` + refresh `web/data/cars.json`. Best-effort Neon backup after success. |
@@ -54,6 +53,10 @@ Exit: `0` ok, `1` error, `2` compute finished with open HOLDs (report still allo
 `cards rebuild` uses OneStep **stop** windows (drive-stop list, no odometer). A swipe is assigned when exactly one GPS-linked car was in a short stop at that swipe time/place. Overnight sits are ignored. Two cars stopped → no vote. Station lat/lng come from exclusive GPS sits; later swipes can match the car at that pump even when another box is sitting elsewhere. Enterprise Vehicle is not the join.
 
 None of the `cards *` commands write Last Reading.
+
+### Station ladder (3 / 5 / 10)
+
+Start from OneStep-linked cars (`factory_id` only). For each GPS-linked car, collect **exclusive** pump sits (exactly one box at that swipe). Cards seen at 3 exclusive stations lock as a **car** card; expand to 5 then 10. The same card at two cars is `SPLIT`. A driver who keeps the card (or logistics personnel: Rich / Tyler) stays a **person** era — that never creates a device↔car join. Office labels (`PDI OFFICE`, HQ) are the **office** bucket. Coverage is % of the eFleets roster with both a factory_id link and a GPS-named **car** card era (target 95%). TRACKER / empty merchants are not pumps; do not invent punches to clear the gap.
 
 ## Hard locks (do not regress)
 

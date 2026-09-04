@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"oilchange/internal/app"
+	"oilchange/internal/cards"
 	"oilchange/internal/config"
 	"oilchange/internal/model"
 	"oilchange/internal/onestep"
@@ -77,8 +78,11 @@ func usage() {
   oilchange cards pairings [--card ID]
   oilchange cards split [--card ID]
   oilchange cards call [--card ID] [--all]
+  oilchange cards ladder [--no-gps]
+  oilchange cards coverage [--no-gps]
   oilchange devices sync [--map PATH]
-  oilchange devices list
+  oilchange devices list [--csv [--out PATH] [--live] [--map PATH]]
+  oilchange devices csv [--out PATH] [--live] [--map PATH]
   oilchange sync [--interval 5m] [--mirror web/data/cars.json] [--require-neon] [--no-remote]
   oilchange pull-supabase
   oilchange backup-neon
@@ -252,7 +256,7 @@ func cmdHolds(ctx context.Context, cfg config.Config, args []string) int {
 
 func cmdCards(ctx context.Context, cfg config.Config, args []string) int {
 	if len(args) < 1 {
-		fmt.Fprintln(os.Stderr, "usage: oilchange cards rebuild|suspect|trace|pairings|split|call")
+		fmt.Fprintln(os.Stderr, "usage: oilchange cards rebuild|suspect|trace|pairings|split|call|ladder|coverage")
 		return model.ExitError
 	}
 	fs := flag.NewFlagSet("cards", flag.ContinueOnError)
@@ -323,6 +327,18 @@ func cmdCards(ctx context.Context, cfg config.Config, args []string) int {
 		if err := a.CardsCall(ctx, *cardID, onlyDisagree); err != nil {
 			fmt.Fprintf(os.Stderr, "cards call: %v\n", err)
 			return model.ExitError
+		}
+		return model.ExitOK
+	case "ladder", "coverage":
+		res, err := a.CardsLadder(ctx, true)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "cards %s: %v\n", args[0], err)
+			return model.ExitError
+		}
+		if args[0] == "coverage" {
+			fmt.Fprint(os.Stdout, cards.FormatCoverage(res.Coverage))
+		} else {
+			fmt.Fprint(os.Stdout, cards.FormatLadder(res))
 		}
 		return model.ExitOK
 	default:

@@ -399,3 +399,60 @@ func TestWrongCardRebuildSuspectTrace(t *testing.T) {
 		t.Fatalf("trace missed 27VA15/CARD-15, hits=%+v", hits)
 	}
 }
+
+func TestCardsLadderDoesNotWriteLastReading(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "lad.sqlite")
+	st, err := store.Open("sqlite", p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	ctx := context.Background()
+	if err := st.UpsertCar(ctx, model.Car{EFleetsID: "27VA15", Nickname: "VA15"}); err != nil {
+		t.Fatal(err)
+	}
+	at := time.Date(2026, 8, 1, 10, 0, 0, 0, time.UTC)
+	if err := st.WriteLastReading(ctx, "27VA15", 100010, at, model.SourceFuelDetails); err != nil {
+		t.Fatal(err)
+	}
+	a := &App{Store: st}
+	if _, err := a.CardsLadder(ctx, true); err != nil {
+		t.Fatal(err)
+	}
+	car, err := st.CarByEFleets(ctx, "27VA15")
+	if err != nil || car.LastReadingMiles == nil || *car.LastReadingMiles != 100010 {
+		t.Fatalf("ladder must not touch Last Reading: %+v %v", car, err)
+	}
+}
+
+func TestDevicesCSVFromStoreLabelOnly(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "devcsv.sqlite")
+	st, err := store.Open("sqlite", p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	ctx := context.Background()
+	if err := st.UpsertCar(ctx, model.Car{EFleetsID: "27TESTA", Nickname: "VA19"}); err != nil {
+		t.Fatal(err)
+	}
+	link := "27TESTA"
+	if err := st.UpsertDevice(ctx, model.OneStepDevice{
+		FactoryID: "FACT1", DeviceID: "DEV1", DisplayName: "WrongCar", LinkedCarEFleetsID: &link, Active: true,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	a := &App{Store: st}
+	var buf bytes.Buffer
+	n, err := a.DevicesCSV(ctx, &buf, false, "", nil)
+	if err != nil || n != 1 {
+		t.Fatalf("n=%d err=%v", n, err)
+	}
+	got := buf.String()
+	if !strings.Contains(got, "factory_id,device_id,display_name,linked_car_efleets_id,status") {
+		t.Fatalf("header %q", got)
+	}
+	if !strings.Contains(got, "FACT1,DEV1,WrongCar,27TESTA,active") {
+		t.Fatalf("row %q", got)
+	}
+}

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"oilchange/internal/model"
+	"oilchange/internal/oil"
 )
 
 // DefaultWindowDays is the station-day lookaround for a swapped-card trace.
@@ -67,21 +68,37 @@ func ScorePairings(txs []model.CardTx, now time.Time) []model.CardPairing {
 		if now.Sub(t.At) >= 0 && now.Sub(t.At) <= RecentBonusDays*24*time.Hour {
 			w += 0.25
 		}
+		person := personKey(t.DriverFirst, t.DriverLast)
+		if person != "" {
+			k := key{card, "person", person}
+			n[k]++
+			score[k] += w
+		}
+		// Logistics personnel keep the card; they never vote a device↔car join.
+		if oil.HasLogisticsPersonnel(t.DriverFirst, t.DriverLast) {
+			continue
+		}
 		// GPS-called car is the join when present. Enterprise Vehicle is fallback.
 		car := strings.TrimSpace(t.CalledEFleetsID)
-		if car != "" && !isUnknownCar(car) {
+		if car != "" && !isUnknownCar(car) && !isOfficeLabel(car) {
 			w *= 2
 		} else {
 			car = strings.TrimSpace(t.RecordedEFleetsID)
 		}
+		if isOfficeLabel(car) || (isUnknownCar(car) && isOfficeLabel(t.RecordedCVN)) {
+			off := strings.TrimSpace(car)
+			if off == "" || isUnknownCar(off) {
+				off = strings.TrimSpace(t.RecordedCVN)
+			}
+			if off != "" {
+				k := key{card, "office", off}
+				n[k]++
+				score[k] += w
+			}
+			continue
+		}
 		if car != "" && !isUnknownCar(car) {
 			k := key{card, "car", car}
-			n[k]++
-			score[k] += w
-		}
-		person := personKey(t.DriverFirst, t.DriverLast)
-		if person != "" {
-			k := key{card, "person", person}
 			n[k]++
 			score[k] += w
 		}
@@ -266,12 +283,16 @@ func personKey(first, last string) string {
 	if f == "" || l == "" {
 		return ""
 	}
+	// DETAILS placeholder, not a driver who keeps a card.
+	if f == "FLEET" && l == "DRIVER" {
+		return ""
+	}
 	return f + " " + l
 }
 
 func isUnknownCar(id string) bool {
 	s := strings.ToLower(strings.TrimSpace(id))
-	return s == "" || s == "unknown" || s == "n/a" || s == "-"
+	return s == "" || s == "unknown" || s == "n/a" || s == "-" || s == "tracker"
 }
 
 func skipStationName(name string) bool {

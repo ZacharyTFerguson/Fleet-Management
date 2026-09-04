@@ -88,15 +88,21 @@ func TestCopyDurableSQLiteToSQLite(t *testing.T) {
 	if err := src.ReplacePairings(ctx, []model.CardPairing{{CardID: "CARD1", EntityType: "car", EntityKey: "27TESTA", EvidenceN: 1, Score: 1, Best: true}}); err != nil {
 		t.Fatal(err)
 	}
+	if err := src.ReplaceEras(ctx, []model.CardEra{{
+		CardID: "CARD1", EFleetsID: "27TESTA", HolderType: "car", HolderKey: "27TESTA",
+		From: at, To: at, EvidenceN: 1, Stations: []string{"Shell"}, Rung: 3,
+	}}); err != nil {
+		t.Fatal(err)
+	}
 
 	counts, err := CopyDurable(ctx, src, dest)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if counts.Cars != 1 || counts.Fills != 1 || counts.Holds != 1 || counts.Devices != 1 || counts.Miles != 1 {
+	if counts.Cars != 1 || counts.Fills != 1 || counts.Holds != 1 || counts.Devices != 1 || counts.Miles != 1 || counts.Eras != 1 {
 		t.Fatalf("counts %+v", counts)
 	}
-	if !strings.Contains(counts.LogLine(), "cars=1") || strings.Contains(counts.LogLine(), "postgres://") {
+	if !strings.Contains(counts.LogLine(), "eras=1") || strings.Contains(counts.LogLine(), "postgres://") {
 		t.Fatalf("log %q", counts.LogLine())
 	}
 
@@ -128,6 +134,10 @@ func TestCopyDurableSQLiteToSQLite(t *testing.T) {
 	devs, err := dest.ListDevices(ctx)
 	if err != nil || len(devs) != 1 || devs[0].FactoryID != "FACT1" {
 		t.Fatalf("devices %+v %v", devs, err)
+	}
+	eras, err := dest.ListEras(ctx)
+	if err != nil || len(eras) != 1 || eras[0].CardID != "CARD1" || eras[0].Rung != 3 {
+		t.Fatalf("eras %+v %v", eras, err)
 	}
 
 	again, err := CopyDurable(ctx, src, dest)

@@ -22,18 +22,8 @@ type GPSFirstResult struct {
 	Pumps    int
 }
 
-// CardEra is one stretch where GPS says this card was in this car.
-// A card that moved (VA19 card riding in VA15, later back in VA19) gets two eras.
-type CardEra struct {
-	CardID    string    `json:"card_id"`
-	EFleetsID string    `json:"efleets_id"`
-	Nickname  string    `json:"nickname,omitempty"`
-	From      time.Time `json:"from"`
-	To        time.Time `json:"to"`
-	EvidenceN int       `json:"evidence_n"`
-	Stations  []string  `json:"stations,omitempty"`
-	Split     bool      `json:"split"`
-}
+// CardEra is the GPS / station-ladder history of where a card sat.
+type CardEra = model.CardEra
 
 // RecordCall is what to call one swipe: GPS car name, not the DETAILS Vehicle column.
 type RecordCall struct {
@@ -462,12 +452,14 @@ func splitEras(hits []gpsHit, nick map[string]string) []CardEra {
 			if cur == nil || cur.EFleetsID != h.car {
 				flush()
 				era := CardEra{
-					CardID:    card,
-					EFleetsID: h.car,
-					Nickname:  nick[h.car],
-					From:      h.at,
-					To:        h.at,
-					EvidenceN: 1,
+					CardID:     card,
+					EFleetsID:  h.car,
+					Nickname:   nick[h.car],
+					HolderType: HolderCar,
+					HolderKey:  h.car,
+					From:       h.at,
+					To:         h.at,
+					EvidenceN:  1,
 				}
 				cur = &era
 			} else {

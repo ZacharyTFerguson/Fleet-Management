@@ -153,7 +153,101 @@ func TestHuntNearbySkipsLogisticsPersonnelBox(t *testing.T) {
 	}
 }
 
-func TestFormatNearbyDoesNotTreatEntityAsJoin(t *testing.T) {
+func TestHuntNearbyThreeFillsSameEasternDayStayWatch(t *testing.T) {
+	ny := enterprise.NY()
+	lat, lng := 40.61716, -79.722
+	day := time.Date(2026, 6, 16, 0, 0, 0, 0, ny)
+	var txs []model.CardTx
+	var visits []model.StopVisit
+	for i := 0; i < 3; i++ {
+		fill := day.Add(time.Duration(10+i) * time.Hour)
+		txs = append(txs, model.CardTx{
+			CardID: "CARD-ONEDAY", At: fill.UTC(),
+			StationName: "SHEETZ", StationAddress: "203 CRAIGDELL RD, LOWER BURRELL, PA",
+		})
+		visits = append(visits, model.StopVisit{
+			FactoryID: "FACT-CAR", DeviceID: "DEV-CAR", HasPos: true, Lat: lat, Lng: lng,
+			From: fill.Add(-5 * time.Minute), To: fill.Add(5 * time.Minute),
+		})
+	}
+	stations := []GeocodedStation{{Name: "SHEETZ", Address: "203 CRAIGDELL RD, LOWER BURRELL, PA", Lat: lat, Lng: lng}}
+	res := HuntNearby(visits, txs, stations, nil, DefaultStopSlack)
+	if res.Certain != 0 || res.Likely != 0 {
+		t.Fatalf("same Eastern day is one exclusive day, not certain: %+v", res)
+	}
+	if res.Watch == 0 {
+		t.Fatal("expected watch")
+	}
+}
+
+func TestEligibleUnknownFillsSkipsGPSCalledAndCarEra(t *testing.T) {
+	ny := enterprise.NY()
+	fill := time.Date(2026, 6, 16, 14, 0, 0, 0, ny)
+	txs := []model.CardTx{
+		{CardID: "CALLED", At: fill.UTC(), CalledEFleetsID: "26LSZW", StationName: "SHEETZ"},
+		{CardID: "ERA", At: fill.UTC(), StationName: "SHEETZ"},
+		{CardID: "OPEN", At: fill.UTC(), StationName: "SHEETZ"},
+	}
+	eras := []model.CardEra{{
+		CardID: "ERA", HolderType: HolderCar, HolderKey: "26LSZW",
+		From: fill.Add(-time.Hour), To: fill.Add(time.Hour),
+	}}
+	got := EligibleUnknownFills(txs, eras)
+	if len(got) != 1 || got[0].CardID != "OPEN" {
+		t.Fatalf("%+v", got)
+	}
+}
+
+func TestHuntNearbyIncompleteCoverageStaysWatch(t *testing.T) {
+	ny := enterprise.NY()
+	lat, lng := 40.61716, -79.722
+	var txs []model.CardTx
+	var visits []model.StopVisit
+	for i := 0; i < 3; i++ {
+		fill := time.Date(2026, 6, 10+i*3, 14, 20, 0, 0, ny)
+		txs = append(txs, model.CardTx{
+			CardID: "CARD-HOME", At: fill.UTC(),
+			StationName: "SHEETZ", StationAddress: "203 CRAIGDELL RD, LOWER BURRELL, PA",
+		})
+		visits = append(visits, model.StopVisit{
+			FactoryID: "FACT-CAR", HasPos: true, Lat: lat, Lng: lng,
+			From: fill.Add(-5 * time.Minute), To: fill.Add(15 * time.Minute),
+		})
+	}
+	stations := []GeocodedStation{{Name: "SHEETZ", Address: "203 CRAIGDELL RD, LOWER BURRELL, PA", Lat: lat, Lng: lng}}
+	res := HuntNearbyFull(visits, txs, stations, nil, DefaultStopSlack, false)
+	if res.Certain != 0 || res.Likely != 0 || !strings.Contains(res.Cards[0].Why, "incomplete") {
+		t.Fatalf("%+v", res)
+	}
+}
+
+func TestFillDayWindowDSTSpringForward(t *testing.T) {
+	ny := enterprise.NY()
+	fill := time.Date(2026, 3, 8, 10, 0, 0, 0, ny)
+	from, to := FillDayWindow(fill)
+	if EasternDay(from) != "2026-03-07" {
+		t.Fatalf("from day %s", EasternDay(from))
+	}
+	if !to.After(from) {
+		t.Fatal("to")
+	}
+}
+
+func TestEligibleUnknownFillsKeepsPersonEraCard(t *testing.T) {
+	ny := enterprise.NY()
+	fill := time.Date(2026, 6, 16, 14, 0, 0, 0, ny)
+	txs := []model.CardTx{{CardID: "PERSON", At: fill.UTC(), StationName: "SHEETZ"}}
+	eras := []model.CardEra{{
+		CardID: "PERSON", HolderType: HolderPerson, HolderKey: "JANE DOE",
+		From: fill.Add(-time.Hour), To: fill.Add(time.Hour),
+	}}
+	got := EligibleUnknownFills(txs, eras)
+	if len(got) != 1 || got[0].CardID != "PERSON" {
+		t.Fatalf("PERSON-era cards stay on the watch list: %+v", got)
+	}
+}
+
+func TestFormatNearbyDoesNotTreatDisplayNameAsJoin(t *testing.T) {
 	s := FormatNearby(NearbyResult{Cards: []NearbyCard{{
 		CardID: "C1", Fills: 1,
 		Watch: []NearbyDevice{{FactoryID: "F1", DeviceID: "D1", Rank: NearbyWatch}},
@@ -162,6 +256,9 @@ func TestFormatNearbyDoesNotTreatEntityAsJoin(t *testing.T) {
 		t.Fatal(s)
 	}
 	if strings.Contains(s, "display_name") {
+		t.Fatal(s)
+	}
+	if strings.Contains(s, "join=") {
 		t.Fatal(s)
 	}
 }

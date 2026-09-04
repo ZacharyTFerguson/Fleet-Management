@@ -38,7 +38,8 @@ type NearbyDevice struct {
 	Fills          int      `json:"fills"`
 	AtFillFills    int      `json:"at_fill_fills"`
 	ExclusiveFills int      `json:"exclusive_fills"`
-	MinMiles       float64  `json:"min_miles,omitempty"`
+	MinMiles       float64  `json:"min_miles"`
+	HasMiles       bool     `json:"has_miles,omitempty"`
 	Stations       []string `json:"stations,omitempty"`
 	Rank           string   `json:"rank"`
 }
@@ -55,10 +56,11 @@ type NearbyCard struct {
 
 // NearbyResult is the operator watch list. It never writes Last Reading.
 type NearbyResult struct {
-	Cards   []NearbyCard `json:"cards"`
-	Certain int          `json:"certain_n"`
-	Likely  int          `json:"likely_n"`
-	Watch   int          `json:"watch_n"`
+	Cards            []NearbyCard `json:"cards"`
+	Certain          int          `json:"certain_n"`
+	Likely           int          `json:"likely_n"`
+	Watch            int          `json:"watch_n"`
+	CoverageComplete bool         `json:"coverage_complete"`
 }
 
 type nearbyStation struct {
@@ -81,9 +83,91 @@ func FillDayWindow(fillAt time.Time) (from, to time.Time) {
 	return from.UTC(), to.UTC()
 }
 
+// EasternDay is the America/New_York calendar date of a swipe (provider time).
+func EasternDay(t time.Time) string {
+	if t.IsZero() {
+		return ""
+	}
+	return t.In(enterprise.NY()).Format("2006-01-02")
+}
+
+// EligibleUnknownFills keeps uncalled swipes that are not already in a car era.
+// PERSON-era cards still appear (watch only). Logistics punches are dropped.
+func EligibleUnknownFills(txs []model.CardTx, eras []model.CardEra) []model.CardTx {
+	carAt := map[string][]model.CardEra{}
+	for _, e := range eras {
+		if strings.TrimSpace(e.CardID) == "" {
+			continue
+		}
+		ht := strings.TrimSpace(e.HolderType)
+		if ht == "" {
+			ht = HolderCar
+		}
+		if ht != HolderCar {
+			continue
+		}
+		carAt[e.CardID] = append(carAt[e.CardID], e)
+	}
+	var out []model.CardTx
+	for _, t := range txs {
+		if strings.TrimSpace(t.CardID) == "" || t.At.IsZero() {
+			continue
+		}
+		if oil.HasLogisticsPersonnel(t.DriverFirst, t.DriverLast) {
+			continue
+		}
+		if strings.TrimSpace(t.CalledEFleetsID) != "" && !isUnknownCar(t.CalledEFleetsID) && !isOfficeLabel(t.CalledEFleetsID) {
+			continue
+		}
+		if fillInCarEra(carAt[t.CardID], t.At) {
+			continue
+		}
+		out = append(out, t)
+	}
+	return out
+}
+
+func fillInCarEra(eras []model.CardEra, at time.Time) bool {
+	for _, e := range eras {
+		from, to := e.From, e.To
+		if from.IsZero() {
+			from = to
+		}
+		if to.IsZero() {
+			to = from
+		}
+		if from.IsZero() {
+			return true
+		}
+		if !at.Before(from) && !at.After(to) {
+			return true
+		}
+	}
+	return false
+}
+
+func CardHasPersonEra(eras []model.CardEra, cardID string) bool {
+	cardID = strings.TrimSpace(cardID)
+	for _, e := range eras {
+		if e.CardID != cardID {
+			continue
+		}
+		if strings.TrimSpace(e.HolderType) == HolderPerson {
+			return true
+		}
+	}
+	return false
+}
+
 // HuntNearby lists factory_id candidates within 1 mile of each unknown card fill
-// during fill-day ±1. One hit is a watch, not a join.
+// during fill-day ±1. One hit is a watch, not a join. complete must be true
+// (every eligible box fetched for the window) before likely/certain ranks apply.
 func HuntNearby(visits []model.StopVisit, txs []model.CardTx, stations []GeocodedStation, devices []model.OneStepDevice, slack time.Duration) NearbyResult {
+	return HuntNearbyFull(visits, txs, stations, devices, slack, true)
+}
+
+// HuntNearbyFull is HuntNearby with an explicit coverage flag.
+func HuntNearbyFull(visits []model.StopVisit, txs []model.CardTx, stations []GeocodedStation, devices []model.OneStepDevice, slack time.Duration, complete bool) NearbyResult {
 	if slack <= 0 {
 		slack = DefaultStopSlack
 	}
@@ -94,12 +178,10 @@ func HuntNearby(visits []model.StopVisit, txs []model.CardTx, stations []Geocode
 			devByFactory[id] = d
 		}
 	}
-	unknown := unknownCardIDs(txs)
 	type acc struct {
 		fills    map[string]struct{}
-		atFill   map[string]struct{}
+		atFill   map[string]struct{} // Eastern YYYY-MM-DD
 		deviceID string
-		vin      string
 		minMiles float64
 		hasMiles bool
 		stations map[string]struct{}
@@ -115,14 +197,11 @@ func HuntNearby(visits []model.StopVisit, txs []model.CardTx, stations []Geocode
 		if card == "" {
 			continue
 		}
-		if _, ok := unknown[card]; !ok {
-			continue
-		}
 		if oil.HasLogisticsPersonnel(tx.DriverFirst, tx.DriverLast) {
 			continue
 		}
 		st := resolveStation(tx, byStation)
-		if !st.hasPos && strings.TrimSpace(st.addr) == "" {
+		if !st.hasPos {
 			continue
 		}
 		from, to := FillDayWindow(tx.At)
@@ -135,7 +214,7 @@ func HuntNearby(visits []model.StopVisit, txs []model.CardTx, stations []Geocode
 			cardsAcc[card] = ca
 		}
 		ca.fills++
-		fillKey := tx.At.UTC().Format(time.RFC3339Nano) + "|" + st.key
+		day := EasternDay(tx.At)
 		for _, v := range visits {
 			if !v.HasPos || strings.TrimSpace(v.FactoryID) == "" {
 				continue
@@ -143,14 +222,14 @@ func HuntNearby(visits []model.StopVisit, txs []model.CardTx, stations []Geocode
 			if v.To.Before(from) || v.From.After(to) {
 				continue
 			}
-			if !st.hasPos {
-				continue
-			}
 			meters := MetersBetween(v.Lat, v.Lng, st.lat, st.lng)
 			if meters > NearbyRadiusMeters {
 				continue
 			}
 			fid := strings.TrimSpace(v.FactoryID)
+			if dev, ok := devByFactory[fid]; ok && oil.HasLogisticsPersonnel(dev.DisplayName) {
+				continue
+			}
 			a := ca.dev[fid]
 			if a == nil {
 				a = &acc{
@@ -168,12 +247,12 @@ func HuntNearby(visits []model.StopVisit, txs []model.CardTx, stations []Geocode
 			if !a.hasMiles || miles < a.minMiles {
 				a.minMiles, a.hasMiles = miles, true
 			}
-			a.fills[fillKey] = struct{}{}
+			a.fills[day+"|"+st.key] = struct{}{}
 			if st.key != "" {
 				a.stations[st.key] = struct{}{}
 			}
-			if stopOverlapsFill(v, tx.At, slack) {
-				a.atFill[fillKey] = struct{}{}
+			if stopOverlapsFill(v, tx.At, slack) && day != "" {
+				a.atFill[day] = struct{}{}
 			}
 		}
 	}
@@ -213,6 +292,7 @@ func HuntNearby(visits []model.StopVisit, txs []model.CardTx, stations []Geocode
 			}
 			if a.hasMiles {
 				d.MinMiles = a.minMiles
+				d.HasMiles = true
 			}
 			if dev, ok := devByFactory[fid]; ok {
 				d.VIN = normalizeNearbyVIN(dev.VIN)
@@ -231,9 +311,9 @@ func HuntNearby(visits []model.StopVisit, txs []model.CardTx, stations []Geocode
 			}
 			sort.Strings(d.Stations)
 			switch {
-			case d.ExclusiveFills >= NearbyCertainFills:
+			case complete && d.ExclusiveFills >= NearbyCertainFills:
 				d.Rank = NearbyCertain
-			case d.ExclusiveFills >= NearbyLikelyFills:
+			case complete && d.ExclusiveFills >= NearbyLikelyFills:
 				d.Rank = NearbyLikely
 			default:
 				d.Rank = NearbyWatch
@@ -262,14 +342,15 @@ func HuntNearby(visits []model.StopVisit, txs []model.CardTx, stations []Geocode
 				nc.Watch = append(nc.Watch, d)
 			}
 		}
-		switch {
-		case len(nc.Certain) > 0:
+		if !complete && (len(nc.Watch) > 0 || len(nc.Likely) > 0 || len(nc.Certain) > 0) {
+			nc.Why = "incomplete GPS coverage for this window — watch only until every active box is fetched"
+		} else if len(nc.Certain) > 0 {
 			nc.Why = fmt.Sprintf("exclusive factory_id %s at fill time on %d days", nc.Certain[0].FactoryID, nc.Certain[0].ExclusiveFills)
-		case len(nc.Likely) > 0:
+		} else if len(nc.Likely) > 0 {
 			nc.Why = fmt.Sprintf("likely factory_id %s at fill time on %d days — keep watching", nc.Likely[0].FactoryID, nc.Likely[0].ExclusiveFills)
-		case len(nc.Watch) > 0:
+		} else if len(nc.Watch) > 0 {
 			nc.Why = fmt.Sprintf("%d device(s) within 1 mile on fill-day ±1 — watch, not a join", len(nc.Watch))
-		default:
+		} else {
 			nc.Why = "no GPS box within 1 mile of a mapped pump on fill-day ±1"
 		}
 		out.Cards = append(out.Cards, nc)
@@ -298,38 +379,7 @@ func HuntNearby(visits []model.StopVisit, txs []model.CardTx, stations []Geocode
 	if out.Cards == nil {
 		out.Cards = []NearbyCard{}
 	}
-	return out
-}
-
-func unknownCardIDs(txs []model.CardTx) map[string]struct{} {
-	pairings := ScorePairings(txs, time.Time{})
-	unknown := UnknownMatchups(txs, pairings)
-	out := map[string]struct{}{}
-	for _, u := range unknown {
-		if strings.TrimSpace(u.CardID) != "" {
-			out[u.CardID] = struct{}{}
-		}
-	}
-	// Cards with no GPS-called car yet (exclusive sit missed them).
-	called := map[string]struct{}{}
-	for _, t := range txs {
-		if strings.TrimSpace(t.CalledEFleetsID) != "" && !isUnknownCar(t.CalledEFleetsID) {
-			called[t.CardID] = struct{}{}
-		}
-	}
-	seen := map[string]struct{}{}
-	for _, t := range txs {
-		id := strings.TrimSpace(t.CardID)
-		if id == "" {
-			continue
-		}
-		seen[id] = struct{}{}
-	}
-	for id := range seen {
-		if _, ok := called[id]; !ok {
-			out[id] = struct{}{}
-		}
-	}
+	out.CoverageComplete = complete
 	return out
 }
 
@@ -340,7 +390,7 @@ func indexGeocoded(stations []GeocodedStation) map[string]nearbyStation {
 		if k == "" {
 			continue
 		}
-		out[k] = nearbyStation{key: k, name: s.Name, addr: s.Address, lat: s.Lat, lng: s.Lng, hasPos: s.Lat != 0 || s.Lng != 0}
+		out[k] = nearbyStation{key: k, name: s.Name, addr: s.Address, lat: s.Lat, lng: s.Lng, hasPos: validStationPos(s.Lat, s.Lng)}
 	}
 	return out
 }
@@ -355,6 +405,16 @@ func resolveStation(tx model.CardTx, geo map[string]nearbyStation) nearbyStation
 		name: strings.TrimSpace(tx.StationName),
 		addr: strings.TrimSpace(tx.StationAddress),
 	}
+}
+
+func validStationPos(lat, lng float64) bool {
+	if lat < -90 || lat > 90 || lng < -180 || lng > 180 {
+		return false
+	}
+	if lat == 0 && lng == 0 {
+		return false
+	}
+	return true
 }
 
 func stopOverlapsFill(v model.StopVisit, fill time.Time, slack time.Duration) bool {
@@ -377,8 +437,8 @@ func normalizeNearbyVIN(s string) string {
 // FormatNearby is the operator listing. factory_id is the identity; labels are omitted.
 func FormatNearby(res NearbyResult) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "nearby certain=%d likely=%d watch=%d cards=%d radius=1mi window=fill-day±1\n",
-		res.Certain, res.Likely, res.Watch, len(res.Cards))
+	fmt.Fprintf(&b, "nearby certain=%d likely=%d watch=%d cards=%d radius=1mi window=fill-day±1 coverage_complete=%v\n",
+		res.Certain, res.Likely, res.Watch, len(res.Cards), res.CoverageComplete)
 	for _, c := range res.Cards {
 		fmt.Fprintf(&b, "card=%s fills=%d certain=%d likely=%d watch=%d %s\n",
 			c.CardID, c.Fills, len(c.Certain), len(c.Likely), len(c.Watch), c.Why)
@@ -390,7 +450,7 @@ func FormatNearby(res NearbyResult) string {
 				}
 				fmt.Fprintf(&b, "  %s factory_id=%s device_id=%s car=%s fills=%d at_fill=%d exclusive=%d",
 					label, d.FactoryID, d.DeviceID, car, d.Fills, d.AtFillFills, d.ExclusiveFills)
-				if d.MinMiles > 0 {
+				if d.HasMiles {
 					fmt.Fprintf(&b, " min_mi=%.2f", d.MinMiles)
 				}
 				b.WriteByte('\n')

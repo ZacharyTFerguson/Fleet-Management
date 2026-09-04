@@ -81,7 +81,7 @@ func usage() {
   oilchange cards call [--card ID] [--all]
   oilchange cards ladder [--no-gps]
   oilchange cards coverage [--no-gps]
-  oilchange cards nearby [--card ID] [--live] [--report] [--persist]
+  oilchange cards nearby [--card ID] [--live] [--report] [--persist] [--report-cap N]
   oilchange devices sync [--map PATH]
   oilchange devices list [--csv [--out PATH] [--live] [--map PATH]]
   oilchange devices csv [--out PATH] [--live] [--map PATH]

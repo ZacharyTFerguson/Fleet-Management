@@ -304,10 +304,10 @@ func walkNearAddress(v any, hits *[]NearAddressHit) {
 
 func hitFromMap(m map[string]any) (NearAddressHit, bool) {
 	fid := strings.TrimSpace(firstMapString(m, "near_address_factory_id", "factory_id"))
-	did := strings.TrimSpace(firstMapString(m, "near_address_device_id", "device_id"))
-	if fid == "" && did == "" {
+	if fid == "" {
 		return NearAddressHit{}, false
 	}
+	did := strings.TrimSpace(firstMapString(m, "near_address_device_id", "device_id"))
 	h := NearAddressHit{
 		FactoryID: fid,
 		DeviceID:  did,
@@ -315,10 +315,10 @@ func hitFromMap(m map[string]any) (NearAddressHit, bool) {
 		Entity:    firstMapString(m, "near_address_entity", "entity"),
 		Address:   firstMapString(m, "address"),
 	}
-	if t, err := parseVisitTime(firstMapAny(m, "stop_start_time", "time_from")); err == nil {
+	if t, err := parseNearAddressTime(firstMapAny(m, "stop_start_time", "time_from")); err == nil {
 		h.From = t
 	}
-	if t, err := parseVisitTime(firstMapAny(m, "stop_end_time", "time_to")); err == nil {
+	if t, err := parseNearAddressTime(firstMapAny(m, "stop_end_time", "time_to")); err == nil {
 		h.To = t
 	}
 	if n, ok := measurementMiles(m["distance_from_location"]); ok {
@@ -332,6 +332,33 @@ func hitFromMap(m map[string]any) (NearAddressHit, bool) {
 		h.Lat, h.Lng, h.HasPos = lat, lng, true
 	}
 	return h, true
+}
+
+func parseNearAddressTime(v any) (time.Time, error) {
+	switch t := v.(type) {
+	case string:
+		s := strings.TrimSpace(t)
+		if s == "" {
+			return time.Time{}, fmt.Errorf("empty time")
+		}
+		for _, layout := range []string{time.RFC3339, time.RFC3339Nano} {
+			if parsed, err := time.Parse(layout, s); err == nil {
+				return parsed.UTC(), nil
+			}
+		}
+		ny, err := time.LoadLocation("America/New_York")
+		if err != nil {
+			ny = time.FixedZone("America/New_York", -5*60*60)
+		}
+		for _, layout := range []string{"2006-01-02 15:04:05", "2006-01-02T15:04:05"} {
+			if parsed, err := time.ParseInLocation(layout, s, ny); err == nil {
+				return parsed.UTC(), nil
+			}
+		}
+		return time.Time{}, fmt.Errorf("near_address time %q", s)
+	default:
+		return time.Time{}, fmt.Errorf("near_address time type %T", v)
+	}
 }
 
 func firstMapString(m map[string]any, keys ...string) string {

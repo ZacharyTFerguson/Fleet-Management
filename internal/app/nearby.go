@@ -17,7 +17,7 @@ import (
 type CardsNearbyOpts struct {
 	CardID     string
 	LiveStops  bool // pull drive-stop for boxes missing from the GPS cache (including unpaired)
-	LiveReport bool // queue OneStep near_address generate-reports (rows still prefer stops)
+	LiveReport bool // queue OneStep near_address generate-reports jobs
 	Persist    bool // merge certain linked-car eras; unpaired factory_id is never joined
 	ReportCap  int  // max generate-reports jobs (default 3)
 }
@@ -36,68 +36,155 @@ func (a *App) CardsNearby(ctx context.Context, opt CardsNearbyOpts) (cards.Nearb
 	if err != nil {
 		return empty, err
 	}
+	eras, err := a.Store.ListEras(ctx)
+	if err != nil {
+		return empty, err
+	}
 	gps, err := a.matchCardsAtGPSStops(ctx, txs)
 	if err != nil {
 		return empty, err
 	}
-	visits := gpsVisitsOrCache(a, gps)
-	if opt.LiveStops && a.OneStep != nil {
-		visits = a.fillMissingNearbyStops(ctx, visits, txs, devs)
-	}
-	res := cards.HuntNearby(visits, txs, gps.Stations, devs, cards.DefaultStopSlack)
+	txs = cards.ApplyCalls(txs, gps.Calls)
+	txs = cards.EligibleUnknownFills(txs, eras)
 	if opt.CardID != "" {
-		res = filterNearbyCard(res, opt.CardID)
+		id := strings.TrimSpace(opt.CardID)
+		var one []model.CardTx
+		for _, t := range txs {
+			if t.CardID == id {
+				one = append(one, t)
+			}
+		}
+		txs = one
 	}
+	visits := loadNearbyVisits(a)
+	complete := nearbyCoverageComplete(devs, visits, txs)
+	if opt.LiveStops && a.OneStep != nil {
+		var failed int
+		visits, failed = a.fillMissingNearbyStops(ctx, visits, txs, devs)
+		complete = failed == 0 && nearbyCoverageComplete(devs, visits, txs)
+	}
+	res := cards.HuntNearbyFull(visits, txs, gps.Stations, devs, cards.DefaultStopSlack, complete)
 	if opt.LiveReport && a.OneStep != nil {
 		a.queueNearAddressReports(ctx, txs, gps.Stations, opt.ReportCap)
 	}
 	if opt.Persist {
-		if err := a.persistCertainNearby(ctx, res, txs); err != nil {
+		if !complete {
+			fmt.Fprintf(os.Stderr, "nearby persist skipped: GPS coverage incomplete (use --live so every active box is fetched)\n")
+		} else if err := a.persistCertainNearby(ctx, res, txs, eras); err != nil {
 			return res, err
 		}
 	}
 	return res, nil
 }
 
-func gpsVisitsOrCache(a *App, gps cards.GPSFirstResult) []model.StopVisit {
+func loadNearbyVisits(a *App) []model.StopVisit {
 	if cached, err := cards.LoadStopVisits(a.gpsStopsCacheFile()); err == nil && len(cached) > 0 {
 		return cached
 	}
 	return nil
 }
 
-func (a *App) fillMissingNearbyStops(ctx context.Context, visits []model.StopVisit, txs []model.CardTx, devs []model.OneStepDevice) []model.StopVisit {
+func nearbyCoverageComplete(devs []model.OneStepDevice, visits []model.StopVisit, txs []model.CardTx) bool {
 	from, to := nearbyUnionWindow(txs)
 	if from.IsZero() {
-		return visits
+		return true
 	}
-	seen := visitFactorySet(visits)
-	var missing []model.OneStepDevice
-	for _, d := range devs {
-		if d.Dead || !d.Active {
-			continue
+	need := 0
+	for _, d := range eligibleNearbyDevices(devs) {
+		need++
+		if !deviceCoveredInWindow(visits, d.FactoryID, from, to) {
+			return false
 		}
-		if strings.TrimSpace(d.FactoryID) == "" {
+	}
+	return need > 0 || len(eligibleNearbyDevices(devs)) == 0
+}
+
+func eligibleNearbyDevices(devs []model.OneStepDevice) []model.OneStepDevice {
+	var out []model.OneStepDevice
+	for _, d := range devs {
+		if d.Dead || !d.Active || strings.TrimSpace(d.FactoryID) == "" {
 			continue
 		}
 		if oil.HasLogisticsPersonnel(d.DisplayName) {
 			continue
 		}
-		if _, ok := seen[d.FactoryID]; ok {
+		out = append(out, d)
+	}
+	return out
+}
+
+func deviceCoveredInWindow(visits []model.StopVisit, factoryID string, from, to time.Time) bool {
+	factoryID = strings.TrimSpace(factoryID)
+	for _, v := range visits {
+		if strings.TrimSpace(v.FactoryID) != factoryID {
+			continue
+		}
+		start := v.From
+		end := v.To
+		if start.IsZero() && end.IsZero() {
+			continue
+		}
+		if end.IsZero() {
+			end = start
+		}
+		if start.IsZero() {
+			start = end
+		}
+		if !end.Before(from) && !start.After(to) {
+			return true
+		}
+	}
+	return false
+}
+
+func (a *App) fillMissingNearbyStops(ctx context.Context, visits []model.StopVisit, txs []model.CardTx, devs []model.OneStepDevice) ([]model.StopVisit, int) {
+	from, to := nearbyUnionWindow(txs)
+	if from.IsZero() {
+		return visits, 0
+	}
+	var missing []model.OneStepDevice
+	for _, d := range eligibleNearbyDevices(devs) {
+		if deviceCoveredInWindow(visits, d.FactoryID, from, to) {
 			continue
 		}
 		missing = append(missing, d)
 	}
 	if len(missing) == 0 {
-		return visits
+		return visits, 0
 	}
-	fmt.Fprintf(os.Stderr, "nearby live-stops fetching %d boxes not in GPS cache\n", len(missing))
-	extra := a.pullDriveStopVisits(ctx, missing, from, to)
+	fmt.Fprintf(os.Stderr, "nearby live-stops fetching %d boxes not covered in fill-day window\n", len(missing))
+	extra, failed := a.pullDriveStopVisitsCounted(ctx, missing, from, to)
 	visits = append(visits, extra...)
 	if err := cards.SaveStopVisits(a.gpsStopsCacheFile(), visits); err != nil {
 		fmt.Fprintf(os.Stderr, "gps-stops cache write: %v\n", err)
 	}
-	return visits
+	return visits, failed
+}
+
+func (a *App) pullDriveStopVisitsCounted(ctx context.Context, devs []model.OneStepDevice, from, to time.Time) ([]model.StopVisit, int) {
+	if a == nil || a.OneStep == nil {
+		return nil, len(devs)
+	}
+	var visits []model.StopVisit
+	failed := 0
+	for _, d := range devs {
+		v, err := a.OneStep.DriveStopVisitsFor(ctx, d, from, to)
+		if err != nil {
+			failed++
+			fmt.Fprintf(os.Stderr, "nearby gps-stops factory_id %s: %v\n", d.FactoryID, err)
+			continue
+		}
+		if len(v) == 0 {
+			v = []model.StopVisit{{
+				FactoryID: d.FactoryID,
+				DeviceID:  d.DeviceID,
+				From:      from,
+				To:        to,
+			}}
+		}
+		visits = append(visits, v...)
+	}
+	return visits, failed
 }
 
 func nearbyUnionWindow(txs []model.CardTx) (time.Time, time.Time) {
@@ -115,24 +202,6 @@ func nearbyUnionWindow(txs []model.CardTx) (time.Time, time.Time) {
 		}
 	}
 	return from, to
-}
-
-func filterNearbyCard(res cards.NearbyResult, cardID string) cards.NearbyResult {
-	cardID = strings.TrimSpace(cardID)
-	out := cards.NearbyResult{}
-	for _, c := range res.Cards {
-		if c.CardID != cardID {
-			continue
-		}
-		out.Cards = append(out.Cards, c)
-		out.Certain += len(c.Certain)
-		out.Likely += len(c.Likely)
-		out.Watch += len(c.Watch)
-	}
-	if out.Cards == nil {
-		out.Cards = []cards.NearbyCard{}
-	}
-	return out
 }
 
 func (a *App) queueNearAddressReports(ctx context.Context, txs []model.CardTx, stations []cards.GeocodedStation, capN int) {
@@ -186,52 +255,45 @@ func (a *App) queueNearAddressReports(ctx context.Context, txs []model.CardTx, s
 	}
 }
 
-func (a *App) persistCertainNearby(ctx context.Context, res cards.NearbyResult, txs []model.CardTx) error {
-	linked := cards.CertainLinkedCars(res)
-	if len(linked) == 0 {
+func (a *App) persistCertainNearby(ctx context.Context, res cards.NearbyResult, txs []model.CardTx, existing []model.CardEra) error {
+	if !res.CoverageComplete {
 		return nil
-	}
-	existing, err := a.Store.ListEras(ctx)
-	if err != nil {
-		return err
-	}
-	hasCar := map[string]struct{}{}
-	for _, e := range existing {
-		if strings.TrimSpace(e.HolderType) == "" || e.HolderType == cards.HolderCar {
-			hasCar[e.CardID] = struct{}{}
-		}
-	}
-	byCard := map[string][]model.CardTx{}
-	for _, t := range txs {
-		byCard[t.CardID] = append(byCard[t.CardID], t)
 	}
 	merged := append([]model.CardEra(nil), existing...)
 	added := 0
 	for _, c := range res.Cards {
-		if _, ok := hasCar[c.CardID]; ok {
+		if cards.CardHasPersonEra(existing, c.CardID) {
+			fmt.Fprintf(os.Stderr, "nearby persist skip card=%s: PERSON era\n", c.CardID)
 			continue
 		}
-		if oil.HasLogisticsPersonnel(c.CardID) {
-			continue
-		}
+		var linked []cards.NearbyDevice
+		cars := map[string]struct{}{}
 		for _, d := range c.Certain {
 			if strings.TrimSpace(d.LinkedCar) == "" {
 				continue
 			}
-			from, to := eraSpan(byCard[c.CardID])
-			merged = append(merged, model.CardEra{
-				CardID:     c.CardID,
-				EFleetsID:  d.LinkedCar,
-				HolderType: cards.HolderCar,
-				HolderKey:  d.LinkedCar,
-				From:       from,
-				To:         to,
-				EvidenceN:  d.ExclusiveFills,
-				Stations:   d.Stations,
-			})
-			added++
-			break
+			if oil.HasLogisticsPersonnel(d.LinkedCar) {
+				continue
+			}
+			linked = append(linked, d)
+			cars[d.LinkedCar] = struct{}{}
 		}
+		if len(cars) != 1 {
+			continue
+		}
+		d := linked[0]
+		from, to := exclusiveDaySpan(txs, c.CardID)
+		merged = append(merged, model.CardEra{
+			CardID:     c.CardID,
+			EFleetsID:  d.LinkedCar,
+			HolderType: cards.HolderCar,
+			HolderKey:  d.LinkedCar,
+			From:       from,
+			To:         to,
+			EvidenceN:  d.ExclusiveFills,
+			Stations:   d.Stations,
+		})
+		added++
 	}
 	if added == 0 {
 		return nil
@@ -240,10 +302,10 @@ func (a *App) persistCertainNearby(ctx context.Context, res cards.NearbyResult, 
 	return a.Store.ReplaceEras(ctx, merged)
 }
 
-func eraSpan(txs []model.CardTx) (time.Time, time.Time) {
+func exclusiveDaySpan(txs []model.CardTx, cardID string) (time.Time, time.Time) {
 	var from, to time.Time
 	for _, t := range txs {
-		if t.At.IsZero() {
+		if t.CardID != cardID || t.At.IsZero() {
 			continue
 		}
 		if from.IsZero() || t.At.Before(from) {

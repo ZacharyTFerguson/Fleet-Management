@@ -81,7 +81,7 @@ Tests lock the ladder with synthetic exclusive pumps (`internal/cards/ladder_tes
 
 ## Near-address hunt (2026-09-04)
 
-Live generate-reports type **`near_address`** exists. Spec that actually echoes: `report_options_near_address.search_address_string` + `range: {value:1, unit:mi}`, `datetime_from`/`datetime_to` = Eastern **fill day ±1** (provider swipe, not bank posting), `all_user_devices` + `exclude_inactive_devices`, `time_zone=America/New_York`, JSON output fields including `near_address_factory_id`. Top-level `address`/`radius` are dropped. Public JSON download 404s; hunt rows use drive-stop stops at 1 mile. CLI: `oilchange cards nearby [--live] [--report] [--persist]`. One hit = watch, not a join. Method: `docs/collab/NEAR-ADDRESS.md`.
+Live generate-reports type **`near_address`** exists. Spec that actually echoes: `report_options_near_address.search_address_string` + `range: {value:1, unit:mi}`, `datetime_from`/`datetime_to` = Eastern **fill day ±1** (provider swipe, not bank posting), `all_user_devices` + `exclude_inactive_devices`, `time_zone=America/New_York`, JSON output fields including `near_address_factory_id`. Top-level `address`/`radius` are dropped. Public JSON download 404s; hunt rows use drive-stop stops at 1 mile. CLI: `oilchange cards nearby [--live] [--report] [--persist] [--report-cap N]`. GPS-called fills and car-era fills are skipped. Exclusive **Eastern days** (1=watch, 2=likely, 3=certain). Incomplete GPS coverage is watch-only. `--persist` writes **certain linked** car eras only; never unpaired boxes, never PERSON cards, never Last Reading. Method: `docs/collab/NEAR-ADDRESS.md`.
 
 ## Next (reasonable)
 

@@ -15,7 +15,12 @@ import (
 func (s *Store) ReplaceEras(ctx context.Context, rows []model.CardEra) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if _, err := s.exec(ctx, `DELETE FROM card_eras`); err != nil {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	if _, err := tx.ExecContext(ctx, s.pg(`DELETE FROM card_eras`)); err != nil {
 		return err
 	}
 	for _, e := range rows {
@@ -52,16 +57,16 @@ func (s *Store) ReplaceEras(ctx context.Context, rows []model.CardEra) error {
 		if e.Split {
 			split = 1
 		}
-		if _, err := s.exec(ctx, `INSERT INTO card_eras (
+		if _, err := tx.ExecContext(ctx, s.pg(`INSERT INTO card_eras (
 			card_id, holder_type, holder_key, efleets_id, nickname, from_at, to_at, evidence_n, stations, split, rung
-		) VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+		) VALUES (?,?,?,?,?,?,?,?,?,?,?)`),
 			card, ht, hk, nullIfEmpty(e.EFleetsID), e.Nickname,
 			from.UTC().Format(time.RFC3339), to.UTC().Format(time.RFC3339),
 			e.EvidenceN, string(st), split, e.Rung); err != nil {
 			return err
 		}
 	}
-	return nil
+	return tx.Commit()
 }
 
 // ListEras returns persisted card location history, oldest first.

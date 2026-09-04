@@ -653,12 +653,12 @@ func asFloat(v any) (float64, bool) {
 
 // GetPublic is the live probe / smoketest GET. oil.LastReading never calls it.
 func (c *Client) GetPublic(ctx context.Context, path string, q url.Values) ([]byte, error) {
-	return c.get(ctx, path, q)
+	return c.lockedGet(ctx, path, q)
 }
 
 // PostPublic is the live probe / smoketest POST. oil.LastReading never calls it.
 func (c *Client) PostPublic(ctx context.Context, path string, body []byte) ([]byte, error) {
-	return c.post(ctx, path, body)
+	return c.lockedPost(ctx, path, body)
 }
 
 func (c *Client) post(ctx context.Context, path string, body []byte) ([]byte, error) {

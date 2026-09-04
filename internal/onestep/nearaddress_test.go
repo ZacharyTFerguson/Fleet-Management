@@ -46,6 +46,28 @@ func TestParseNearAddressJSONFixture(t *testing.T) {
 	}
 }
 
+func TestParseNearAddressRequiresFactoryID(t *testing.T) {
+	hits, err := ParseNearAddressJSON([]byte(`{"result_list":[{"near_address_device_id":"DEV-ONLY","near_address_entity":"LABEL"}]}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(hits) != 0 {
+		t.Fatalf("device_id-only must not be a factory_id: %+v", hits)
+	}
+}
+
+func TestParseNearAddressNaiveEasternTime(t *testing.T) {
+	hits, err := ParseNearAddressJSON([]byte(`{"result_list":[{"near_address_factory_id":"F1","stop_start_time":"2026-06-16 10:14:00"}]}`))
+	if err != nil || len(hits) != 1 {
+		t.Fatalf("%+v %v", hits, err)
+	}
+	ny, _ := time.LoadLocation("America/New_York")
+	want := time.Date(2026, 6, 16, 10, 14, 0, 0, ny).UTC()
+	if !hits[0].From.Equal(want) {
+		t.Fatalf("got %s want %s", hits[0].From, want)
+	}
+}
+
 func TestParseNearAddressIgnoresOdometerOnlyRow(t *testing.T) {
 	hits, err := ParseNearAddressJSON([]byte(`{"result_list":[{"odometer":99999,"near_address_entity":"LABEL"}]}`))
 	if err != nil {

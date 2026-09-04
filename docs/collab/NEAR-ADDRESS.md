@@ -87,8 +87,19 @@ JSON download: the job carries `OutputFilePath` on the OneStep webfiles volume. 
 
 - `internal/onestep/nearaddress.go` — generate + poll + JSON parse; each HTTP call holds `Client.mu` (do not lock inside `get()`).
 - `internal/cards/nearby.go` — fill-day window, 1-mile haversine on stop visits, watch/likely/certain.
-- CLI: `oilchange cards nearby [--card ID] [--live] [--report]`
-- Tests: parse fixture, httptest generate/poll/mutex, fill-day bounds, exclusive vs collision. Never live OneStep in `go test`.
+- CLI: `oilchange cards nearby [--card ID] [--live] [--report] [--persist] [--report-cap N]`
+- Tests: parse fixture, httptest generate/poll/mutex, fill-day bounds, exclusive vs collision, same-day watch, incomplete coverage, PERSON persist veto. Never live OneStep in `go test`.
+
+## Rewrite (review loop 1)
+
+A second pass found four bugs in the first wiring. They are closed:
+
+1. **Unknown filter.** `CalledEFleetsID` is in-memory. The hunt `ApplyCalls` then skips GPS-named fills and fills already inside a **car** era. PERSON eras stay watch-only; persist never writes them.
+2. **Certainty counted fills, not days.** Three punches on one Eastern calendar day is one exclusive day = watch. Likely/certain need 2/3 distinct `America/New_York` `YYYY-MM-DD` keys.
+3. **Incomplete GPS cache.** Cache is often only the linked boxes. Likely/certain require every eligible active box to have a covering visit (positioned or `HasPos=false` placeholder) in the union fill-day window. `--persist` is skipped when coverage is incomplete.
+4. **PERSON persist.** Hard veto. `ReplaceEras` is a single `BEGIN`/`COMMIT` so a failed insert cannot leave eras deleted.
+
+`--live` fetches only boxes not already covering the union window. `--report` queues at most `--report-cap` jobs (default 3) and does **not** download rows (public download is 404). Rows come from cached/live 1-mile stops. `GET`/`POST /v3/api/public` go through the same mutex as generate/poll. `get()`/`post()` stay lock-free so drive-stop (which already holds `mu`) does not deadlock.
 
 ## Do not
 

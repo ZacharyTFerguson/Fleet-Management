@@ -1,7 +1,7 @@
 # oilchange
 
 PDI fleet oil-change binary in **Fleet-Management**. Last Reading is computed only in `internal/oil`.
-Do not invent miles. HOLD skips the Last Reading write.
+Do not invent miles. HOLD skips the Last Reading write. LLM intro: [`docs/FOR-LLMS.md`](docs/FOR-LLMS.md).
 
 ```
 go build -o oilchange ./cmd/oilchange

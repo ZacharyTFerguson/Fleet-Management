@@ -18,5 +18,6 @@ Each locked rule has a fixture. Live eFleets/OneStep/Supabase are never required
 | Logistics personnel names do not link devices | `internal/oil` TestLogisticsPersonnelDoesNotLinkDevice |
 | Same-second different odo → SAME_SECOND_FILL | `internal/oil` TestSameSecondDifferentOdo |
 | Dead factory_id not summed | `internal/oil` TestDeadFactoryIDNotSummed |
+| drive-stop 200 uses `distance` / `drive_stop_list` (not device odo; ~594.9 vs History ~595) | `onestep/drive-stop-200.json` + `internal/onestep` TestDriveStopGolden594UsesDistanceNotOdo |
 | Header trim (`Cust Name `) not column I/J | `enterprise/details.csv` |
 | Real DETAILS/Maintenance/FleetSummary header sets | `testdata/enterprise/*.csv` |

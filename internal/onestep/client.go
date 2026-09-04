@@ -30,6 +30,8 @@ type Client struct {
 	Token         string
 	PrivateKeyPEM string
 	HTTP          *http.Client
+	// Now overrides time.Now so tests can pin dt_tracker_to. Live calls leave it nil.
+	Now func() time.Time
 }
 
 // AuthMode is jwt-rs256 when oilchange.env has the OneStep usage-note PEM+key, else api-key query (Cursor guide).
@@ -176,19 +178,38 @@ func (c *Client) DriveStopMilesFor(ctx context.Context, d model.OneStepDevice, s
 }
 
 func (c *Client) driveStopMiles(ctx context.Context, factoryID, deviceID string, since time.Time) (float64, error) {
+	did := strings.TrimSpace(deviceID)
+	if did == "" {
+		// DriveStopMiles(factoryID) tests pass the History id in the first arg.
+		did = strings.TrimSpace(factoryID)
+	}
+	if did == "" {
+		// Hitting drive-stop with an empty query returns a misleading 403
+		// "access denied". The route is enabled; fail here instead.
+		return 0, fmt.Errorf("onestep drive-stop: device_id is required (empty query looks like HTTP 403 access denied; the API is enabled)")
+	}
+	now := time.Now()
+	if c != nil && c.Now != nil {
+		now = c.Now()
+	}
 	q := url.Values{}
-	if factoryID != "" {
-		q.Set("factory_id", factoryID)
-	}
-	if deviceID != "" {
-		q.Set("device_id", deviceID)
-	}
-	q.Set("from", since.UTC().Format(time.RFC3339))
+	q.Set("device_id", did)
+	q.Set("dt_tracker_from", FormatTrackerTime(since))
+	q.Set("dt_tracker_to", FormatTrackerTime(now))
 	b, err := c.get(ctx, "/v3/api/public/route/drive-stop", q)
 	if err != nil {
 		return 0, err
 	}
 	return sumDriveStop(b)
+}
+
+// FormatTrackerTime is the naive America/New_York stamp for dt_tracker_from / dt_tracker_to.
+func FormatTrackerTime(t time.Time) string {
+	loc, err := time.LoadLocation("America/New_York")
+	if err != nil {
+		loc = time.FixedZone("America/New_York", -5*60*60)
+	}
+	return t.In(loc).Format("2006-01-02 15:04:05")
 }
 
 // sumDriveStop adds trip miles only. An odometer field on the same JSON is ignored.
@@ -201,7 +222,8 @@ func sumDriveStop(b []byte) (float64, error) {
 		}
 		return sumMaps(arr)
 	}
-	for _, k := range []string{"stops", "routes", "data", "trips"} {
+	// Proven 200: drive_stop_list[].distance. Older fixtures also used stops/miles.
+	for _, k := range []string{"drive_stop_list", "stops", "routes", "data", "trips"} {
 		if v, ok := obj[k]; ok {
 			if sl, ok := v.([]any); ok {
 				var maps []map[string]any
@@ -220,6 +242,13 @@ func sumDriveStop(b []byte) (float64, error) {
 			}
 		}
 	}
+	if v, ok := obj["distance"]; ok {
+		n, valid := asFloat(v)
+		if !valid {
+			return 0, fmt.Errorf("drive-stop JSON root distance is not a finite non-negative number")
+		}
+		return n, nil
+	}
 	if v, ok := obj["miles"]; ok {
 		n, valid := asFloat(v)
 		if !valid {
@@ -227,7 +256,7 @@ func sumDriveStop(b []byte) (float64, error) {
 		}
 		return n, nil
 	}
-	return 0, fmt.Errorf("drive-stop JSON had no miles")
+	return 0, fmt.Errorf("drive-stop JSON had no distance")
 }
 
 // sumMaps is GPS/trip distance, not a device odometer reading. An empty list
@@ -236,7 +265,7 @@ func sumMaps(maps []map[string]any) (float64, error) {
 	var sum float64
 	for i, m := range maps {
 		found := false
-		for _, key := range []string{"miles", "distance", "distance_miles"} {
+		for _, key := range []string{"distance", "miles", "distance_miles"} {
 			v, exists := m[key]
 			if !exists {
 				continue
@@ -339,6 +368,15 @@ func (c *Client) get(ctx context.Context, path string, q url.Values) ([]byte, er
 			msg = msg[:240] + "…"
 		}
 		// Never echo query strings (api-key) or Authorization material.
+		if res.StatusCode == http.StatusUnauthorized {
+			if msg == "" {
+				return nil, fmt.Errorf("onestep %s: HTTP %s: JWS required (raw token is not enough)", path, res.Status)
+			}
+			return nil, fmt.Errorf("onestep %s: HTTP %s: JWS required (raw token is not enough): %s", path, res.Status, msg)
+		}
+		if res.StatusCode == http.StatusForbidden && strings.Contains(path, "drive-stop") {
+			return nil, fmt.Errorf("onestep %s: HTTP %s: empty/missing query can look like access denied; drive-stop is enabled — send device_id, dt_tracker_from, dt_tracker_to; do not invent miles or use device odo", path, res.Status)
+		}
 		if msg == "" {
 			return nil, fmt.Errorf("onestep %s: HTTP %s", path, res.Status)
 		}

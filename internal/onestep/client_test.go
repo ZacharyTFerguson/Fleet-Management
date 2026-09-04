@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -20,20 +21,36 @@ import (
 )
 
 func TestDriveStopSumsMilesIgnoresOdometerJSON(t *testing.T) {
+	from := time.Date(2026, 8, 1, 14, 0, 0, 0, time.UTC)
+	to := time.Date(2026, 9, 4, 7, 0, 0, 0, time.UTC)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v3/api/public/route/drive-stop" {
 			http.NotFound(w, r)
 			return
 		}
-		if r.URL.Query().Get("factory_id") != "FACT1" {
-			t.Errorf("factory_id %s", r.URL.Query().Get("factory_id"))
+		q := r.URL.Query()
+		if q.Get("device_id") != "DEV1" {
+			t.Errorf("device_id %s", q.Get("device_id"))
 		}
-		_, _ = w.Write([]byte(`{"odometer":999999,"stops":[{"miles":3.2,"odometer":111},{"distance":1.3}]}`))
+		if q.Get("factory_id") != "" {
+			t.Errorf("factory_id must not be a drive-stop query: %s", q.Get("factory_id"))
+		}
+		if q.Get("from") != "" {
+			t.Errorf("from is not the proven param: %s", q.Get("from"))
+		}
+		if q.Get("dt_tracker_from") != FormatTrackerTime(from) {
+			t.Errorf("dt_tracker_from %s", q.Get("dt_tracker_from"))
+		}
+		if q.Get("dt_tracker_to") != FormatTrackerTime(to) {
+			t.Errorf("dt_tracker_to %s", q.Get("dt_tracker_to"))
+		}
+		_, _ = w.Write([]byte(`{"odometer":999999,"drive_stop_list":[{"distance":3.2,"odometer":111},{"distance":1.3}]}`))
 	}))
 	defer srv.Close()
 	c := NewClient(srv.URL, "tok")
 	c.HTTP = srv.Client()
-	n, err := c.DriveStopMiles(context.Background(), "FACT1", time.Unix(0, 0).UTC())
+	c.Now = func() time.Time { return to }
+	n, err := c.DriveStopMilesFor(context.Background(), model.OneStepDevice{FactoryID: "FACT1", DeviceID: "DEV1"}, from)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -73,15 +90,100 @@ func TestDriveStopRejectsNonObjectRows(t *testing.T) {
 	}
 }
 
-func TestDriveStopDoesNotUseRootDistanceOrOdometer(t *testing.T) {
-	for _, body := range []string{
-		`{"distance":12.5}`,
-		`{"odometer":123456}`,
-		`{"distance":12.5,"odometer":123456}`,
-	} {
-		if n, err := sumDriveStop([]byte(body)); err == nil {
-			t.Errorf("sumDriveStop(%s) = %v, want error", body, n)
-		}
+func TestDriveStopRootDistanceIgnoresOdometer(t *testing.T) {
+	n, err := sumDriveStop([]byte(`{"distance":594.9,"odometer":999999}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n < 594.8 || n > 595.0 {
+		t.Fatalf("distance %v (must not use odometer 999999)", n)
+	}
+	if n, err := sumDriveStop([]byte(`{"odometer":123456}`)); err == nil {
+		t.Fatalf("odometer-only must not become miles=%v", n)
+	}
+}
+
+func TestDriveStopListPreferredOverRootDistance(t *testing.T) {
+	n, err := sumDriveStop([]byte(`{"distance":1,"odometer":999999,"drive_stop_list":[{"distance":300.4},{"distance":294.5}]}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n < 594.8 || n > 595.0 {
+		t.Fatalf("list sum %v", n)
+	}
+}
+
+func TestDriveStopMissingDeviceIDFailsLocally(t *testing.T) {
+	hits := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hits++
+		http.Error(w, "access denied", http.StatusForbidden)
+	}))
+	defer srv.Close()
+	c := NewClient(srv.URL, "tok")
+	c.HTTP = srv.Client()
+	_, err := c.DriveStopMiles(context.Background(), "", time.Unix(0, 0).UTC())
+	if err == nil {
+		t.Fatal("empty device_id must fail before HTTP")
+	}
+	if hits != 0 {
+		t.Fatalf("must not dial drive-stop with an empty query, hits=%d", hits)
+	}
+	if !strings.Contains(err.Error(), "device_id is required") {
+		t.Fatalf("err %v", err)
+	}
+}
+
+func TestDriveStop403IsMissingQueryNotDisabled(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, `{"odometer":999999,"error":"access denied"}`, http.StatusForbidden)
+	}))
+	defer srv.Close()
+	c := NewClient(srv.URL, "tok")
+	c.HTTP = srv.Client()
+	n, err := c.DriveStopMiles(context.Background(), "DEV1", time.Unix(0, 0).UTC())
+	if err == nil || n != 0 {
+		t.Fatalf("403 must not become miles=%v err=%v", n, err)
+	}
+	if !strings.Contains(err.Error(), "drive-stop is enabled") {
+		t.Fatalf("err %v", err)
+	}
+	if strings.Contains(strings.ToLower(err.Error()), "not enabled") {
+		t.Fatalf("must not treat 403 as API-not-enabled: %v", err)
+	}
+	if strings.Contains(err.Error(), "999999") {
+		t.Fatalf("must not surface odo on 403: %v", err)
+	}
+}
+
+func TestDriveStop401IsJWSRequired(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "raw token", http.StatusUnauthorized)
+	}))
+	defer srv.Close()
+	c := NewClient(srv.URL, "tok")
+	c.HTTP = srv.Client()
+	_, err := c.DriveStopMiles(context.Background(), "DEV1", time.Unix(0, 0).UTC())
+	if err == nil {
+		t.Fatal("expected 401")
+	}
+	if !strings.Contains(err.Error(), "JWS required") {
+		t.Fatalf("err %v", err)
+	}
+}
+
+func TestDriveStopGolden594UsesDistanceNotOdo(t *testing.T) {
+	_, file, _, _ := runtime.Caller(0)
+	body, err := os.ReadFile(filepath.Join(filepath.Dir(file), "..", "..", "testdata", "onestep", "drive-stop-200.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	n, err := sumDriveStop(body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n < 594.8 || n > 595.0 {
+		t.Fatalf("golden miles %v (must be drive_stop_list distance, not odo 999999)", n)
 	}
 }
 

@@ -1,0 +1,8 @@
+{
+  "distance": 594.9,
+  "odometer": 999999,
+  "drive_stop_list": [
+    {"distance": 300.4, "odometer": 111},
+    {"distance": 294.5}
+  ]
+}

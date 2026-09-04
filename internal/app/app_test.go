@@ -131,13 +131,19 @@ func TestSyncOneStepFetchesFromTrustedEnterpriseAnchor(t *testing.T) {
 			http.NotFound(w, r)
 			return
 		}
-		if got := r.URL.Query().Get("factory_id"); got != "FACT1" {
-			t.Errorf("factory_id %q", got)
+		if got := r.URL.Query().Get("device_id"); got != "DEV1" {
+			t.Errorf("device_id %q", got)
 		}
-		if got := r.URL.Query().Get("from"); got != trustedAt.Format(time.RFC3339) {
-			t.Errorf("from %q", got)
+		if got := r.URL.Query().Get("factory_id"); got != "" {
+			t.Errorf("factory_id must not be a drive-stop query: %q", got)
 		}
-		_, _ = w.Write([]byte(`{"miles":12.4,"odometer":999999}`))
+		if got := r.URL.Query().Get("dt_tracker_from"); got != onestep.FormatTrackerTime(trustedAt) {
+			t.Errorf("dt_tracker_from %q", got)
+		}
+		if r.URL.Query().Get("dt_tracker_to") == "" {
+			t.Error("dt_tracker_to missing")
+		}
+		_, _ = w.Write([]byte(`{"distance":12.4,"odometer":999999}`))
 	}))
 	defer srv.Close()
 	client := onestep.NewClient(srv.URL, "")
@@ -166,7 +172,6 @@ func TestSyncOneStepFetchesFromTrustedEnterpriseAnchor(t *testing.T) {
 		t.Fatalf("last reading must use Enterprise odo plus miles-since: %+v", car.LastReadingMiles)
 	}
 }
-
 
 func TestSyncOneStepReturnsDriveStopFailures(t *testing.T) {
 	p := filepath.Join(t.TempDir(), "onestep-error.sqlite")
@@ -256,7 +261,7 @@ func TestLiveFleetHasMoreVehiclesThanTwoCarDemo(t *testing.T) {
 	defer st.Close()
 	a := &App{Cfg: config.Config{SQLitePath: p}, Store: st}
 	ctx := context.Background()
-	if err := a.SyncEnterprise(ctx, livePath, "","",""); err != nil {
+	if err := a.SyncEnterprise(ctx, livePath, "", "", ""); err != nil {
 		t.Fatal(err)
 	}
 	got, err := st.ListCars(ctx)

@@ -10,7 +10,7 @@ go test ./...
 
 Toolchain: Go 1.27.1.
 
-OneStep live auth: short-lived RS256 JWT when a PEM is present in gitignored `oilchange.env`; otherwise `api-key` query (see [`docs/onestep-api-auth.md`](docs/onestep-api-auth.md)).
+OneStep live auth: mint RS256 JWS `{access_token, exp}` with the account PEM → `Authorization: Bearer <jwt>` (not raw Bearer, not `?api-key=`). `GET /v3/api/public/route/drive-stop` is enabled: required query `device_id`, `dt_tracker_from`, `dt_tracker_to`; use `distance` / `drive_stop_list`. Empty query can look like HTTP 403 — that is not “API not enabled.” Raw token → 401 JWS required. Never OneStep odo as Last Reading. See [`docs/onestep-api-auth.md`](docs/onestep-api-auth.md).
 
 Sit-still / important-location Node app lives in a separate PR (`cursor/important-location-trigger-61d4`); it is intentionally not bundled here.
 

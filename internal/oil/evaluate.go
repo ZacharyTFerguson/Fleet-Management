@@ -253,7 +253,7 @@ func shopLooksAbandoned(shop trusted, fills []model.Fill, prior int) bool {
 func latestShop(ros []model.ShopRO) *trusted {
 	var best *trusted
 	for _, r := range ros {
-		if r.Odometer <= 0 {
+		if r.Odometer <= 0 || r.At.IsZero() {
 			continue
 		}
 		t := trusted{Odo: r.Odometer, At: r.At.Truncate(time.Second), Source: model.SourceShopRO}

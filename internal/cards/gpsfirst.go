@@ -68,6 +68,75 @@ func (g *geoAcc) add(lat, lng float64) {
 	g.lng += (lng - g.lng) / float64(g.n)
 }
 
+// FillsWithFleetSight drops swipes whose FillDayWindow only has GPS from a
+// handful of linked boxes. A watch-loop fetch of one car into August must not
+// let GPS-first treat that car as exclusive at every pump.
+func FillsWithFleetSight(txs []model.CardTx, visits []model.StopVisit, linked []model.OneStepDevice) []model.CardTx {
+	nLinked := 0
+	isLinked := map[string]struct{}{}
+	for _, d := range linked {
+		id := strings.TrimSpace(d.FactoryID)
+		if id == "" || d.Dead || !d.Active {
+			continue
+		}
+		if d.LinkedCarEFleetsID == nil || strings.TrimSpace(*d.LinkedCarEFleetsID) == "" {
+			continue
+		}
+		if _, ok := isLinked[id]; ok {
+			continue
+		}
+		isLinked[id] = struct{}{}
+		nLinked++
+	}
+	need := 1
+	if nLinked >= 8 {
+		need = 8
+	}
+	if nLinked == 0 || need <= 1 {
+		return txs
+	}
+	var out []model.CardTx
+	for _, t := range txs {
+		if t.At.IsZero() {
+			out = append(out, t)
+			continue
+		}
+		from, to := FillDayWindow(t.At)
+		if from.IsZero() {
+			out = append(out, t)
+			continue
+		}
+		seen := map[string]struct{}{}
+		for _, v := range visits {
+			fid := strings.TrimSpace(v.FactoryID)
+			if _, ok := isLinked[fid]; !ok {
+				continue
+			}
+			start, end := v.From, v.To
+			if start.IsZero() && end.IsZero() {
+				continue
+			}
+			if end.IsZero() {
+				end = start
+			}
+			if start.IsZero() {
+				start = end
+			}
+			if end.Before(from) || start.After(to) {
+				continue
+			}
+			seen[fid] = struct{}{}
+			if len(seen) >= need {
+				break
+			}
+		}
+		if len(seen) >= need {
+			out = append(out, t)
+		}
+	}
+	return out
+}
+
 // MatchByStopTimes is the time-only exclusive matcher. GPS-first matching
 // (region + station coordinates) lives in MatchGPSFirst.
 func MatchByStopTimes(visits []model.StopVisit, txs []model.CardTx, slack time.Duration) []model.GPSCardMatch {

@@ -206,6 +206,53 @@ func SeedWatchedFactoryIDs(fills []model.CardTx, prior NearbyResult, devices []m
 	return out
 }
 
+// SeedPriorityFactoryIDs is the VA (or hypothesis) box we asked about.
+// 1-mile spectators do not have to be spanning-fetched before persist.
+func SeedPriorityFactoryIDs(fills []model.CardTx, devices []model.OneStepDevice, cars []model.Car) []string {
+	seen := map[string]struct{}{}
+	var out []string
+	add := func(id string) {
+		id = strings.TrimSpace(id)
+		if id == "" {
+			return
+		}
+		if _, ok := seen[id]; ok {
+			return
+		}
+		seen[id] = struct{}{}
+		out = append(out, id)
+	}
+	for _, t := range fills {
+		rec := strings.TrimSpace(t.RecordedEFleetsID)
+		if isUnknownCar(rec) || !IsVirginiaVehicle(rec, t.RecordedCVN, cars) {
+			continue
+		}
+		for _, id := range FactoryIDsForLinkedCar(devices, rec) {
+			add(id)
+		}
+	}
+	if len(out) > 0 {
+		sort.Strings(out)
+		return out
+	}
+	for _, t := range fills {
+		rec := strings.TrimSpace(t.RecordedEFleetsID)
+		if isUnknownCar(rec) || oil.HasLogisticsPersonnel(rec) {
+			continue
+		}
+		ids := FactoryIDsForLinkedCar(devices, rec)
+		if len(ids) == 0 {
+			continue
+		}
+		for _, id := range ids {
+			add(id)
+		}
+		break
+	}
+	sort.Strings(out)
+	return out
+}
+
 type watchCardRank struct {
 	id        string
 	exclusive int

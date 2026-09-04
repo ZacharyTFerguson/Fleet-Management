@@ -303,3 +303,30 @@ func TestGPSFirstPicksCarSittingAtSharedPump(t *testing.T) {
 		t.Fatalf("card at SHELL must be called VA15, not the car sitting at home: %+v", got.Calls)
 	}
 }
+
+func TestFillsWithFleetSightDropsOneBoxAugustFetch(t *testing.T) {
+	var linked []model.OneStepDevice
+	ids := []string{"F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8"}
+	for _, id := range ids {
+		car := "CAR-" + id
+		linked = append(linked, model.OneStepDevice{
+			FactoryID: id, Active: true, LinkedCarEFleetsID: &car,
+		})
+	}
+	may := time.Date(2026, 6, 16, 14, 0, 0, 0, time.UTC)
+	aug := time.Date(2026, 8, 20, 14, 0, 0, 0, time.UTC)
+	var visits []model.StopVisit
+	for _, id := range ids {
+		visits = append(visits, model.StopVisit{
+			FactoryID: id, From: may.Add(-24 * time.Hour), To: may.Add(48 * time.Hour),
+		})
+	}
+	visits = append(visits, model.StopVisit{
+		FactoryID: "F1", From: aug.Add(-24 * time.Hour), To: aug.Add(48 * time.Hour),
+	})
+	txs := []model.CardTx{{CardID: "MAY", At: may}, {CardID: "AUG", At: aug}}
+	got := FillsWithFleetSight(txs, visits, linked)
+	if len(got) != 1 || got[0].CardID != "MAY" {
+		t.Fatalf("August one-box fetch must not be GPS-first exclusive: %+v", got)
+	}
+}

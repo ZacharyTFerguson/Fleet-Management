@@ -300,6 +300,11 @@ func (a *App) CardsLadder(ctx context.Context, persist bool) (cards.LadderResult
 	}
 	res := cards.ClassifyLadder(gps, txs, fleet, devs, cards.DefaultLadderRungs)
 	if persist {
+		existing, err := a.Store.ListEras(ctx)
+		if err != nil {
+			return res, err
+		}
+		res.Eras = cards.PreserveUnladderedCarEras(res.Eras, existing)
 		if err := a.Store.ReplaceEras(ctx, res.Eras); err != nil {
 			return res, err
 		}
@@ -695,7 +700,7 @@ func (a *App) matchCardsAtGPSStops(ctx context.Context, txs []model.CardTx) (car
 					}
 				}
 			}
-			gps := cards.MatchGPSFirst(cached, txs, fleet, cards.DefaultStopSlack)
+			gps := cards.MatchGPSFirst(cached, gpsFirstTxs(txs, cached, devs), fleet, cards.DefaultStopSlack)
 			fmt.Fprintf(os.Stderr, "gps-stops cache %d visits with_pos=%d pumps=%d\n", len(cached), countHasPos(cached), gps.Pumps)
 			return gps, nil
 		}
@@ -718,7 +723,17 @@ func (a *App) matchCardsAtGPSStops(ctx context.Context, txs []model.CardTx) (car
 	} else {
 		fmt.Fprintf(os.Stderr, "gps-stops cache wrote %d visits with_pos=%d\n", len(visits), countHasPos(visits))
 	}
-	return cards.MatchGPSFirst(visits, txs, fleet, cards.DefaultStopSlack), nil
+	return cards.MatchGPSFirst(visits, gpsFirstTxs(txs, visits, devs), fleet, cards.DefaultStopSlack), nil
+}
+
+func gpsFirstTxs(txs []model.CardTx, visits []model.StopVisit, devs []model.OneStepDevice) []model.CardTx {
+	var linked []model.OneStepDevice
+	for _, d := range devs {
+		if linkedActive(d) {
+			linked = append(linked, d)
+		}
+	}
+	return cards.FillsWithFleetSight(txs, visits, linked)
 }
 
 func (a *App) writeCardsSnapshot(ctx context.Context, txs []model.CardTx, ps []model.CardPairing, gps cards.GPSFirstResult, ladder *cards.LadderResult) error {

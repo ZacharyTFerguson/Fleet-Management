@@ -101,6 +101,12 @@ func (a *App) CardsWatch(ctx context.Context, opt CardsWatchOpts) (cards.NearbyR
 	}
 
 	visits := loadNearbyVisits(a)
+	if len(visits) > 0 {
+		geo := cards.MatchGPSFirst(visits, txs, fleet, cards.DefaultStopSlack)
+		if len(geo.Stations) > 0 {
+			gps.Stations = geo.Stations
+		}
+	}
 	prior := cards.HuntNearbyFull(visits, txs, gps.Stations, devs, cards.DefaultStopSlack, false)
 	order := cards.WatchCardOrder(txs, prior, fleet)
 	fmt.Fprintf(os.Stderr, "watch cards=%d fills_cap=%d live=%v persist=%v pace=%s (watched boxes only; not a fleet pull)\n",
@@ -118,13 +124,17 @@ func (a *App) CardsWatch(ctx context.Context, opt CardsWatchOpts) (cards.NearbyR
 		watched := cards.SeedWatchedFactoryIDs(allFills, prior, devs, fleet)
 		need := watchDevicesByFactory(devs, watched)
 		needIDs := factoryIDsOf(need)
+		rankIDs := cards.SeedPriorityFactoryIDs(allFills, devs, fleet)
+		if len(rankIDs) == 0 {
+			rankIDs = needIDs
+		}
 		from, to := cards.UnionFillDayWindow(batch)
-		cardComplete := liveOK && cards.WatchedCoverageComplete(visits, needIDs, from, to)
+		cardComplete := liveOK && cards.WatchedCoverageComplete(visits, rankIDs, from, to)
 		if opt.LiveStops && a.OneStep != nil && len(need) > 0 && !from.IsZero() {
 			var failed int
 			before := len(visits)
 			visits, lastCall, failed = a.fillWatchedStops(ctx, visits, needIDs, devs, from, to, pace, lastCall, cardID)
-			cardComplete = liveOK && failed == 0 && cards.WatchedCoverageComplete(visits, needIDs, from, to)
+			cardComplete = liveOK && failed == 0 && cards.WatchedCoverageComplete(visits, rankIDs, from, to)
 			if len(visits) > before {
 				g2 := cards.MatchGPSFirst(visits, txs, fleet, cards.DefaultStopSlack)
 				if len(g2.Stations) > 0 {

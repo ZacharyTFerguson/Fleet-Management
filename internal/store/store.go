@@ -670,13 +670,31 @@ func (s *Store) OpenHolds(ctx context.Context) ([]model.HoldEvent, error) {
 }
 
 // InsertOilChange records last oil. It does not change Last Reading.
+// cars.last_oil_* only moves forward (later date, or same date with higher miles).
 func (s *Store) InsertOilChange(ctx context.Context, o model.OilChange) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if _, err := s.exec(ctx, `INSERT INTO oil_changes (efleets_id, miles, date, location, source) VALUES (?,?,?,?,?)`,
 		o.EFleetsID, o.Miles, o.Date.Format("2006-01-02"), o.Location, o.Source); err != nil {
 		return err
 	}
+	c, err := s.carByEFleetsLocked(ctx, o.EFleetsID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil
+		}
+		return err
+	}
+	if c.LastOilDate != nil {
+		if c.LastOilDate.After(o.Date) {
+			return nil
+		}
+		if c.LastOilDate.Equal(o.Date) && c.LastOilMiles != nil && *c.LastOilMiles >= o.Miles {
+			return nil
+		}
+	}
 	now := time.Now().UTC().Format(time.RFC3339)
-	_, err := s.exec(ctx, `UPDATE cars SET last_oil_miles=?, last_oil_date=?, updated_at=? WHERE efleets_id=?`,
+	_, err = s.exec(ctx, `UPDATE cars SET last_oil_miles=?, last_oil_date=?, updated_at=? WHERE efleets_id=?`,
 		o.Miles, o.Date.Format(time.RFC3339), now, o.EFleetsID)
 	return err
 }

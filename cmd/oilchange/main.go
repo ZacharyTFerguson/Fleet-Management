@@ -30,6 +30,8 @@ func run(args []string) int {
 		return cmdSyncEnterprise(ctx, cfg, args[1:])
 	case "sync-onestep":
 		return cmdSyncOneStep(ctx, cfg, args[1:])
+	case "probe-onestep":
+		return cmdProbeOneStep(ctx, cfg, args[1:])
 	case "compute":
 		return cmdCompute(ctx, cfg, args[1:])
 	case "oil-done":
@@ -44,6 +46,10 @@ func run(args []string) int {
 		return cmdDevices(ctx, cfg, args[1:])
 	case "sync", "sync-supabase":
 		return cmdSyncSupabase(ctx, cfg, args[1:])
+	case "backup-neon", "backup":
+		return cmdBackupNeon(ctx, cfg, args[1:])
+	case "pull-supabase":
+		return cmdPullSupabase(ctx, cfg, args[1:])
 	case "serve":
 		return cmdServe(args[1:])
 	case "env":
@@ -60,17 +66,20 @@ func usage() {
 
   oilchange sync-enterprise [--vehicles PATH --fuel-details PATH [--shop-ro PATH] [--mileage-history PATH]]
   oilchange sync-onestep [--map PATH]
+  oilchange probe-onestep --device-id ID[,ID…] [--hours 6,24,48 | --from RFC3339 [--to RFC3339]]
   oilchange compute [--override-lower]
   oilchange oil-done --efleets-id ID --miles N --date YYYY-MM-DD [--location NAME]
   oilchange report [--interval 5000] [--due-within N] [--out PATH.csv]
   oilchange holds
-  oilchange cards rebuild [--fuel-details PATH]
+  oilchange cards rebuild [--fuel-details PATH] [--no-gps]
   oilchange cards suspect
   oilchange cards trace --card ID [--window-days 2]
   oilchange cards pairings [--card ID]
   oilchange devices sync [--map PATH]
   oilchange devices list
-  oilchange sync [--interval 5m] [--mirror web/data/cars.json]
+  oilchange sync [--interval 5m] [--mirror web/data/cars.json] [--require-neon] [--no-remote]
+  oilchange pull-supabase
+  oilchange backup-neon
   oilchange serve [--addr 127.0.0.1:4739] [--mirror web/data/cars.json] [--web-dir PATH]
   oilchange env
 
@@ -249,6 +258,7 @@ func cmdCards(ctx context.Context, cfg config.Config, args []string) int {
 	details := fs.String("fuel-details", "", "optional DETAILS CSV to ingest before rebuild")
 	cardID := fs.String("card", "", "card id (trace/pairings)")
 	window := fs.Int("window-days", 2, "station co-occurrence window in days (trace)")
+	noGPS := fs.Bool("no-gps", false, "skip OneStep stop windows (swipe majority only)")
 	if err := fs.Parse(args[1:]); err != nil {
 		return model.ExitError
 	}
@@ -258,6 +268,12 @@ func cmdCards(ctx context.Context, cfg config.Config, args []string) int {
 		return model.ExitError
 	}
 	defer done()
+	a.CardsMirror = defaultCardsPath()
+	if cfg.OneStepToken != "" && !*noGPS {
+		c := onestep.NewClient(cfg.OneStepBase, cfg.OneStepToken)
+		c.PrivateKeyPEM = cfg.OneStepPrivateKey
+		a.OneStep = c
+	}
 	switch args[0] {
 	case "rebuild":
 		n, err := a.CardsRebuild(ctx, *details)
@@ -266,6 +282,9 @@ func cmdCards(ctx context.Context, cfg config.Config, args []string) int {
 			return model.ExitError
 		}
 		fmt.Fprintf(os.Stdout, "cards rebuild: %d transactions rescored\n", n)
+		if a.CardsMirror != "" {
+			fmt.Fprintf(os.Stdout, "cards snapshot %s\n", a.CardsMirror)
+		}
 		return model.ExitOK
 	case "suspect":
 		if err := a.CardsSuspects(ctx); err != nil {

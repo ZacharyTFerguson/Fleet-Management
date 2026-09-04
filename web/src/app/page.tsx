@@ -1,10 +1,12 @@
 import { CarsBoard } from "@/components/CarsBoard";
+import { DeskNav } from "@/components/DeskNav";
 
 export default function Home() {
   return (
     <main className="shell">
       <div className="atmosphere" aria-hidden="true" />
       <div className="grain" aria-hidden="true" />
+      <DeskNav current="oil" />
 
       <header className="hero">
         <p className="brand">FLEET</p>

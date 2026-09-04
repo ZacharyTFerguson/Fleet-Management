@@ -7,6 +7,8 @@ import "strings"
 var oilNeedles = []string{
 	"lube oil filter",
 	"full synthetic engine oil",
+	"semi synthetic engine oil",
+	"semi-synthetic engine oil",
 	"synthetic lube",
 	"oil change",
 	"conventional lube oil",
@@ -20,6 +22,14 @@ var oilExcludes = []string{
 	"oil pressure",
 	"oil light",
 	"oil cooler",
+	"drain plug",
+	"oil filter surcharge",
+	"oil surcharge",
+	"refrigerant oil",
+	"camshaft oil",
+	"oil temperature",
+	"oil feed",
+	"lube chassis",
 }
 
 // IsOilChangeService reports whether a shop RO line is an oil change we may seed last_oil_* from.

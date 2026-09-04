@@ -24,6 +24,7 @@ type Options struct {
 	Addr       string // e.g. 127.0.0.1:4739
 	WebDir     string // optional on-disk export; empty → embedded web/out
 	MirrorPath string // cars.json written by oilchange sync
+	CardsPath  string // cards.json from oilchange cards rebuild
 }
 
 // Handler returns the mux that serves static UI + /api/cars.
@@ -31,6 +32,10 @@ func Handler(opts Options) (http.Handler, error) {
 	mirror := opts.MirrorPath
 	if mirror == "" {
 		mirror = filepath.Join("web", "data", "cars.json")
+	}
+	cardsPath := opts.CardsPath
+	if cardsPath == "" {
+		cardsPath = filepath.Join(filepath.Dir(mirror), "cards.json")
 	}
 	static, err := staticFS(opts.WebDir)
 	if err != nil {
@@ -43,6 +48,13 @@ func Handler(opts Options) (http.Handler, error) {
 			return
 		}
 		serveCars(w, r, mirror)
+	})
+	mux.HandleFunc("/api/cards", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet && r.Method != http.MethodHead {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		serveJSONFile(w, r, cardsPath)
 	})
 	mux.Handle("/", spaFileServer(static))
 	return mux, nil
@@ -58,7 +70,7 @@ func ListenAndServe(opts Options) error {
 	if addr == "" {
 		addr = "127.0.0.1:4739"
 	}
-	fmt.Fprintf(os.Stderr, "oilchange serve: Oil Desk at http://%s (mirror %s)\n", addr, opts.MirrorPath)
+	fmt.Fprintf(os.Stderr, "oilchange serve: Oil Desk at http://%s (mirror %s cards %s)\n", addr, opts.MirrorPath, opts.CardsPath)
 	return http.ListenAndServe(addr, h)
 }
 
@@ -78,6 +90,29 @@ func staticFS(webDir string) (fs.FS, error) {
 		return nil, fmt.Errorf("embedded web/out: %w (rebuild with cd web && npm run build:static)", err)
 	}
 	return sub, nil
+}
+
+func serveJSONFile(w http.ResponseWriter, r *http.Request, path string) {
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	b, err := os.ReadFile(path)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			w.WriteHeader(http.StatusOK)
+			if r.Method != http.MethodHead {
+				_, _ = w.Write([]byte(`{"synced_at":"` + time.Now().UTC().Format(time.RFC3339) + `","source":"mock-seed","stats":{},"unknown":[],"stations":[],"cars_without_card":[]}`))
+			}
+			return
+		}
+		w.WriteHeader(http.StatusInternalServerError)
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
+	}
+	if r.Method == http.MethodHead {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	_, _ = w.Write(b)
 }
 
 func serveCars(w http.ResponseWriter, r *http.Request, mirror string) {

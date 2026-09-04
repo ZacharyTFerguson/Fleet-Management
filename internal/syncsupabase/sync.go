@@ -32,7 +32,9 @@ type Config struct {
 	URL         string
 	ServiceRole string // PostgREST upsert when set (server-side only)
 	SyncSecret  string // x-fleet-sync-token for /functions/v1/fleet-sync when service role unset
+	AnonKey     string // SUPABASE_GROK_BUILD_KEY / publishable; SELECT only
 	MirrorPath  string // local JSON the web UI can read without secrets
+	NoRemote    bool   // skip PostgREST upsert; still write MirrorPath
 }
 
 // Snapshot is the durable fleet surface for the cars list UI.
@@ -162,7 +164,7 @@ func Run(ctx context.Context, cfg Config, cars []CarRow, holds []HoldRow, cards 
 		Cards:    cards,
 	}
 	var syncErr error
-	if cfg.URL != "" && (cfg.ServiceRole != "" || cfg.SyncSecret != "") {
+	if !cfg.NoRemote && cfg.URL != "" && (cfg.ServiceRole != "" || cfg.SyncSecret != "") {
 		if err := refuseXRAY(cfg.URL); err != nil {
 			syncErr = err
 		} else if err := pushSupabase(ctx, cfg, snap); err != nil {
@@ -177,6 +179,12 @@ func Run(ctx context.Context, cfg Config, cars []CarRow, holds []HoldRow, cards 
 	}
 	return snap, errors.Join(syncErr, mirrorErr)
 }
+
+// writeMirrorMu serializes the final replace of cars.json. CreateTemp names
+// stay unique per call, but Windows MoveFileEx cannot replace the same dest
+// from many goroutines at once (Access is denied). Run() already holds runMu;
+// this lock covers writeMirror callers that skip Run.
+var writeMirrorMu sync.Mutex
 
 func writeMirror(path string, snap *Snapshot) error {
 	dir := filepath.Dir(path)
@@ -202,7 +210,22 @@ func writeMirror(path string, snap *Snapshot) error {
 	if err := f.Close(); err != nil {
 		return err
 	}
-	return os.Rename(tmp, path)
+	writeMirrorMu.Lock()
+	defer writeMirrorMu.Unlock()
+	return replaceFile(tmp, path)
+}
+
+// replaceFile atomically puts tmp at dest. On Windows, a leftover dest that
+// MOVEFILE_REPLACE_EXISTING cannot take is removed and the rename retried.
+func replaceFile(tmp, dest string) error {
+	err := os.Rename(tmp, dest)
+	if err == nil {
+		return nil
+	}
+	if removeErr := os.Remove(dest); removeErr != nil && !errors.Is(removeErr, os.ErrNotExist) {
+		return errors.Join(err, removeErr)
+	}
+	return os.Rename(tmp, dest)
 }
 
 func pushSupabase(ctx context.Context, cfg Config, snap *Snapshot) error {

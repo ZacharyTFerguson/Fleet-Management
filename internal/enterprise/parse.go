@@ -147,7 +147,7 @@ func ParseShopROs(r io.Reader) ([]model.ShopRO, []model.MaintenanceLocation, []m
 			continue
 		}
 		dateStr := col(idx, row, "RO Completed Date", "RO Complete Date")
-		if dateStr == "" {
+		if emptyCell(dateStr) {
 			dateStr = col(idx, row, "RO Created Date")
 		}
 		at, err := ParseDate(dateStr)
@@ -173,7 +173,7 @@ func ParseShopROs(r io.Reader) ([]model.ShopRO, []model.MaintenanceLocation, []m
 			lid := stableID("ml", shop)
 			locs[lid] = model.MaintenanceLocation{ID: lid, Name: shop}
 		}
-		if oil.IsOilChangeService(desc) && roid != "" {
+		if oil.IsOilChangeService(desc) && roid != "" && !at.IsZero() {
 			oilByRO[key] = model.OilChange{
 				EFleetsID: id,
 				Miles:     odo,
@@ -231,6 +231,11 @@ func readCSV(r io.Reader) ([][]string, map[string]int, error) {
 }
 
 // parseInt accepts eFleets "71306.0" and "100,000" without inventing a mile from junk text.
+func emptyCell(s string) bool {
+	s = strings.TrimSpace(s)
+	return s == "" || s == "-"
+}
+
 func parseInt(s string) (int, error) {
 	s = strings.TrimSpace(s)
 	s = strings.ReplaceAll(s, ",", "")

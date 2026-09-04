@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"time"
 
 	"oilchange/internal/cards"
@@ -20,8 +21,10 @@ import (
 
 // App wires CLI commands. Last Reading still happens only in internal/oil.
 type App struct {
-	Cfg   config.Config
-	Store *store.Store
+	Cfg         config.Config
+	Store       *store.Store
+	CardsMirror string           // web/data/cards.json; empty skips the Cards desk write
+	OneStep     *onestep.Client  // optional; GPS stop times for card matching
 }
 
 // OpenStore opens sqlite or postgres from env.
@@ -63,7 +66,20 @@ func (a *App) SyncEnterprise(ctx context.Context, vehicles, fuel, shop, mileage 
 		if err != nil {
 			return err
 		}
+		roster, err := a.Store.ListCars(ctx)
+		if err != nil {
+			return err
+		}
+		known := make(map[string]bool, len(roster))
+		for _, c := range roster {
+			known[c.EFleetsID] = true
+		}
+		skipped := 0
 		for _, f := range fills {
+			if !known[f.EFleetsID] {
+				skipped++
+				continue
+			}
 			if err := a.Store.UpsertFill(ctx, f); err != nil {
 				return err
 			}
@@ -73,12 +89,18 @@ func (a *App) SyncEnterprise(ctx context.Context, vehicles, fuel, shop, mileage 
 				}
 			}
 		}
+		if skipped > 0 {
+			fmt.Fprintf(os.Stderr, "DETAILS skipped %d punches for vehicles not on the roster\n", skipped)
+		}
 		for _, g := range stations {
 			if err := a.Store.UpsertStation(ctx, g); err != nil {
 				return err
 			}
 		}
 		for _, c := range cardRows {
+			if c.LinkedCarEFleetsID != nil && !known[*c.LinkedCarEFleetsID] {
+				c.LinkedCarEFleetsID = nil
+			}
 			if err := a.Store.UpsertCard(ctx, c); err != nil {
 				return err
 			}
@@ -242,8 +264,10 @@ func (a *App) SyncOneStep(ctx context.Context, mapPath string, client *onestep.C
 			n, err := client.DriveStopMilesFor(ctx, d, out.FillTime)
 			if err != nil {
 				fetchErrors = append(fetchErrors, fmt.Errorf("%s factory_id %s: %w", c.EFleetsID, d.FactoryID, err))
+				fmt.Fprintf(os.Stderr, "drive-stop %s factory_id %s: %v\n", c.EFleetsID, d.FactoryID, err)
 				continue
 			}
+			fmt.Fprintf(os.Stderr, "drive-stop %s factory_id %s miles=%.2f\n", c.EFleetsID, d.FactoryID, n)
 			if err := a.Store.SaveMilesSince(ctx, model.DriveStopMiles{FactoryID: d.FactoryID, Since: out.FillTime, Miles: n}); err != nil {
 				return err
 			}
@@ -368,7 +392,94 @@ func (a *App) CardsRebuild(ctx context.Context, fuelPath string) (int, error) {
 	if err := a.Store.ReplacePairings(ctx, ps); err != nil {
 		return 0, err
 	}
+	gps, err := a.matchCardsAtGPSStops(ctx, txs)
+	if err != nil {
+		return 0, err
+	}
+	if err := a.writeCardsSnapshot(ctx, txs, ps, gps); err != nil {
+		return 0, err
+	}
 	return len(txs), nil
+}
+
+func gpsStopsCachePath() string {
+	return filepath.Join("data", "runtime", "gps-stops.json")
+}
+
+func (a *App) matchCardsAtGPSStops(ctx context.Context, txs []model.CardTx) ([]model.GPSCardMatch, error) {
+	if a == nil || a.Store == nil || len(txs) == 0 {
+		return nil, nil
+	}
+	cache := gpsStopsCachePath()
+	if a.OneStep == nil {
+		visits, err := cards.LoadStopVisits(cache)
+		if err != nil {
+			return nil, nil
+		}
+		fmt.Fprintf(os.Stderr, "gps-stops cache %d visits\n", len(visits))
+		return cards.MatchByStopTimes(visits, txs, cards.DefaultStopSlack), nil
+	}
+	var from, to time.Time
+	for _, t := range txs {
+		if t.At.IsZero() {
+			continue
+		}
+		if from.IsZero() || t.At.Before(from) {
+			from = t.At
+		}
+		if to.IsZero() || t.At.After(to) {
+			to = t.At
+		}
+	}
+	if from.IsZero() {
+		return nil, nil
+	}
+	devs, err := a.Store.ListDevices(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var visits []model.StopVisit
+	n := 0
+	for _, d := range devs {
+		if d.Dead || !d.Active || d.LinkedCarEFleetsID == nil || *d.LinkedCarEFleetsID == "" {
+			continue
+		}
+		n++
+		v, err := a.OneStep.DriveStopVisitsFor(ctx, d, from, to)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "gps-stops %s factory_id %s: %v\n", *d.LinkedCarEFleetsID, d.FactoryID, err)
+			continue
+		}
+		fmt.Fprintf(os.Stderr, "gps-stops %s factory_id %s stops=%d\n", *d.LinkedCarEFleetsID, d.FactoryID, len(v))
+		visits = append(visits, v...)
+	}
+	if n == 0 {
+		return nil, nil
+	}
+	if err := cards.SaveStopVisits(cache, visits); err != nil {
+		fmt.Fprintf(os.Stderr, "gps-stops cache write: %v\n", err)
+	} else {
+		fmt.Fprintf(os.Stderr, "gps-stops cache wrote %d visits\n", len(visits))
+	}
+	return cards.MatchByStopTimes(visits, txs, cards.DefaultStopSlack), nil
+}
+
+func (a *App) writeCardsSnapshot(ctx context.Context, txs []model.CardTx, ps []model.CardPairing, gps []model.GPSCardMatch) error {
+	if a == nil || a.CardsMirror == "" {
+		return nil
+	}
+	nicks := map[string]string{}
+	if a.Store != nil {
+		cars, err := a.Store.ListCars(ctx)
+		if err != nil {
+			return err
+		}
+		for _, c := range cars {
+			nicks[c.EFleetsID] = c.Nickname
+		}
+	}
+	snap := cards.BuildSnapshot(txs, ps, gps, nicks, time.Now().UTC())
+	return cards.WriteSnapshot(a.CardsMirror, snap)
 }
 
 func (a *App) CardsSuspects(ctx context.Context) error {

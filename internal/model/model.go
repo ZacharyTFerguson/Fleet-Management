@@ -87,6 +87,29 @@ type CardTx struct {
 	Odometer          *int
 }
 
+// StopVisit is one GPS stop (car sitting still). Card matching uses the time
+// window; Last Reading must not read this.
+type StopVisit struct {
+	EFleetsID string    `json:"efleets_id"`
+	FactoryID string    `json:"factory_id"`
+	DeviceID  string    `json:"device_id"`
+	From      time.Time `json:"from"`
+	To        time.Time `json:"to"`
+	Lat       float64   `json:"lat"`
+	Lng       float64   `json:"lng"`
+	HasPos    bool      `json:"has_pos"`
+}
+
+// GPSCardMatch is the card that swiped while a GPS-linked car was stopped.
+type GPSCardMatch struct {
+	EFleetsID      string   `json:"efleets_id"`
+	CardID         string   `json:"card_id"`
+	EvidenceN      int      `json:"evidence_n"`
+	Stations       []string `json:"stations,omitempty"`
+	EnterpriseCars []string `json:"enterprise_cars,omitempty"`
+	Best           bool     `json:"best"`
+}
+
 // CardPairing is a scored car or person link for one card over the full history.
 type CardPairing struct {
 	CardID     string

@@ -26,9 +26,11 @@ Sit-still / important-location Node app lives in a separate PR (`cursor/importan
 | `oil-done` | `--efleets-id ID --miles N --date YYYY-MM-DD [--location NAME]` |
 | `report` | `[--interval 5000] [--due-within N] [--out PATH.csv]` |
 | `holds` | open HOLDs |
-| `sync` | Push local SQLite cars/holds to **ZacharyTFerguson's Project** (`hdtwfdjdvdzdxfdriyzn`, table `fleet_cars`) when `SUPABASE_URL` + (`SUPABASE_SERVICE_ROLE` or `SUPABASE_SYNC_SECRET`) are set, and refresh `web/data/cars.json`. `[--interval 5m]` for throughout-the-day refresh. Never targets XRAY. |
+| `sync` | Push local SQLite cars/holds to **ZacharyTFerguson's Project** (`hdtwfdjdvdzdxfdriyzn`, table `fleet_cars`) when `SUPABASE_URL` + (`SUPABASE_SERVICE_ROLE` or `SUPABASE_SYNC_SECRET`) are set, and refresh `web/data/cars.json`. `[--interval 5m]` for throughout-the-day refresh. Never targets XRAY. After a successful sync, also runs a **best-effort** Neon backup when `DATABASE_URL` is set (`[--require-neon]` to fail if backup is down). |
+| `pull-supabase` | GET `fleet_cars` from Zachary’s project using `SUPABASE_GROK_BUILD_KEY` (or service role). Merges non-null last_reading/HOLD into sqlite. Does not compute Last Reading. Never XRAY. |
+| `backup-neon` | Copy sqlite oilchange tables into **Neon** (`Fleet_Management_Neon` / `Fleet_Manage_Oil`). SQLite stays the working store. Alias: `backup`. |
 | `serve` | Host Oil Desk UI + `/api/cars` on `127.0.0.1:4739` from the **embedded** static export (`web/out`). **No npm/Node required.** `[--addr]` `[--mirror]` `[--web-dir]`. |
-| `cards rebuild` | ingest optional `--fuel-details` then score every swipe into `card_pairings` (never writes Last Reading) |
+| `cards rebuild` | ingest optional `--fuel-details` then score every swipe into `card_pairings` (never writes Last Reading). GPS stop windows from OneStep unless `--no-gps` (rematch from `data/runtime/gps-stops.json`) |
 | `cards suspect` | cards whose latest Enterprise Vehicle is not the swipe-majority car |
 | `cards trace` | `--card ID [--window-days 2]` other cars at the same station on nearby days |
 | `cards pairings` | `[--card ID]` scored car/person links; `BEST` is evidence, not Enterprise last-write-wins |
@@ -68,9 +70,32 @@ export OILCHANGE_DB=./oilchange.sqlite
 ./bin/oilchange serve --addr 127.0.0.1:4739 --mirror web/data/cars.json
 ```
 
-Binary path after build: `bin/oilchange`. Alias: `sync-supabase` ≡ `sync`.
+Binary path after build: `bin/oilchange` (Windows: `bin/oilchange.exe`). Alias: `sync-supabase` ≡ `sync`.
 
-**Windows / macOS:** same commands after `go build` on that OS (`GOOS=windows go build -o bin/oilchange.exe ./cmd/oilchange`, etc.). Prebuilt assets are already in the repo; `go build` does not invoke npm.
+For the full ~205-car roster, use `testdata/enterprise/fleetsummary_live.csv` and `details_live.csv` instead of the tiny demo CSVs.
+
+### Windows (PowerShell)
+
+Same stack: Go only, no npm. `go build` embeds `web/out`. Open **http://127.0.0.1:4739** on this PC.
+
+```powershell
+Copy-Item oilchange.env.example oilchange.env
+# Edit oilchange.env: OILCHANGE_DB, optional SUPABASE_URL + SUPABASE_SERVICE_ROLE
+# or SUPABASE_SYNC_SECRET. Never commit oilchange.env.
+
+go build -o bin/oilchange.exe ./cmd/oilchange
+
+$env:OILCHANGE_DB = "$PWD\oilchange.sqlite"
+.\bin\oilchange.exe sync-enterprise `
+  --vehicles testdata\enterprise\fleetsummary_live.csv `
+  --fuel-details testdata\enterprise\details_live.csv `
+  --shop-ro testdata\enterprise\maintenance.csv
+.\bin\oilchange.exe compute   # exit 2 with open HOLDs is OK without OneStep miles
+.\bin\oilchange.exe sync --mirror web\data\cars.json
+.\bin\oilchange.exe serve --addr 127.0.0.1:4739 --mirror web\data\cars.json
+```
+
+Process env set with `$env:NAME = "..."` wins over `oilchange.env`. Cross-compile from another OS with `GOOS=windows go build -o bin/oilchange.exe ./cmd/oilchange`.
 
 ### Optional: Next.js cloud/dev (npm only when editing the UI)
 
@@ -86,10 +111,18 @@ cd web && npm ci && npm run dev          # App Router + /api/cars in Node
 
 | Where | Vars |
 |---|---|
-| CLI (`oilchange.env`) | `OILCHANGE_DB`, `SUPABASE_URL`, then either `SUPABASE_SERVICE_ROLE` (PostgREST upsert into `fleet_cars`) or `SUPABASE_SYNC_SECRET` (`/functions/v1/fleet-sync`). Optional `FLEET_MIRROR_PATH`. |
+| CLI (`oilchange.env`) | `OILCHANGE_DB` (working sqlite), `DATABASE_URL` (Neon **unpooled** backup only — not the DSN while sqlite is set), `SUPABASE_URL`, then either `SUPABASE_SERVICE_ROLE` (PostgREST upsert into `fleet_cars`) or `SUPABASE_SYNC_SECRET` (`/functions/v1/fleet-sync`). Optional `FLEET_MIRROR_PATH`. |
 | Web (`web/.env.local`) | Only needed for `npm run dev`. `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`. Never put service role / sync secret in `NEXT_PUBLIC_*`. Templates: `oilchange.env.example`, `web/.env.local.example`. |
 
 Without Supabase credentials the CLI writes a **mock mirror** at `web/data/cars.json` and `oilchange serve` (or Next `/api/cars`) serves that. With credentials, sync upserts into `fleet_cars`. Schema/RLS: `supabase/migrations/` + `migrations/005_shared_project_fleet_prefix.sql` (anon SELECT on `fleet_cars` only).
+
+## Neon backup
+
+SQLite (`OILCHANGE_DB`) is still the working store. `oilchange sync` still pushes Oil Desk cars to Supabase `fleet_cars`. Neon (`DATABASE_URL`, unpooled / no `-pooler`) is a durable copy of the sqlite tables — run `oilchange backup-neon` (also attempted after a successful `sync` when `DATABASE_URL` is set). Never point `DATABASE_URL` at XRAY or Supabase.
+
+```powershell
+.\bin\oilchange.exe backup-neon
+```
 
 Cadence: `oilchange sync --interval 5m` keeps the mirror (and Supabase) fresh while the UI polls (`NEXT_PUBLIC_REFRESH_MS`, default 120s; baked into the static export at build time).
 

@@ -19,14 +19,53 @@ import (
 	"oilchange/internal/model"
 )
 
+func TestParseDriveStopVisitsStopsOnly(t *testing.T) {
+	body := []byte(`{
+		"distance":{"value":12,"unit":"mi"},
+		"drive_stop_list":[
+			{"type":"drive","time_from":"2026-08-30T10:00:00Z","time_to":"2026-08-30T10:20:00Z","distance":{"value":12,"unit":"mi"}},
+			{"type":"stop","time_from":"2026-08-30T10:20:00Z","time_to":"2026-08-30T10:35:00Z","first_valid_lat_lng":{"lat":42.1,"lng":-76.5},"odometer_from":{"value":999}}
+		]
+	}`)
+	v, err := parseDriveStopVisits(body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(v) != 1 {
+		t.Fatalf("want 1 stop, got %+v", v)
+	}
+	if !v[0].HasPos || v[0].Lat < 42 || v[0].Lng >= -76 || v[0].Lng <= -77 {
+		t.Fatalf("latlng %+v", v[0])
+	}
+	if v[0].To.Sub(v[0].From) != 15*time.Minute {
+		t.Fatalf("window %s %s", v[0].From, v[0].To)
+	}
+}
+
 func TestDriveStopSumsMilesIgnoresOdometerJSON(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v3/api/public/route/drive-stop" {
 			http.NotFound(w, r)
 			return
 		}
-		if r.URL.Query().Get("factory_id") != "FACT1" {
-			t.Errorf("factory_id %s", r.URL.Query().Get("factory_id"))
+		q := r.URL.Query()
+		if q.Get("device_id") != "FACT1" {
+			t.Errorf("device_id %s", q.Get("device_id"))
+		}
+		if q.Get("factory_id") != "" {
+			t.Errorf("factory_id must not be sent: %s", q.Get("factory_id"))
+		}
+		if q.Get("from") != "" {
+			t.Errorf("from must not be sent: %s", q.Get("from"))
+		}
+		if q.Get("dt_tracker_from") == "" || q.Get("dt_tracker_to") == "" {
+			t.Errorf("missing dt_tracker window from=%q to=%q", q.Get("dt_tracker_from"), q.Get("dt_tracker_to"))
+		}
+		if q.Get("stop_duration") != "5m0s" {
+			t.Errorf("stop_duration %s", q.Get("stop_duration"))
+		}
+		if q.Get("return_points") != "" {
+			t.Errorf("return_points must not be sent")
 		}
 		_, _ = w.Write([]byte(`{"odometer":999999,"stops":[{"miles":3.2,"odometer":111},{"distance":1.3}]}`))
 	}))
@@ -82,6 +121,71 @@ func TestDriveStopDoesNotUseRootDistanceOrOdometer(t *testing.T) {
 		if n, err := sumDriveStop([]byte(body)); err == nil {
 			t.Errorf("sumDriveStop(%s) = %v, want error", body, n)
 		}
+	}
+}
+
+func TestDriveStopUsesLiveMeasurementNotOdometer(t *testing.T) {
+	body := `{
+		"distance":{"value":12.4,"unit":"mi"},
+		"drive_stop_list":[{
+			"type":"drive",
+			"distance":{"value":12.4,"unit":"mi"},
+			"odometer_from":{"value":999999,"unit":"mi"},
+			"odometer_to":{"value":1012345,"unit":"mi"}
+		}]
+	}`
+	n, err := sumDriveStop([]byte(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n < 12.3 || n > 12.5 {
+		t.Fatalf("sum %v (must use distance.value, not odometer)", n)
+	}
+}
+
+func TestDriveStopEmptyListIsMeasuredZero(t *testing.T) {
+	n, err := sumDriveStop([]byte(`{"drive_stop_list":[],"odometer":999999}`))
+	if err != nil || n != 0 {
+		t.Fatalf("empty drive_stop_list: miles=%v err=%v", n, err)
+	}
+}
+
+func TestDriveStopConvertsKilometres(t *testing.T) {
+	n, err := sumDriveStop([]byte(`{"distance":{"value":1.609344,"unit":"km"}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n < 0.99 || n > 1.01 {
+		t.Fatalf("km conversion %v", n)
+	}
+}
+
+func TestDriveStopChunksOnHTTP500(t *testing.T) {
+	from := time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)
+	to := from.Add(40 * 24 * time.Hour)
+	var windows []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		q := r.URL.Query()
+		windows = append(windows, q.Get("dt_tracker_from")+"|"+q.Get("dt_tracker_to"))
+		if len(windows) == 1 {
+			http.Error(w, `{"code":500,"message":"internal error"}`, http.StatusInternalServerError)
+			return
+		}
+		_, _ = w.Write([]byte(`{"distance":{"value":2,"unit":"mi"}}`))
+	}))
+	defer srv.Close()
+	c := NewClient(srv.URL, "tok")
+	c.HTTP = srv.Client()
+	c.now = func() time.Time { return to }
+	n, err := c.DriveStopMiles(context.Background(), "FACT1", from)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n != 4 {
+		t.Fatalf("chunked miles %v windows %v", n, windows)
+	}
+	if len(windows) < 3 {
+		t.Fatalf("expected full window plus chunks, got %v", windows)
 	}
 }
 

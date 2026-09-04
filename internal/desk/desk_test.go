@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -69,6 +70,34 @@ func TestCarsAPIFromMirror(t *testing.T) {
 	h.ServeHTTP(rec2, req2)
 	if rec2.Code != http.StatusOK {
 		t.Fatalf("index status %d", rec2.Code)
+	}
+}
+
+func TestCardsAPIFromMirror(t *testing.T) {
+	dir := t.TempDir()
+	web := filepath.Join(dir, "out")
+	if err := os.MkdirAll(web, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(web, "index.html"), []byte("<html>ok</html>"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cards := filepath.Join(dir, "cards.json")
+	if err := os.WriteFile(cards, []byte(`{"source":"card-swipes","stats":{"cards":2,"unknown":1},"unknown":[{"kind":"suspect","card_id":"CARD-MIX-99","best_car":"27VA15"}]}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	h, err := desk.Handler(desk.Options{WebDir: web, MirrorPath: filepath.Join(dir, "cars.json"), CardsPath: cards})
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := httptest.NewRequest(http.MethodGet, "/api/cards", nil)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status %d body %s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "CARD-MIX-99") {
+		t.Fatalf("body %s", rec.Body.String())
 	}
 }
 

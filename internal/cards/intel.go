@@ -67,7 +67,7 @@ func ScorePairings(txs []model.CardTx, now time.Time) []model.CardPairing {
 		if now.Sub(t.At) >= 0 && now.Sub(t.At) <= RecentBonusDays*24*time.Hour {
 			w += 0.25
 		}
-		if car := strings.TrimSpace(t.RecordedEFleetsID); car != "" {
+		if car := strings.TrimSpace(t.RecordedEFleetsID); car != "" && !isUnknownCar(car) {
 			k := key{card, "car", car}
 			n[k]++
 			score[k] += w
@@ -138,7 +138,7 @@ func FindSuspects(txs []model.CardTx, pairings []model.CardPairing) []Suspect {
 	latest := map[string]model.CardTx{}
 	count := map[string]map[string]int{}
 	for _, t := range txs {
-		if t.CardID == "" || t.RecordedEFleetsID == "" {
+		if t.CardID == "" || strings.TrimSpace(t.RecordedEFleetsID) == "" {
 			continue
 		}
 		if prev, ok := latest[t.CardID]; !ok || t.At.After(prev.At) {
@@ -262,13 +262,41 @@ func personKey(first, last string) string {
 	return f + " " + l
 }
 
+func isUnknownCar(id string) bool {
+	s := strings.ToLower(strings.TrimSpace(id))
+	return s == "" || s == "unknown" || s == "n/a" || s == "-"
+}
+
+func skipStationName(name string) bool {
+	s := strings.ToLower(strings.TrimSpace(name))
+	return s == "" || s == "tracker" || s == "unknown" || s == "n/a"
+}
+
 func stationKey(name, addr string) string {
 	n := strings.ToLower(strings.TrimSpace(name))
-	a := strings.ToLower(strings.TrimSpace(addr))
-	if n == "" && a == "" {
+	if skipStationName(n) {
 		return ""
 	}
-	return n + "|" + a
+	city, state := cityState(addr)
+	if city == "" && state == "" {
+		return n
+	}
+	return n + "|" + city + "|" + state
+}
+
+func cityState(addr string) (string, string) {
+	parts := strings.Split(addr, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		p = strings.ToLower(strings.TrimSpace(p))
+		if p != "" {
+			out = append(out, p)
+		}
+	}
+	if len(out) >= 2 {
+		return out[len(out)-2], out[len(out)-1]
+	}
+	return "", ""
 }
 
 func truncateDay(t time.Time) time.Time {

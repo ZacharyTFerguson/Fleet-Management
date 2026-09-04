@@ -40,11 +40,8 @@ func applyMigrations(db *sql.DB, dialect string) error {
 		if err != nil {
 			return fmt.Errorf("read rls: %w", err)
 		}
-		if err := execAll(db, string(rls)); err != nil {
-			msg := strings.ToLower(err.Error())
-			if !strings.Contains(msg, "already exists") {
-				return fmt.Errorf("rls: %w", err)
-			}
+		if err := execAllIgnoreRLS(db, string(rls)); err != nil {
+			return fmt.Errorf("rls: %w", err)
 		}
 	}
 	return nil
@@ -96,6 +93,34 @@ func execAllIgnoreDup(db *sql.DB, script string) error {
 		}
 	}
 	return nil
+}
+
+// execAllIgnoreRLS applies 002_rls.sql. Neon has no Supabase anon/authenticated
+// roles; skip those policy statements so ENABLE ROW LEVEL SECURITY still runs.
+func execAllIgnoreRLS(db *sql.DB, script string) error {
+	for _, stmt := range splitSQL(script) {
+		if _, err := db.Exec(stmt); err != nil {
+			if rlsIgnorable(err) {
+				continue
+			}
+			return fmt.Errorf("%w in %q", err, trimForErr(stmt))
+		}
+	}
+	return nil
+}
+
+func rlsIgnorable(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	if strings.Contains(msg, "already exists") {
+		return true
+	}
+	if strings.Contains(msg, "does not exist") && (strings.Contains(msg, "role") || strings.Contains(msg, "user")) {
+		return true
+	}
+	return strings.Contains(msg, "42704")
 }
 
 func splitSQL(s string) []string {

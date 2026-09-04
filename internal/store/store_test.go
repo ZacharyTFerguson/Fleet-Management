@@ -70,6 +70,44 @@ func TestOpaquePDINoStatePrefix(t *testing.T) {
 	}
 }
 
+func TestInsertOilChangeAdvancesLastOilNotLastReading(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "oil.sqlite")
+	s, err := Open("sqlite", p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	ctx := context.Background()
+	if err := s.UpsertCar(ctx, model.Car{EFleetsID: "27TESTA", Nickname: "VA19"}); err != nil {
+		t.Fatal(err)
+	}
+	readAt := time.Date(2026, 9, 1, 14, 0, 0, 0, time.UTC)
+	if err := s.WriteLastReading(ctx, "27TESTA", 180312, readAt, model.SourceFuelDetails); err != nil {
+		t.Fatal(err)
+	}
+	newer := time.Date(2026, 8, 20, 0, 0, 0, 0, time.UTC)
+	older := time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)
+	if err := s.InsertOilChange(ctx, model.OilChange{EFleetsID: "27TESTA", Miles: 179598, Date: newer, Location: "Valvoline", Source: "shop_ro"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.InsertOilChange(ctx, model.OilChange{EFleetsID: "27TESTA", Miles: 100000, Date: older, Location: "Old Shop", Source: "shop_ro"}); err != nil {
+		t.Fatal(err)
+	}
+	c, err := s.CarByEFleets(ctx, "27TESTA")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.LastOilMiles == nil || *c.LastOilMiles != 179598 {
+		t.Fatalf("last oil must stay the later RO, got %+v", c.LastOilMiles)
+	}
+	if c.LastOilDate == nil || !c.LastOilDate.Equal(newer) {
+		t.Fatalf("last oil date %+v", c.LastOilDate)
+	}
+	if c.LastReadingMiles == nil || *c.LastReadingMiles != 180312 {
+		t.Fatalf("InsertOilChange must not touch Last Reading, got %+v", c.LastReadingMiles)
+	}
+}
+
 func TestRemigrateReopenSameSQLite(t *testing.T) {
 	p := filepath.Join(t.TempDir(), "reopen.sqlite")
 	s1, err := Open("sqlite", p)

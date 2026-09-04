@@ -132,11 +132,15 @@ func TestSyncOneStepFetchesFromTrustedEnterpriseAnchor(t *testing.T) {
 			http.NotFound(w, r)
 			return
 		}
-		if got := r.URL.Query().Get("factory_id"); got != "FACT1" {
-			t.Errorf("factory_id %q", got)
+		q := r.URL.Query()
+		if got := q.Get("device_id"); got != "DEV1" {
+			t.Errorf("device_id %q", got)
 		}
-		if got := r.URL.Query().Get("from"); got != trustedAt.Format(time.RFC3339) {
-			t.Errorf("from %q", got)
+		if q.Get("factory_id") != "" {
+			t.Errorf("factory_id must not be sent")
+		}
+		if got := q.Get("dt_tracker_from"); got != trustedAt.Format(time.RFC3339) {
+			t.Errorf("dt_tracker_from %q", got)
 		}
 		_, _ = w.Write([]byte(`{"miles":12.4,"odometer":999999}`))
 	}))

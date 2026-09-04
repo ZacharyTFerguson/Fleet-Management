@@ -22,6 +22,7 @@ func cmdServe(args []string) int {
 		Addr:       *addr,
 		WebDir:     *webDir,
 		MirrorPath: *mirror,
+		CardsPath:  defaultCardsPath(),
 	}
 	if err := desk.ListenAndServe(opts); err != nil {
 		fmt.Fprintln(os.Stderr, err)

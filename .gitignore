@@ -22,8 +22,10 @@ onestep*.local
 /agent-tools/
 node_modules/
 data/runtime/
+web/data/cards.json
 supabase/.temp/
 *.log
 .DS_Store
 Thumbs.db
 web/tsconfig.tsbuildinfo
+.neon

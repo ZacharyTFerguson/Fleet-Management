@@ -108,6 +108,68 @@ html.driver-mode .grain {
   }
 }
 
+.desk-nav {
+  display: flex;
+  gap: 0.5rem;
+  padding-top: 0.25rem;
+}
+
+.desk-nav a {
+  color: var(--steel);
+  text-decoration: none;
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-size: 0.8rem;
+  padding: 0.4rem 0.7rem;
+  border: 2px solid transparent;
+}
+
+.desk-nav a.is-current {
+  color: var(--primary);
+  border-color: var(--steel);
+}
+
+html.driver-mode .desk-nav a {
+  color: #000;
+  border-color: transparent;
+}
+
+html.driver-mode .desk-nav a.is-current {
+  border-color: #000;
+}
+
+.desk-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0 0 1rem;
+}
+
+.desk-tabs .cta.is-on {
+  background: var(--sodium);
+  border-color: var(--sodium);
+  color: #111;
+}
+
+.card-id {
+  font-size: clamp(1.15rem, 4vw, 1.55rem) !important;
+  letter-spacing: 0.04em;
+  word-break: break-all;
+}
+
+.station-name {
+  font-size: clamp(1.25rem, 4.2vw, 1.7rem) !important;
+}
+
+.matchup-why {
+  margin: 0 0 0.75rem;
+  color: var(--mist);
+  font-size: 0.95rem;
+  line-height: 1.4;
+}
+
 .hero {
   padding: clamp(1.5rem, 5vh, 3.5rem) 0 1.75rem;
   animation: rise 0.7s ease-out;

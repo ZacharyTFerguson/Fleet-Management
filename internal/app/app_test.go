@@ -331,6 +331,49 @@ func TestLiveFleetHasMoreVehiclesThanTwoCarDemo(t *testing.T) {
 	}
 }
 
+func TestComputeDoesNotStackRepeatedHolds(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "hold-stack.sqlite")
+	st, err := store.Open("sqlite", p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	a := &App{Store: st}
+	ctx := context.Background()
+	if err := st.UpsertCar(ctx, model.Car{EFleetsID: "CAR1", Nickname: "VA1"}); err != nil {
+		t.Fatal(err)
+	}
+	odo := 100000
+	if err := st.UpsertFill(ctx, model.Fill{
+		EFleetsID:                    "CAR1",
+		ProviderCompanyVehicleNumber: "VA1",
+		Odometer:                     &odo,
+		ProviderTransactionTime:      time.Date(2026, 6, 1, 10, 0, 0, 0, time.UTC),
+		Source:                       model.SourceFuelDetails,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 3; i++ {
+		code, err := a.Compute(ctx, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if code != model.ExitHolds {
+			t.Fatalf("compute %d: code %d want holds", i, code)
+		}
+	}
+	holds, err := st.OpenHolds(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(holds) != 1 {
+		t.Fatalf("daily compute stacked %d open holds: %+v", len(holds), holds)
+	}
+	if holds[0].Reason != model.HoldNoDevice {
+		t.Fatalf("reason %s", holds[0].Reason)
+	}
+}
+
 func TestOilDoneDoesNotChangeLastReading(t *testing.T) {
 	p := filepath.Join(t.TempDir(), "oil.sqlite")
 	st, err := store.Open("sqlite", p)

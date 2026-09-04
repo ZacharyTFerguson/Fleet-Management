@@ -168,6 +168,58 @@ func TestUpsertCarAllocatesPastPDIConflictsAndGaps(t *testing.T) {
 	}
 }
 
+func TestSetHoldIdempotentAndReplacesReason(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "hold-idempotent.sqlite")
+	s, err := Open("sqlite", p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	ctx := context.Background()
+	if err := s.UpsertCar(ctx, model.Car{EFleetsID: "CAR1"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SetHold(ctx, "CAR1", model.HoldNoDevice, "no live factory_id"); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SetHold(ctx, "CAR1", model.HoldNoDevice, "no live factory_id"); err != nil {
+		t.Fatal(err)
+	}
+	holds, err := s.OpenHolds(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(holds) != 1 {
+		t.Fatalf("repeated SetHold stacked %d open events: %+v", len(holds), holds)
+	}
+	if holds[0].Reason != model.HoldNoDevice {
+		t.Fatalf("reason %s", holds[0].Reason)
+	}
+	if err := s.SetHold(ctx, "CAR1", model.HoldNoDriveStop, "no miles-since"); err != nil {
+		t.Fatal(err)
+	}
+	holds, err = s.OpenHolds(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(holds) != 1 {
+		t.Fatalf("reason change left %d open events: %+v", len(holds), holds)
+	}
+	if holds[0].Reason != model.HoldNoDriveStop {
+		t.Fatalf("want NO_DRIVESTOP, got %+v", holds[0])
+	}
+	car, err := s.CarByEFleets(ctx, "CAR1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if car.HoldReason == nil || *car.HoldReason != model.HoldNoDriveStop {
+		t.Fatalf("cars.hold_reason %+v", car.HoldReason)
+	}
+	if err := s.SetHold(ctx, "MISSING", model.HoldNoDevice, "no car"); err == nil {
+		t.Fatal("SetHold on unknown car must fail")
+	}
+}
+
 func TestConcurrentHoldAndReadingStayConsistent(t *testing.T) {
 	p := filepath.Join(t.TempDir(), "hold-reading.sqlite")
 	s, err := Open("sqlite", p)

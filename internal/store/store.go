@@ -618,7 +618,16 @@ func (s *Store) WriteLastReading(ctx context.Context, efleetsID string, miles in
 }
 
 // SetHold skips Last Reading. Prior last_reading_* stay put so operators do not trust a flagged number.
+//
+// SetHold is idempotent per (efleets_id, reason, detail): the car ends the
+// transaction with exactly one open hold_events row, which matches
+// cars.hold_reason. A repeated NO_DEVICE compute therefore does not stack a
+// new open event every tick, and a changed reason closes the previous one
+// instead of leaving two "current" holds.
 func (s *Store) SetHold(ctx context.Context, efleetsID, reason, detail string) error {
+	if reason == "" {
+		return fmt.Errorf("store: empty hold reason for %s", efleetsID)
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	tx, err := s.db.BeginTx(ctx, nil)
@@ -627,8 +636,33 @@ func (s *Store) SetHold(ctx context.Context, efleetsID, reason, detail string) e
 	}
 	defer func() { _ = tx.Rollback() }()
 	now := time.Now().UTC().Format(time.RFC3339)
-	if _, err := tx.ExecContext(ctx, s.pg(`UPDATE cars SET hold_reason=?, updated_at=? WHERE efleets_id=?`), reason, now, efleetsID); err != nil {
+	res, err := tx.ExecContext(ctx, s.pg(`UPDATE cars SET hold_reason=?, updated_at=? WHERE efleets_id=?`), reason, now, efleetsID)
+	if err != nil {
 		return err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return fmt.Errorf("store: unknown efleets_id %s", efleetsID)
+	}
+	// Close every open event except the oldest one that already says the
+	// same thing. COALESCE(...,-1) keeps the predicate true when there is
+	// no such event (id <> NULL would match nothing).
+	if _, err := tx.ExecContext(ctx, s.pg(`UPDATE hold_events SET open=FALSE
+		WHERE efleets_id=? AND open=TRUE
+		  AND id <> COALESCE((SELECT MIN(id) FROM hold_events
+		                      WHERE efleets_id=? AND open=TRUE AND reason=? AND COALESCE(detail,'')=?), -1)`),
+		efleetsID, efleetsID, reason, detail); err != nil {
+		return err
+	}
+	var open int
+	if err := tx.QueryRowContext(ctx, s.pg(`SELECT COUNT(*) FROM hold_events WHERE efleets_id=? AND open=TRUE`), efleetsID).Scan(&open); err != nil {
+		return err
+	}
+	if open > 0 {
+		return tx.Commit()
 	}
 	if _, err := tx.ExecContext(ctx, s.pg(`INSERT INTO hold_events (efleets_id, reason, detail, at, open) VALUES (?,?,?,?,?)`),
 		efleetsID, reason, detail, now, true); err != nil {

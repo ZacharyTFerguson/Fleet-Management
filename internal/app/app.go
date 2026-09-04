@@ -23,10 +23,11 @@ import (
 
 // App wires CLI commands. Last Reading still happens only in internal/oil.
 type App struct {
-	Cfg         config.Config
-	Store       *store.Store
-	CardsMirror string          // web/data/cards.json; empty skips the Cards desk write
-	OneStep     *onestep.Client // optional; GPS stop times for card matching
+	Cfg          config.Config
+	Store        *store.Store
+	CardsMirror  string          // web/data/cards.json; empty skips the Cards desk write
+	OneStep      *onestep.Client // optional; GPS stop times for card matching
+	GPSStopsPath string          // optional override for tests; default data/runtime/gps-stops.json
 }
 
 // OpenStore opens sqlite or postgres from env.
@@ -495,6 +496,13 @@ func gpsStopsCachePath() string {
 	return filepath.Join("data", "runtime", "gps-stops.json")
 }
 
+func (a *App) gpsStopsCacheFile() string {
+	if a != nil && strings.TrimSpace(a.GPSStopsPath) != "" {
+		return a.GPSStopsPath
+	}
+	return gpsStopsCachePath()
+}
+
 const gpsLookback = 120 * 24 * time.Hour
 
 func clampGPSWindow(from, to time.Time) (time.Time, time.Time) {
@@ -547,7 +555,7 @@ func (a *App) matchCardsAtGPSStops(ctx context.Context, txs []model.CardTx) (car
 	if err != nil {
 		return empty, err
 	}
-	cache := gpsStopsCachePath()
+	cache := a.gpsStopsCacheFile()
 	var from, to time.Time
 	for _, t := range txs {
 		if t.At.IsZero() {

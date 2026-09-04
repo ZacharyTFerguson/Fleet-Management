@@ -34,6 +34,7 @@ Sit-still / important-location Node app lives in a separate PR (`cursor/importan
 | `backup-neon` | Copy sqlite oilchange tables into **Neon** (`Fleet_Management_Neon` / `Fleet_Manage_Oil`). SQLite stays the working store. Alias: `backup`. |
 | `serve` | Host Oil Desk UI + `/api/cars` on `127.0.0.1:4739` from the **embedded** static export (`web/out`). **No npm/Node required.** `[--addr]` `[--mirror]` `[--web-dir]`. |
 | `cards rebuild` | ingest optional `--fuel-details` then score every swipe into `card_pairings` (never writes Last Reading). GPS-first: stop windows from OneStep unless `--no-gps` (rematch from `data/runtime/gps-stops.json`). Station lat/lng from exclusive GPS sits; later swipes match the car at that pump even when another box is sitting elsewhere. |
+| `cards history` | **One operator path** for card/vehicle history: `devices csv` → ingest DETAILS (file or live `EFLEETS_*` in env) → GPS stops + `cards rebuild` → ladder 3/5/10 → persist `card_eras` → print coverage. `[--vehicles PATH]` `[--fuel-details PATH]` `[--devices-live]` `[--map PATH]` `[--devices-out PATH]` `[--no-gps]`. Never Last Reading. |
 | `cards suspect` | cards whose latest Enterprise Vehicle is not the swipe-majority / GPS-called car |
 | `cards trace` | `--card ID [--window-days 2]` other cars at the same station on nearby days |
 | `cards pairings` | `[--card ID]` scored car/person links; `BEST` is evidence, not Enterprise last-write-wins |
@@ -178,6 +179,27 @@ go build -o bin/oilchange ./cmd/oilchange
 ```
 
 Heuristic: best car = 1.0 per swipe on that eFleets id, +0.25 if the swipe is within 30 days. Trace joins other swipes at `lower(station name)|lower(address)` within ±`--window-days` (default 2).
+
+### Card history finder (one command)
+
+Reconstruct where each fuel card sat (car eras, driver-kept person eras, office cards) from OneStep GPS + eFleets DETAILS. Does **not** write Last Reading. TRACKER merchants yield 0% card eras until a named DETAILS export is ingested — that is honest, not a bug.
+
+```bash
+export OILCHANGE_DB=./oilchange.sqlite
+go build -o bin/oilchange ./cmd/oilchange
+
+# File-drop (CI / desktop without live portals)
+./bin/oilchange cards history \
+  --vehicles testdata/enterprise/fleetsummary_live.csv \
+  --fuel-details testdata/enterprise/details_live.csv \
+  --map data/runtime/onestep-map.csv \
+  --no-gps
+
+# Live when tokens/secrets are already in oilchange.env (never prompts for a password)
+./bin/oilchange cards history --devices-live --map data/runtime/onestep-map.csv
+```
+
+Steps inside `cards history`: (1) optional `devices sync` + write `data/runtime/onestep-devices.csv`, (2) ingest DETAILS, (3) refresh `gps-stops.json` + `cards rebuild` (pairings + `card_eras`), (4) station ladder 3 → 5 → 10 with coverage %. Use `cards split --card ID` or `cards coverage` after a run.
 
 HOLD `LOGISTICS_PERSONNEL` (third-spec name `RICH_TYLER_PAIRING`): logistics-personnel names on a punch or OneStep label never create a device↔car link.
 

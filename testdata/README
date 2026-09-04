@@ -17,6 +17,7 @@ Each locked rule has a fixture. Live eFleets/OneStep/Supabase are never required
 | Exporter never writes remaining/due | `internal/export` TestNeverWritesRemainingDue |
 | Logistics personnel names do not link devices | `internal/oil` TestLogisticsPersonnelDoesNotLinkDevice |
 | Station ladder 3/5/10 exclusive pumps; driver-kept / SPLIT / office / TRACKER | `internal/cards` TestStationLadder* |
+| Card history one-path CLI + backprop eras | `internal/app` TestCardsHistory* + `internal/cards` TestBackprop* |
 | Devices CSV display_name is a label only | `internal/onestep` TestWriteDevicesCSVDisplayNameIsLabelOnly |
 | Same-second different odo → SAME_SECOND_FILL | `internal/oil` TestSameSecondDifferentOdo |
 | Dead factory_id not summed | `internal/oil` TestDeadFactoryIDNotSummed |

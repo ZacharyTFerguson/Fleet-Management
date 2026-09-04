@@ -35,6 +35,7 @@ SQLite (`OILCHANGE_DB`) is the working store for ingest, compute, and serve. Neo
 | `sync-onestep` | Devices + drive-stop miles-since after the trusted fill second. Join on `factory_id` only. |
 | `devices sync` / `list` / `csv` | Durable `onestep_devices` registry (`factory_id` PK, `device_id` history id, `display_name` label only). `csv` writes gitignored-friendly inventory. Does not fetch miles. |
 | `cards rebuild` | Score swipes into `card_pairings`. GPS-first stop windows from OneStep unless `--no-gps` (rematch from `data/runtime/gps-stops.json`). Persists `card_eras`. Never writes Last Reading. |
+| `cards history` | **One operator path**: devices CSV → DETAILS ingest (file or live `EFLEETS_*` in env) → GPS stops + rebuild → ladder 3/5/10 → `card_eras` + coverage. Never prompts for a password. Never Last Reading. |
 | `cards split` / `call` / `ladder` / `coverage` | GPS eras (SPLIT / PERSON / OFFICE). Ladder: exclusive pumps at 3 then 5 then 10 stations. Coverage is % roster with factory_id **and** a GPS-named car card era (target 95%). |
 | `probe-onestep` | One-shot live drive-stop GET. Prints measured miles. Does **not** write Last Reading. |
 | `compute` | Last Reading + HOLD. `[--override-lower]` is the only way to write a lower reading. |
@@ -57,6 +58,8 @@ None of the `cards *` commands write Last Reading.
 ### Station ladder (3 / 5 / 10)
 
 Start from OneStep-linked cars (`factory_id` only). For each GPS-linked car, collect **exclusive** pump sits (exactly one box at that swipe). Cards seen at 3 exclusive stations lock as a **car** card; expand to 5 then 10. The same card at two cars is `SPLIT`. A driver who keeps the card (or logistics personnel: Rich / Tyler) stays a **person** era — that never creates a device↔car join. Office labels (`PDI OFFICE`, HQ) are the **office** bucket. Coverage is % of the eFleets roster with both a factory_id link and a GPS-named **car** card era (target 95%). TRACKER / empty merchants are not pumps; do not invent punches to clear the gap.
+
+**Operator entrypoint:** `oilchange cards history` runs devices CSV → DETAILS → GPS rebuild → ladder → `card_eras` + coverage in one shot. GPS forward labels backpropagate to earlier swipes of the same card until a car switch (`why=backprop`).
 
 ## Hard locks (do not regress)
 

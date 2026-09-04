@@ -293,6 +293,27 @@ func gpsSplitBelowRung(hits map[string]*carHit) bool {
 	return strong >= 2
 }
 
+// oneStrongGPSCar is below-rung exclusive evidence for exactly one car.
+// A single stray sit on a second car is not driver-kept and must not drop
+// the GPS-named car era.
+func oneStrongGPSCar(hits map[string]*carHit) (string, *carHit, bool) {
+	var strong []string
+	for car, h := range hits {
+		if h == nil {
+			continue
+		}
+		// Station count is exclusive-pump evidence. Do not use EvidenceN:
+		// backprop inflates it on the earlier car of a driver-kept split.
+		if len(h.stations) >= 2 {
+			strong = append(strong, car)
+		}
+	}
+	if len(strong) != 1 {
+		return "", nil, false
+	}
+	return strong[0], hits[strong[0]], true
+}
+
 func classifyCard(card string, inf *cardInfo, hits map[string]*carHit, rungs []int) LadderCard {
 	lc := LadderCard{CardID: card, Stations: []string{}, Cars: []string{}}
 	minLock := 3
@@ -393,7 +414,45 @@ func classifyCard(card string, inf *cardInfo, hits map[string]*carHit, rungs []i
 		return lc
 	}
 
-	// Below the first rung: driver-kept stays on the person; office cards stay office.
+	// Office stays office even if a GPS car happened to sit during a swipe.
+	if inf != nil && inf.office != "" {
+		lc.Bucket = HolderOffice
+		lc.HolderKey = inf.office
+		lc.Nickname = inf.office
+		lc.EvidenceN = inf.n
+		lc.Stations = sortedKeys(inf.stations)
+		lc.StationN = len(lc.Stations)
+		return lc
+	}
+
+	// GPS exclusive sits already named exactly one car. DETAILS driver is who
+	// was driving, not proof the card is person-kept — this file-drop names a
+	// driver on every punch. Driver-kept is the same person across two+ cars.
+	if len(any) == 1 {
+		a := any[0]
+		lc.Bucket = HolderCar
+		lc.HolderKey = a.car
+		lc.Nickname = a.h.nickname
+		lc.StationN = a.n
+		lc.Stations = sortedKeys(a.h.stations)
+		lc.EvidenceN = a.h.evidence
+		lc.Rung = rungFor(a.n, rungs)
+		lc.Cars = []string{a.car}
+		return lc
+	}
+	if car, h, ok := oneStrongGPSCar(hits); ok {
+		lc.Bucket = HolderCar
+		lc.HolderKey = car
+		lc.Nickname = h.nickname
+		lc.StationN = len(h.stations)
+		lc.Stations = sortedKeys(h.stations)
+		lc.EvidenceN = h.evidence
+		lc.Rung = rungFor(len(h.stations), rungs)
+		lc.Cars = []string{car}
+		return lc
+	}
+
+	// Below the first rung: driver-kept stays on the person.
 	if inf != nil && inf.person != "" && !strings.Contains(inf.person, "|") {
 		lc.Bucket = HolderPerson
 		lc.HolderKey = inf.person
@@ -404,15 +463,6 @@ func classifyCard(card string, inf *cardInfo, hits map[string]*carHit, rungs []i
 		for _, a := range any {
 			lc.Cars = append(lc.Cars, a.car)
 		}
-		return lc
-	}
-	if inf != nil && inf.office != "" {
-		lc.Bucket = HolderOffice
-		lc.HolderKey = inf.office
-		lc.Nickname = inf.office
-		lc.EvidenceN = inf.n
-		lc.Stations = sortedKeys(inf.stations)
-		lc.StationN = len(lc.Stations)
 		return lc
 	}
 	lc.Bucket = ""

@@ -61,6 +61,12 @@ func NewClient(base, token string) *Client {
 	}
 }
 
+type devicePointVIN struct {
+	DeviceState struct {
+		VIN string `json:"vin"`
+	} `json:"device_state"`
+}
+
 type deviceJSON struct {
 	FactoryID   string `json:"factory_id"`
 	FactoryId   string `json:"factoryId"`
@@ -73,12 +79,20 @@ type deviceJSON struct {
 	IsActive    *bool  `json:"is_active"`
 	Dead        bool   `json:"dead"`
 	Odometer    any    `json:"odometer"` // present on some payloads; must not be used as Last Reading
+	VIN         string `json:"vin"`      // not present live; keep in case a top-level appears
+	Settings    struct {
+		VIN string `json:"vin"`
+	} `json:"settings"`
+	LatestDevicePoint         devicePointVIN `json:"latest_device_point"`
+	LatestAccurateDevicePoint devicePointVIN `json:"latest_accurate_device_point"`
 }
 
 // ListDevices GET device-info (OneStep demo) then /device (Cursor guide). Odometer JSON is discarded.
 func (c *Client) ListDevices(ctx context.Context) ([]model.OneStepDevice, error) {
 	q := url.Values{}
 	q.Set("latest_point", "true")
+	// Live /device defaults to 100 rows; limit=1000 returns the full inventory (264 on 2026-09-04).
+	q.Set("limit", "1000")
 	paths := []string{"/v3/api/public/device-info", "/v3/api/public/device", "/v3/api/public/devices"}
 	var last error
 	for _, p := range paths {
@@ -104,7 +118,7 @@ func (c *Client) ListDevices(ctx context.Context) ([]model.OneStepDevice, error)
 	return nil, last
 }
 
-// parseDevices keeps factory_id/device_id/display_name and drops odometer so History UI cannot leak in.
+// parseDevices keeps factory_id/device_id/display_name/VIN and drops odometer so History UI cannot leak in.
 func parseDevices(b []byte) ([]model.OneStepDevice, error) {
 	var raw []deviceJSON
 	if err := json.Unmarshal(b, &raw); err != nil {
@@ -140,6 +154,14 @@ func parseDevices(b []byte) ([]model.OneStepDevice, error) {
 		fid := first(d.FactoryID, d.FactoryId)
 		did := first(d.DeviceID, d.DeviceId, d.ID)
 		name := first(d.DisplayName, d.Name)
+		// OBD device_state.vin is the car the box is plugged into; settings.vin is portal Vehicle Info.
+		// params.vin is noisier and is not used. display_name is never an identity.
+		vin := first(
+			d.LatestDevicePoint.DeviceState.VIN,
+			d.LatestAccurateDevicePoint.DeviceState.VIN,
+			d.Settings.VIN,
+			d.VIN,
+		)
 		if fid == "" {
 			continue
 		}
@@ -157,6 +179,7 @@ func parseDevices(b []byte) ([]model.OneStepDevice, error) {
 			FactoryID:   fid,
 			DeviceID:    did,
 			DisplayName: name,
+			VIN:         normalizeVIN(vin),
 			Active:      active,
 			Dead:        d.Dead,
 		})
@@ -824,6 +847,57 @@ func LinkByFactoryID(dev model.OneStepDevice, factoryToCar map[string]string) mo
 		return dev
 	}
 	if car, ok := factoryToCar[dev.FactoryID]; ok && car != "" {
+		dev.LinkedCarEFleetsID = &car
+	}
+	return dev
+}
+
+const vinLen = 17
+
+func normalizeVIN(s string) string {
+	return strings.ToUpper(strings.TrimSpace(s))
+}
+
+// VINToEFleets maps a 17-char roster VIN onto exactly one efleets_id.
+// Duplicate roster VINs are dropped so a collision cannot invent a join.
+func VINToEFleets(cars []model.Car) map[string]string {
+	count := map[string]int{}
+	firstCar := map[string]string{}
+	for _, c := range cars {
+		v := normalizeVIN(c.VIN)
+		if len(v) != vinLen {
+			continue
+		}
+		count[v]++
+		if _, ok := firstCar[v]; !ok {
+			firstCar[v] = strings.TrimSpace(c.EFleetsID)
+		}
+	}
+	out := map[string]string{}
+	for v, n := range count {
+		eid := firstCar[v]
+		if n == 1 && eid != "" {
+			out[v] = eid
+		}
+	}
+	return out
+}
+
+// LinkByVIN attaches a car using exact 17-char VIN equality to cars.vin.
+// Display_name and plate are not consulted. An existing factory_id link is kept.
+func LinkByVIN(dev model.OneStepDevice, vinToCar map[string]string) model.OneStepDevice {
+	if oil.HasLogisticsPersonnel(dev.DisplayName) {
+		dev.LinkedCarEFleetsID = nil
+		return dev
+	}
+	if dev.LinkedCarEFleetsID != nil && strings.TrimSpace(*dev.LinkedCarEFleetsID) != "" {
+		return dev
+	}
+	v := normalizeVIN(dev.VIN)
+	if len(v) != vinLen {
+		return dev
+	}
+	if car, ok := vinToCar[v]; ok && car != "" {
 		dev.LinkedCarEFleetsID = &car
 	}
 	return dev

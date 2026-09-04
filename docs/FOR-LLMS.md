@@ -33,7 +33,7 @@ SQLite (`OILCHANGE_DB`) is the working store for ingest, compute, and serve. Neo
 |---|---|
 | `sync-enterprise` | Ingest eFleets roster, fuel DETAILS, optional shop ROs. Seeds last oil. Does **not** compute Last Reading. Live portal if `EFLEETS_*` is set; otherwise `--vehicles` / `--fuel-details` file drop. |
 | `sync-onestep` | Devices + drive-stop miles-since after the trusted fill second. Join on `factory_id` only. |
-| `devices sync` / `list` / `csv` | Durable `onestep_devices` registry (`factory_id` PK, `device_id` history id, `display_name` label only). `csv` writes gitignored-friendly inventory. Does not fetch miles. |
+| `devices sync` / `list` / `csv` | Durable `onestep_devices` registry (`factory_id` PK, `device_id` history id, `display_name` label only). Unpaired boxes may attach by exact 17-char OBD VIN to `cars.vin`. `csv` writes gitignored-friendly inventory. Does not fetch miles. |
 | `cards rebuild` | Score swipes into `card_pairings`. GPS-first stop windows from OneStep unless `--no-gps` (rematch from `data/runtime/gps-stops.json`). Persists `card_eras`. Never writes Last Reading. |
 | `cards history` | **One operator path**: devices CSV → DETAILS ingest (file or live `EFLEETS_*` in env) → GPS stops + rebuild → ladder 3/5/10 → `card_eras` + coverage. Never prompts for a password. Never Last Reading. |
 | `cards split` / `call` / `ladder` / `coverage` | GPS eras (SPLIT / PERSON / OFFICE). Ladder: exclusive pumps at 3 then 5 then 10 stations. Coverage is % roster with factory_id **and** a GPS-named car card era (target 95%). |
@@ -68,7 +68,7 @@ If a step would violate one of these, stop and HOLD. Full card: [`docs/collab/OI
 1. **Last Reading only in `internal/oil`.** Trusted fill/shop odo + stored drive-stop miles-since. Nowhere else.
 2. **Never OneStep odometer.** Ignore `odometer` / `odometer_from` / `odometer_to` / device mileage as Last Reading.
 3. **HOLD skips the Last Reading write.** Do not seed a number to clear a HOLD. `WriteLastReading` must not “finish the desk.”
-4. **Join GPS on `factory_id` only.** `device_id` is History / drive-stop identity. **`display_name` is never a join key.** Never guess an unpaired `factory_id`.
+4. **Join GPS on `factory_id`.** `device_id` is History / drive-stop identity. **`display_name` is never a join key.** Unpaired boxes may attach by exact 17-char OBD `device_state.vin` = roster `cars.vin` (not plate, not nickname, not `params.vin`). Never guess an unpaired `factory_id`.
 5. **Never invent miles.** A missing GPS sum is `NO_DRIVESTOP`, not zero. A measured empty trip list **is** stored as 0 on purpose — that is not a guess.
 6. **SQLite is the daily driver.** Neon is the backup. Oil Desk remote is this fleet’s Supabase `fleet_cars`. Later that same project is a second **full copy** if Neon is down. Do not add S3, extra Neon, or direct AWS. Do not unset `OILCHANGE_DB` so desktop can keep working offline.
 7. **Never write fleet oil to the other/wrong Supabase project** (the in-repo name is XRAY). Refuse it as `DATABASE_URL` too (also refuse `-pooler` and `supabase.co` as Neon). Exact project lock: OIL-LOCKS + README. Do not copy that lock from chat; copy it from those files.

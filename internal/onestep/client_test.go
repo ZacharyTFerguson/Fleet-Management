@@ -218,6 +218,108 @@ func TestParseDevicesResultList(t *testing.T) {
 	}
 }
 
+func TestParseDevicesKeepsNestedVINDropsOdometer(t *testing.T) {
+	body := []byte(`{"result_list":[{
+		"factory_id":"FACT1","device_id":"DEV1","display_name":"WrongCar","odometer":999999,
+		"settings":{"vin":"1HGCM82633A004352"},
+		"latest_device_point":{"device_state":{"vin":"1HGCM82633A004352","odometer":{"value":888}},"params":{"vin":"IGNOREDPARAMS"}},
+		"latest_accurate_device_point":{"device_state":{"vin":"1HGCM82633A004352"}}
+	}]}`)
+	devs, err := parseDevices(body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(devs) != 1 || devs[0].FactoryID != "FACT1" {
+		t.Fatalf("%+v", devs)
+	}
+	if devs[0].VIN != "1HGCM82633A004352" {
+		t.Fatalf("vin %q", devs[0].VIN)
+	}
+	if devs[0].DisplayName != "WrongCar" {
+		t.Fatalf("display_name is a label only, got %q", devs[0].DisplayName)
+	}
+}
+
+func TestParseDevicesIgnoresParamsVIN(t *testing.T) {
+	devs, err := parseDevices([]byte(`[{
+		"factory_id":"FACT1",
+		"latest_device_point":{"params":{"vin":"1HGCM82633A004352"}}
+	}]`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(devs) != 1 || devs[0].VIN != "" {
+		t.Fatalf("params.vin is not identity: %+v", devs)
+	}
+}
+
+func TestParseDevicesPrefersOBDVINOverSettings(t *testing.T) {
+	body := []byte(`[{
+		"factory_id":"FACT1",
+		"display_name":"NicknameMatch",
+		"settings":{"vin":"1HGCM82633A000001"},
+		"latest_device_point":{"device_state":{"vin":"1HGCM82633A000002"}}
+	}]`)
+	devs, err := parseDevices(body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(devs) != 1 || devs[0].VIN != "1HGCM82633A000002" {
+		t.Fatalf("OBD device_state.vin must win: %+v", devs)
+	}
+}
+
+func TestLinkByVINExactNotDisplayName(t *testing.T) {
+	vinToCar := VINToEFleets([]model.Car{
+		{EFleetsID: "CARVIN", VIN: "1HGCM82633A004352", Nickname: "WrongCar", Plate: "ABC1234"},
+		{EFleetsID: "CARNAME", VIN: "1HGCM82633A000099", Nickname: "WrongCar"},
+	})
+	d := LinkByVIN(model.OneStepDevice{
+		FactoryID: "FACT1", DisplayName: "WrongCar", VIN: "1HGCM82633A004352",
+	}, vinToCar)
+	if d.LinkedCarEFleetsID == nil || *d.LinkedCarEFleetsID != "CARVIN" {
+		t.Fatalf("exact VIN join %+v", d)
+	}
+	d = LinkByVIN(model.OneStepDevice{
+		FactoryID: "FACT2", DisplayName: "1HGCM82633A004352", VIN: "",
+	}, vinToCar)
+	if d.LinkedCarEFleetsID != nil {
+		t.Fatal("empty VIN must not join via display_name")
+	}
+	d = LinkByVIN(model.OneStepDevice{
+		FactoryID: "FACT3", DisplayName: "ABC1234", VIN: "SHORT",
+	}, vinToCar)
+	if d.LinkedCarEFleetsID != nil {
+		t.Fatal("short/non-17 VIN must not join plate or nickname")
+	}
+	keep := "ALREADY"
+	d = LinkByVIN(model.OneStepDevice{
+		FactoryID: "FACT4", VIN: "1HGCM82633A004352", LinkedCarEFleetsID: &keep,
+	}, vinToCar)
+	if d.LinkedCarEFleetsID == nil || *d.LinkedCarEFleetsID != "ALREADY" {
+		t.Fatalf("existing factory_id link must win: %+v", d)
+	}
+}
+
+func TestVINToEFleetsDropsDuplicateRosterVIN(t *testing.T) {
+	m := VINToEFleets([]model.Car{
+		{EFleetsID: "A", VIN: "1HGCM82633A004352"},
+		{EFleetsID: "B", VIN: "1HGCM82633A004352"},
+	})
+	if len(m) != 0 {
+		t.Fatalf("duplicate roster VIN must not map: %#v", m)
+	}
+}
+
+func TestLinkByVINTwoBoxesSameCarVIN(t *testing.T) {
+	vinToCar := VINToEFleets([]model.Car{{EFleetsID: "CARVIN", VIN: "1HGCM82633A004352"}})
+	a := LinkByVIN(model.OneStepDevice{FactoryID: "BOX1", VIN: "1HGCM82633A004352"}, vinToCar)
+	b := LinkByVIN(model.OneStepDevice{FactoryID: "BOX2", VIN: "1HGCM82633A004352"}, vinToCar)
+	if a.LinkedCarEFleetsID == nil || b.LinkedCarEFleetsID == nil || *a.LinkedCarEFleetsID != "CARVIN" || *b.LinkedCarEFleetsID != "CARVIN" {
+		t.Fatalf("two factory_ids may share one VIN: %+v %+v", a, b)
+	}
+}
+
 func TestParseDevicesDoesNotPromoteGenericID(t *testing.T) {
 	devs, err := parseDevices([]byte(`[{"id":"history-device-id","display_name":"VA19"}]`))
 	if err != nil {
@@ -306,7 +408,9 @@ func TestAPIKeyQueryWhenNoPEM(t *testing.T) {
 }
 
 func TestListDevicesFactoryID(t *testing.T) {
+	var sawQuery string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		sawQuery = r.URL.RawQuery
 		_, _ = w.Write([]byte(`[{"factory_id":"FACT1","device_id":"DEV1","display_name":"VA19","odometer":50}]`))
 	}))
 	defer srv.Close()
@@ -318,6 +422,9 @@ func TestListDevicesFactoryID(t *testing.T) {
 	}
 	if len(devs) != 1 || devs[0].FactoryID != "FACT1" {
 		t.Fatalf("%+v", devs)
+	}
+	if !strings.Contains(sawQuery, "limit=1000") {
+		t.Fatalf("full inventory limit missing: %q", sawQuery)
 	}
 }
 

@@ -258,6 +258,9 @@ func TestEnvReportEFleetsHintOmitsValues(t *testing.T) {
 				t.Fatalf("missing keys should still name the secret slot: %q", line)
 			}
 		}
+		if strings.HasPrefix(line, "EFLEETS_DETAILS_URL:") && strings.Contains(line, "URL set") {
+			t.Fatalf("empty URL should not say URL set: %q", line)
+		}
 	}
 	if !foundHint {
 		t.Fatal("missing username line")

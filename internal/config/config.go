@@ -128,6 +128,9 @@ func (c Config) EnvReport() []string {
 		return s
 	}
 	page := func(u string) string {
+		if strings.TrimSpace(u) == "" {
+			return ""
+		}
 		lu := strings.ToLower(u)
 		if strings.Contains(lu, "fueltab=") || strings.Contains(lu, "maintenancetab=") || strings.HasSuffix(lu, "/dashboard") || strings.Contains(lu, "/fuel?") {
 			return "portal page, not a CSV export"

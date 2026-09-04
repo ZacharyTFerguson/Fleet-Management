@@ -16,10 +16,12 @@ Paste this whole file into another agent in workspace `C:\Users\Zacha\go\local9_
 ```
 eFleets / OneStep / compute  →  SQLite (OILCHANGE_DB)     ← daily driver
                                     ├─ oilchange sync     → Supabase fleet_cars + web/data/cars.json
-                                    └─ oilchange backup-neon → Neon Postgres (AWS-hosted; this)
+                                    └─ oilchange backup-neon → Neon Postgres (this)
 ```
 
 SQLite stays the DSN whenever `OILCHANGE_DB` is set. `DATABASE_URL` is a **second** pgx connection used only by backup.
+
+Vendor diversity: Neon is one vendor backup. The second vendor is this fleet’s Supabase (Oil Desk today; full sqlite-table copy later). Do not add a third store or another Neon.
 
 ## Project (already exists)
 
@@ -113,14 +115,14 @@ Last verified copy (approx): sqlite cars=205, fills=201, open holds=205, cards=2
 - Do not require npm for desktop `serve`.
 - Do not apply `supabase/migrations/*fleet*` SQL to Neon.
 - Do not unset `OILCHANGE_DB`. Desktop must keep working offline on sqlite.
-- Do not add AWS S3, RDS, a second Neon, or any other direct-AWS backup. Neon already runs on AWS; the second full copy is this fleet’s Supabase when that work is asked for.
+- Do not add a third store, extra Neon, or S3. The second full copy is this fleet’s Supabase when that work is asked for.
 - Default `go test ./...` must not hit live Neon (integration test skips unless `DATABASE_URL` is already in the process env).
 
 ## Out of scope unless the human asks
 
 - Neon Auth, Functions, AI Gateway, Data API
 - Using the `uploads` bucket for sqlite file dumps
-- AWS S3, RDS, extra Neon, or any other **direct AWS** backup (Neon already is the AWS copy; diversity is this fleet’s Supabase)
+- Extra Neon, S3, or any other third store
 - Building a full Supabase sqlite-table backup until the human asks (today `oilchange sync` is Oil Desk `fleet_cars` only)
 - Migrating Oil Desk reads off Supabase onto Neon
 - Nested untracked tree `Fleet-Management/` (implement in **repo root**)

@@ -24,10 +24,10 @@ Two puzzles, not one:
 ```
 eFleets / OneStep / compute  →  SQLite (OILCHANGE_DB)     ← daily driver (works offline)
                                     ├─ oilchange sync     → Oil Desk remote `fleet_cars` + web/data/cars.json
-                                    └─ oilchange backup-neon → Neon Postgres (AWS-hosted backup only)
+                                    └─ oilchange backup-neon → Neon Postgres (backup only)
 ```
 
-SQLite (`OILCHANGE_DB`) is the working store for ingest, compute, and serve. Neon is a durable copy of those sqlite tables — not the daily driver. Neon runs on AWS; do **not** add S3, RDS, a second Neon, or any other direct-AWS backup. The Oil Desk remote is this fleet’s Supabase `fleet_cars` table. **Later**, that same Supabase project becomes a **full** sqlite-table backup so an AWS/Neon outage is not the only copy. Today `sync` is still desk cars/holds, not that full backup. Command cheat-sheet: [`README.md`](../README.md).
+SQLite (`OILCHANGE_DB`) is the working store for ingest, compute, and serve. Neon is a durable copy of those sqlite tables — not the daily driver. Do **not** add a third store, extra Neon, or S3. The Oil Desk remote is this fleet’s Supabase `fleet_cars` table. **Later**, that same Supabase project becomes a **full** sqlite-table backup (second vendor) so one vendor going down is not the only copy. Today `sync` is still desk cars/holds, not that full backup. Command cheat-sheet: [`README.md`](../README.md).
 
 | Cmd | Role |
 |---|---|
@@ -64,7 +64,7 @@ If a step would violate one of these, stop and HOLD. Full card: [`docs/collab/OI
 3. **HOLD skips the Last Reading write.** Do not seed a number to clear a HOLD. `WriteLastReading` must not “finish the desk.”
 4. **Join GPS on `factory_id` only.** `device_id` is History / drive-stop identity. **`display_name` is never a join key.** Never guess an unpaired `factory_id`.
 5. **Never invent miles.** A missing GPS sum is `NO_DRIVESTOP`, not zero. A measured empty trip list **is** stored as 0 on purpose — that is not a guess.
-6. **SQLite is the daily driver.** Neon is the AWS-hosted backup. Oil Desk remote is this fleet’s Supabase `fleet_cars`. That Supabase project is the planned second **full** backup (not a new AWS product). Do not unset `OILCHANGE_DB` so desktop can keep working offline.
+6. **SQLite is the daily driver.** Neon is one vendor backup. Oil Desk remote is this fleet’s Supabase `fleet_cars`. That Supabase project is the planned second **full** backup (second vendor, not a third store). Do not unset `OILCHANGE_DB` so desktop can keep working offline.
 7. **Never write fleet oil to the other/wrong Supabase project** (the in-repo name is XRAY). Refuse it as `DATABASE_URL` too (also refuse `-pooler` and `supabase.co` as Neon). Exact project lock: OIL-LOCKS + README. Do not copy that lock from chat; copy it from those files.
 8. Live device map is gitignored `data/runtime/onestep-map.csv`. Fixture `testdata/onestep/map.csv` is not the fleet.
 9. **Never ask a human to log into eFleets in chat.** Secrets belong in gitignored `oilchange.env` or Cloud Agent secrets. File-drop CSVs do not need a portal login.

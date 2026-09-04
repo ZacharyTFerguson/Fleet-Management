@@ -122,7 +122,7 @@ Without Supabase credentials the CLI writes a **mock mirror** at `web/data/cars.
 
 ## Neon backup
 
-SQLite (`OILCHANGE_DB`) is still the working store. `oilchange sync` still pushes Oil Desk cars to Supabase `fleet_cars`. Neon (`DATABASE_URL`, unpooled / no `-pooler`) is a durable copy of the sqlite tables — run `oilchange backup-neon` (also attempted after a successful `sync` when `DATABASE_URL` is set). Neon runs on AWS; do not add S3 or another AWS product as a store. The same fleet Supabase project is the planned second **full** backup for when AWS/Neon is down — that is not implemented yet (`sync` is still desk `fleet_cars`, not a sqlite clone). Never point `DATABASE_URL` at XRAY or Supabase.
+SQLite (`OILCHANGE_DB`) is still the working store. `oilchange sync` still pushes Oil Desk cars to Supabase `fleet_cars`. Neon (`DATABASE_URL`, unpooled / no `-pooler`) is a durable copy of the sqlite tables — run `oilchange backup-neon` (also attempted after a successful `sync` when `DATABASE_URL` is set). Do not add a third store, extra Neon, or S3. The same fleet Supabase project is the planned second **full** backup (second vendor) — that is not implemented yet (`sync` is still desk `fleet_cars`, not a sqlite clone). Never point `DATABASE_URL` at XRAY or Supabase.
 
 ```powershell
 .\bin\oilchange.exe backup-neon

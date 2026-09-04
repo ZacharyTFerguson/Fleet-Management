@@ -4,7 +4,7 @@ Updated: 2026-09-04 (UTC) after live drive-stop → compute → Oil Desk mirror.
 
 ## True now
 
-- Daily driver is sqlite (`OILCHANGE_DB=./oilchange.sqlite`). Neon `Fleet_Manage_Oil` on project `Fleet_Management_Neon` (`icy-thunder-13848536`, branch `production`) is backup only (AWS). Unpooled `DATABASE_URL` (no `-pooler`, not XRAY `chjqcznyxvtjbamttqdj`). Do not add S3 or another AWS store. This fleet’s Supabase is the planned second full backup later; today `sync` is Oil Desk `fleet_cars` only.
+- Daily driver is sqlite (`OILCHANGE_DB=./oilchange.sqlite`). Neon `Fleet_Manage_Oil` on project `Fleet_Management_Neon` (`icy-thunder-13848536`, branch `production`) is one vendor backup. Unpooled `DATABASE_URL` (no `-pooler`, not XRAY `chjqcznyxvtjbamttqdj`). Do not add a third store, extra Neon, or S3. This fleet’s Supabase is the planned second-vendor full backup later; today `sync` is Oil Desk `fleet_cars` only.
 - Oil Desk: `oilchange serve` at `http://127.0.0.1:4739`, mirror `web/data/cars.json` (`source=mock-mirror`, synced ~2026-09-04T03:03:06Z).
 - Roster: **205** cars. **146** Last Reading (fill odo + drive-stop miles). **189** last oil from Enterprise shop ROs. **0** `NO_DRIVESTOP`. Open HOLDs: **55** `NO_DEVICE`, **4** `NO_TRUSTED_FILL`.
 - Live OneStep map: `data/runtime/onestep-map.csv` (gitignored) — 146 `factory_id,device_id,efleets_id`. Do **not** use `testdata/onestep/map.csv` on this roster.
@@ -55,7 +55,7 @@ Cache: `data/runtime/gps-stops.json` (gitignored). `--no-gps` rematches from cac
 - Enterprise DETAILS for the 4 `NO_TRUSTED_FILL` cars.
 - Capture a real Maintenance Detail export URL (or CDP) so last oil is not stuck on Downloads CSVs.
 - Do not “fill in” Last Reading for those 59.
-- Later (not now): full sqlite-table backup onto this fleet’s Supabase so Neon/AWS down is not the only copy. Do not add AWS S3/RDS/extra Neon.
+- Later (not now): full sqlite-table backup onto this fleet’s Supabase (second vendor). Do not add extra Neon, S3, or a third store.
 
 ## Env (presence only)
 

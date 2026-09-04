@@ -163,6 +163,27 @@ func swipeInWindow(at time.Time, w eraWindow) bool {
 	return true
 }
 
+func stationsForAnchors(anchors []forwardAnchor, car string) []string {
+	seen := map[string]struct{}{}
+	var out []string
+	for _, a := range anchors {
+		if a.car != car {
+			continue
+		}
+		st := strings.TrimSpace(a.station)
+		if st == "" || skipStationName(st) {
+			continue
+		}
+		if _, ok := seen[st]; ok {
+			continue
+		}
+		seen[st] = struct{}{}
+		out = append(out, st)
+	}
+	sort.Strings(out)
+	return out
+}
+
 func backpropCalls(txs []model.CardTx, anchors []forwardAnchor, holder map[string]cardHolder, nick map[string]string) []RecordCall {
 	byCard := map[string][]forwardAnchor{}
 	for _, a := range anchors {
@@ -177,16 +198,22 @@ func backpropCalls(txs []model.CardTx, anchors []forwardAnchor, holder map[strin
 	var out []RecordCall
 	for _, t := range txs {
 		card := strings.TrimSpace(t.CardID)
-		if card == "" || t.At.IsZero() || skipStationName(t.StationName) {
+		if card == "" || t.At.IsZero() {
 			continue
 		}
-		station := firstNonEmpty(t.StationName, stationKey(t.StationName, t.StationAddress))
-		rec := strings.TrimSpace(t.RecordedEFleetsID)
 		if h, ok := holder[card]; ok && (h.bucket == HolderPerson || h.bucket == HolderOffice) {
 			continue
 		}
+		station := firstNonEmpty(t.StationName, stationKey(t.StationName, t.StationAddress))
+		if skipStationName(station) {
+			station = ""
+		}
+		rec := strings.TrimSpace(t.RecordedEFleetsID)
 		sk := card + "|" + t.At.UTC().Format(time.RFC3339Nano)
 		if a, ok := direct[sk]; ok {
+			if station == "" {
+				station = a.station
+			}
 			out = append(out, RecordCall{
 				CardID: card, At: t.At, Station: station,
 				EnterpriseCar: rec, CalledCar: a.car,
@@ -206,11 +233,19 @@ func backpropCalls(txs []model.CardTx, anchors []forwardAnchor, holder map[strin
 			continue
 		}
 		w := cover[0]
+		if station == "" {
+			for _, a := range byCard[card] {
+				if a.car == w.car && a.station != "" {
+					station = a.station
+					break
+				}
+			}
+		}
 		out = append(out, RecordCall{
 			CardID: card, At: t.At, Station: station,
 			EnterpriseCar: rec, CalledCar: w.car,
-			CalledName:    firstNonEmpty(nick[w.car], w.car),
-			Why:           "backprop",
+			CalledName: firstNonEmpty(nick[w.car], w.car),
+			Why:        "backprop",
 		})
 	}
 	sort.Slice(out, func(i, j int) bool {
@@ -305,7 +340,8 @@ func backpropEras(anchors []forwardAnchor, txs []model.CardTx, assigned map[stri
 				Nickname:   firstNonEmpty(nick[w.car], w.car),
 				HolderType: HolderCar, HolderKey: w.car,
 				From: from, To: to, EvidenceN: evidence,
-				Split: len(cars) > 1,
+				Stations: stationsForAnchors(list, w.car),
+				Split:    len(cars) > 1,
 			})
 		}
 	}

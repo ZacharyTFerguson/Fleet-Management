@@ -1,6 +1,7 @@
 package cards
 
 import (
+	"fmt"
 	"math"
 	"sort"
 	"strings"
@@ -15,12 +16,13 @@ const StationRadiusMeters = 350.0
 
 // GPSFirstResult is GPS-at-the-pump matching. It never writes Last Reading.
 type GPSFirstResult struct {
-	Matches  []model.GPSCardMatch
-	Eras     []CardEra
-	Calls    []RecordCall
-	Stations []GeocodedStation
-	Pumps    int
-	assigned map[string]gpsHit // forward exclusive sits; same package only
+	Matches   []model.GPSCardMatch
+	Eras      []CardEra
+	Calls     []RecordCall
+	Stations  []GeocodedStation
+	Pumps     int
+	assigned  map[string]gpsHit // forward exclusive sits; same package only
+	hasGPSPos bool              // visits had coordinates; TRACKER is not the coverage blocker
 }
 
 // CardEra is the GPS / station-ladder history of where a card sat.
@@ -79,7 +81,10 @@ func MatchByStopTimes(visits []model.StopVisit, txs []model.CardTx, slack time.D
 //  2. Prefer cars sitting at a GPS pump cluster (shared short-stop sites).
 //  3. If the station is geocoded, the sit must be within StationRadiusMeters.
 //  4. Else if the merchant state is known, prefer cars whose unit region is that state.
-//  5. Two candidates still left → skip (do not guess). TRACKER / empty merchants are skipped.
+//  5. Two candidates still left → skip (do not guess).
+//
+// TRACKER / empty merchant *names* are not pumps, but an exclusive GPS sit at
+// swipe time still names the card (station label is the GPS cluster, not TRACKER).
 //
 // A first exclusive hit geocodes that station from the box lat/lng, then a
 // second pass retries swipes that were ambiguous on time alone. Last Reading
@@ -107,6 +112,13 @@ func MatchGPSFirst(visits []model.StopVisit, txs []model.CardTx, fleet []model.C
 	pumps := clusterPumps(visits)
 	geo := map[string]*geoAcc{}
 	assigned := map[string]gpsHit{} // swipe key → hit
+	hasGPSPos := false
+	for _, v := range visits {
+		if v.HasPos && strings.TrimSpace(v.EFleetsID) != "" && !isUnknownCar(v.EFleetsID) {
+			hasGPSPos = true
+			break
+		}
+	}
 
 	assignPass := func(useGeo bool) {
 		for _, t := range txs {
@@ -114,18 +126,20 @@ func MatchGPSFirst(visits []model.StopVisit, txs []model.CardTx, fleet []model.C
 			if card == "" || t.At.IsZero() {
 				continue
 			}
-			if skipStationName(t.StationName) {
-				continue
-			}
+			placeholder := skipStationName(t.StationName)
 			sk := swipeKey(t)
 			if _, ok := assigned[sk]; ok {
 				continue
 			}
-			stKey := stationKey(t.StationName, t.StationAddress)
-			_, stState := cityState(t.StationAddress)
-			stState = strings.ToUpper(strings.TrimSpace(stState))
-			if len(stState) > 2 {
-				stState = stState[:2]
+			stKey := ""
+			stState := ""
+			if !placeholder {
+				stKey = stationKey(t.StationName, t.StationAddress)
+				_, stState = cityState(t.StationAddress)
+				stState = strings.ToUpper(strings.TrimSpace(stState))
+				if len(stState) > 2 {
+					stState = stState[:2]
+				}
 			}
 			cands := uniqueCarsAt(buckets, t.At, slack)
 			cands = filterCandidates(cands, stKey, stState, region, geo, pumps, useGeo)
@@ -133,10 +147,18 @@ func MatchGPSFirst(visits []model.StopVisit, txs []model.CardTx, fleet []model.C
 				continue
 			}
 			v := cands[0]
+			station := firstNonEmpty(t.StationName, stKey)
+			if placeholder {
+				// Fake merchant address must not geocode; require a real pump cluster sit.
+				if !sitAtPump(v, pumps) {
+					continue
+				}
+				station = gpsPumpStation(v)
+			}
 			hit := gpsHit{
 				card:    card,
 				car:     strings.TrimSpace(v.EFleetsID),
-				station: firstNonEmpty(t.StationName, stKey),
+				station: station,
 				rec:     strings.TrimSpace(t.RecordedEFleetsID),
 				at:      t.At,
 				lat:     v.Lat,
@@ -176,7 +198,10 @@ func MatchGPSFirst(visits []model.StopVisit, txs []model.CardTx, fleet []model.C
 	matches := collapseMatches(hits)
 	calls, eras := Backpropagate(assigned, txs, nil, nick)
 	stations := flattenGeo(geo)
-	return GPSFirstResult{Matches: matches, Eras: eras, Calls: calls, Stations: stations, Pumps: len(pumps), assigned: assigned}
+	return GPSFirstResult{
+		Matches: matches, Eras: eras, Calls: calls, Stations: stations,
+		Pumps: len(pumps), assigned: assigned, hasGPSPos: hasGPSPos,
+	}
 }
 
 // ApplyCalls copies GPS-called cars onto swipes. RecordedEFleetsID is unchanged.
@@ -355,6 +380,14 @@ func clusterPumps(visits []model.StopVisit) []pumpCluster {
 		}
 	}
 	return out
+}
+
+// gpsPumpStation is the ladder station key when DETAILS merchant is TRACKER/empty.
+func gpsPumpStation(v model.StopVisit) string {
+	if !v.HasPos {
+		return "gps-stop"
+	}
+	return fmt.Sprintf("gps:%.4f,%.4f", v.Lat, v.Lng)
 }
 
 func sitAtPump(v model.StopVisit, pumps []pumpCluster) bool {

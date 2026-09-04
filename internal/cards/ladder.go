@@ -265,7 +265,7 @@ func ClassifyLadder(gps GPSFirstResult, txs []model.CardTx, fleet []model.Car, d
 	gps.Eras = backEras
 	eras := mergeLadderEras(backEras, classified, info, byCardCar, nick)
 	cov := RosterCoverage(fleet, devices, eras, cars)
-	cov.Blocked = LadderBlocker(txs, nil)
+	cov.Blocked = LadderBlocker(txs, gpsPosVisits(gps))
 	return LadderResult{
 		Rungs:    rungsOut,
 		Cars:     cars,
@@ -624,6 +624,13 @@ func RosterCoverage(fleet []model.Car, devices []model.OneStepDevice, eras []Car
 	return cov
 }
 
+func gpsPosVisits(gps GPSFirstResult) []model.StopVisit {
+	if !gps.hasGPSPos {
+		return nil
+	}
+	return []model.StopVisit{{HasPos: true, EFleetsID: "gps"}}
+}
+
 // LadderBlocker explains why live coverage can sit below 95% without inventing punches.
 func LadderBlocker(txs []model.CardTx, visits []model.StopVisit) string {
 	named, skipped := 0, 0
@@ -638,6 +645,11 @@ func LadderBlocker(txs []model.CardTx, visits []model.StopVisit) string {
 		named++
 	}
 	if named == 0 && skipped > 0 {
+		for _, v := range visits {
+			if v.HasPos && strings.TrimSpace(v.EFleetsID) != "" && !isUnknownCar(v.EFleetsID) {
+				return ""
+			}
+		}
 		return "all DETAILS merchants are TRACKER/empty; station ladder cannot name cards without real pump names"
 	}
 	if skipped > 0 && named < skipped {

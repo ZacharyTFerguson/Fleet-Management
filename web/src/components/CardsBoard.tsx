@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState, useTransition } from "react";
 import type { CardsSnapshot, CardEra, GPSCardMatch, UnknownMatchup } from "@/lib/types";
+import { normalizeCardsSnapshot } from "@/lib/cardsSnapshot";
 
 const REFRESH_MS = Number(process.env.NEXT_PUBLIC_REFRESH_MS || 120000);
 const DRIVER_MODE_KEY = "fleet-driver-mode";
@@ -52,7 +53,7 @@ export function CardsBoard() {
         const res = await fetch("/api/cards", { cache: "no-store" });
         const body = await res.json();
         if (!res.ok) throw new Error(body.error || res.statusText);
-        setSnap(body as CardsSnapshot);
+        setSnap(normalizeCardsSnapshot(body as CardsSnapshot));
         setError(null);
       } catch (e) {
         setError(e instanceof Error ? e.message : "Could not load cards");
@@ -88,7 +89,7 @@ export function CardsBoard() {
   }
 
   const q = query.trim().toLowerCase();
-  const unknown = snap.unknown.filter((u) => {
+  const unknown = (snap.unknown ?? []).filter((u) => {
     if (!q) return true;
     const hay = [
       u.card_id,
@@ -105,10 +106,11 @@ export function CardsBoard() {
       .toLowerCase();
     return hay.includes(q);
   });
-  const stations = snap.stations.filter((s) => {
+  const stations = (snap.stations ?? []).filter((s) => {
     if (!q) return true;
     return `${s.name} ${s.address}`.toLowerCase().includes(q);
   });
+  const missingCars = snap.cars_without_card ?? [];
 
   return (
     <section className="roster" aria-label="Card matchups">
@@ -234,14 +236,14 @@ export function CardsBoard() {
         <StationList rows={stations} query={query} />
       )}
 
-      {snap.cars_without_card.length > 0 && tab === "unknown" ? (
+      {missingCars.length > 0 && tab === "unknown" ? (
         <p className="search-empty">
-          {snap.cars_without_card.length} cars show up on swipes but no card votes them BEST:{" "}
-          {snap.cars_without_card
+          {missingCars.length} cars show up on swipes but no card votes them BEST:{" "}
+          {missingCars
             .slice(0, 12)
             .map((id) => nick(snap, id))
             .join(", ")}
-          {snap.cars_without_card.length > 12 ? "…" : ""}
+          {missingCars.length > 12 ? "…" : ""}
         </p>
       ) : null}
     </section>

@@ -60,6 +60,18 @@ func BuildSnapshotFull(txs []model.CardTx, pairings []model.CardPairing, gps []m
 	unknown := UnknownMatchups(txs, pairings)
 	stations := MapStations(txs)
 	missing := CarsWithoutBestCard(txs, pairings)
+	if unknown == nil {
+		unknown = []UnknownMatchup{}
+	}
+	if stations == nil {
+		stations = []StationSummary{}
+	}
+	if missing == nil {
+		missing = []string{}
+	}
+	if gps == nil {
+		gps = []model.GPSCardMatch{}
+	}
 	cards := map[string]struct{}{}
 	for _, t := range txs {
 		if t.CardID != "" {

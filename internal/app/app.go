@@ -495,7 +495,10 @@ func (a *App) CardsRebuild(ctx context.Context, fuelPath string) (int, error) {
 	if err != nil {
 		return 0, err
 	}
+	blocked := ladder.Coverage.Blocked
 	ladder.Eras = cards.PreserveUnladderedCarEras(ladder.Eras, existingEras)
+	ladder.Coverage = cards.RosterCoverage(fleet, devs, ladder.Eras, ladder.Cars)
+	ladder.Coverage.Blocked = blocked
 	if err := a.Store.ReplacePairings(ctx, ps); err != nil {
 		return 0, err
 	}

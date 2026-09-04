@@ -168,6 +168,16 @@ Maintenance VIN remains exact 17-char OBD `device_state.vin` = `cars.vin` from t
 
 The Aug–Sep 2026 DETAILS file (`DETAILS_583424_30-Days` (14)/(13) and the identically hashed `.xls`) is a new swipe window, not a duplicate of the May–June ingest.
 
+### Live watch `--live --persist` (2026-09-04T20:53Z–22:54Z, EXIT 0)
+
+One process (`/tmp/oilchange cards watch --live --persist --fills 10 --pace 35s`). Watched boxes only. Artifacts: `/opt/cursor/artifacts/watch_live.err`, `watch_live.out`.
+
+- 118 unknown cards in the loop; **83** cards fetched (**168** drive-stop GETs, `failed=0`); 37 PERSON persist skips; 1 watched-box coverage-incomplete skip.
+- Hunt print: `certain=7 likely=8 watch=198 cards=74 coverage_complete=false`. **3** certain **linked** car eras persisted (unpaired factory_id not joined).
+- After GPS: `watch vin-pair linked=0 asked=40 already=204 no_vin=38 no_roster=19 skipped_existing_map=0`. Empty OBD VIN stayed unpaired. Never `display_name`. Never Last Reading.
+- Then `cards history --no-gps` rematch (no live GPS, no live `/device`): `coverage roster=205 device_link=196 (95.6%) card_era=92 (44.9%) known=92 (44.9%) ladder_locked=90`. Cache **146,771** visits / **2,547** pumps. Artifacts: `/opt/cursor/artifacts/history_no_gps.err`, `history_no_gps.out`.
+- Do not start a second watch. Do not `cards coverage --no-gps` as a metrics shortcut (it ReplaceEras).
+
 ## Do not
 
 - Use bank posting time.

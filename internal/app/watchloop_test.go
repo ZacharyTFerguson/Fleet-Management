@@ -359,6 +359,11 @@ func TestCardsRebuildPreservesNearbyCertainEra(t *testing.T) {
 	if err := st.UpsertCar(ctx, model.Car{EFleetsID: car, Nickname: "292NCX"}); err != nil {
 		t.Fatal(err)
 	}
+	if err := st.UpsertDevice(ctx, model.OneStepDevice{
+		FactoryID: "FACT-NCX", DeviceID: "DEV-NCX", LinkedCarEFleetsID: &car, Active: true,
+	}); err != nil {
+		t.Fatal(err)
+	}
 	if err := st.ReplaceEras(ctx, []model.CardEra{{
 		CardID: "NEAR-CARD", EFleetsID: car, HolderType: cards.HolderCar, HolderKey: car,
 		From:      time.Date(2026, 8, 4, 14, 0, 0, 0, time.UTC),
@@ -388,6 +393,13 @@ func TestCardsRebuildPreservesNearbyCertainEra(t *testing.T) {
 	}
 	if !found {
 		t.Fatalf("nearby certain era wiped: %+v", eras)
+	}
+	ladder, err := a.CardsLadder(ctx, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ladder.Coverage.CardEraN != 1 || ladder.Coverage.KnownN != 1 {
+		t.Fatalf("preserve must count in coverage after rebuild: %+v", ladder.Coverage)
 	}
 }
 

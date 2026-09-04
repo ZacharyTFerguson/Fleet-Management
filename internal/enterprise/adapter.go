@@ -33,10 +33,10 @@ type Adapter interface {
 
 // FileAdapter is the test path and the operator fallback when CSVs are already in Downloads.
 type FileAdapter struct {
-	Vehicles  string
-	Fuel      string
-	ShopRO    string
-	Mileage   string
+	Vehicles string
+	Fuel     string
+	ShopRO   string
+	Mileage  string
 }
 
 // Fetch opens a local export. Live Last Reading still goes through the same parsers.

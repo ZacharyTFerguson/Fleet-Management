@@ -31,7 +31,7 @@ func TestDriveStopSumsMilesIgnoresOdometerJSON(t *testing.T) {
 		_, _ = w.Write([]byte(`{"odometer":999999,"stops":[{"miles":3.2,"odometer":111},{"distance":1.3}]}`))
 	}))
 	defer srv.Close()
-	c := NewClient(srv.URL, "tok")
+	c := NewClient(srv.URL, "")
 	c.HTTP = srv.Client()
 	n, err := c.DriveStopMiles(context.Background(), "FACT1", time.Unix(0, 0).UTC())
 	if err != nil {
@@ -160,26 +160,64 @@ func TestJWTAuthHeaderNotRawKey(t *testing.T) {
 	}
 }
 
-func TestAPIKeyQueryWhenNoPEM(t *testing.T) {
-	var sawQuery string
-	var sawAuth string
+func TestTokenWithoutPEMDoesNotSendAPIKey(t *testing.T) {
+	hits := 0
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		sawAuth = r.Header.Get("Authorization")
-		sawQuery = r.URL.RawQuery
+		hits++
+		if r.URL.Query().Get("api-key") != "" || r.Header.Get("Authorization") != "" {
+			t.Errorf("must not send api-key or raw Bearer: header=%q query=%q", r.Header.Get("Authorization"), r.URL.RawQuery)
+		}
 		_, _ = w.Write([]byte(`[{"factory_id":"FACT1","device_id":"DEV1"}]`))
 	}))
 	defer srv.Close()
 	c := NewClient(srv.URL, "query-key")
 	c.HTTP = srv.Client()
-	if _, err := c.ListDevices(context.Background()); err != nil {
+	if _, err := c.ListDevices(context.Background()); err == nil {
+		t.Fatal("token without PEM must fail")
+	}
+	if hits != 0 {
+		t.Fatalf("must not dial OneStep without PEM, hits=%d", hits)
+	}
+	if c.AuthMode() != "missing-pem" {
+		t.Fatalf("auth mode %s", c.AuthMode())
+	}
+}
+
+func TestDriveStop403IsHoldNotOdo(t *testing.T) {
+	pemBytes := mustTestPEM(t)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("api-key") != "" {
+			t.Errorf("api-key query %q", r.URL.RawQuery)
+		}
+		http.Error(w, `{"odometer":999999}`, http.StatusForbidden)
+	}))
+	defer srv.Close()
+	c := NewClient(srv.URL, "tok")
+	c.PrivateKeyPEM = string(pemBytes)
+	c.HTTP = srv.Client()
+	n, err := c.DriveStopMiles(context.Background(), "FACT1", time.Unix(0, 0).UTC())
+	if err == nil || n != 0 {
+		t.Fatalf("403 must not become miles=%v err=%v", n, err)
+	}
+	if !strings.Contains(err.Error(), "HOLD/History") {
+		t.Fatalf("err %v", err)
+	}
+	if strings.Contains(err.Error(), "999999") {
+		t.Fatalf("must not surface odo on 403: %v", err)
+	}
+}
+
+func mustTestPEM(t *testing.T) []byte {
+	t.Helper()
+	priv, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
 		t.Fatal(err)
 	}
-	if sawAuth != "" {
-		t.Fatalf("auth %q", sawAuth)
+	der, err := x509.MarshalPKCS8PrivateKey(priv)
+	if err != nil {
+		t.Fatal(err)
 	}
-	if !strings.Contains(sawQuery, "api-key=query-key") {
-		t.Fatalf("query %q", sawQuery)
-	}
+	return pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: der})
 }
 
 func TestListDevicesFactoryID(t *testing.T) {
@@ -187,7 +225,7 @@ func TestListDevicesFactoryID(t *testing.T) {
 		_, _ = w.Write([]byte(`[{"factory_id":"FACT1","device_id":"DEV1","display_name":"VA19","odometer":50}]`))
 	}))
 	defer srv.Close()
-	c := NewClient(srv.URL, "tok")
+	c := NewClient(srv.URL, "")
 	c.HTTP = srv.Client()
 	devs, err := c.ListDevices(context.Background())
 	if err != nil {
@@ -212,7 +250,7 @@ func TestListDevicesSkipsIDOnlyEndpoint(t *testing.T) {
 		}
 	}))
 	defer srv.Close()
-	client := NewClient(srv.URL, "token")
+	client := NewClient(srv.URL, "")
 	client.HTTP = srv.Client()
 	devs, err := client.ListDevices(context.Background())
 	if err != nil {
@@ -261,6 +299,7 @@ func TestHTTPErrorBodyRedactsAPIKey(t *testing.T) {
 	}))
 	defer srv.Close()
 	client := NewClient(srv.URL, "super-secret-token")
+	client.PrivateKeyPEM = string(mustTestPEM(t))
 	client.HTTP = srv.Client()
 	_, err := client.ListDevices(context.Background())
 	if err == nil {
@@ -320,6 +359,7 @@ func TestHTTPErrorRedactsURLEncodedAuthAndQuery(t *testing.T) {
 	}))
 	defer srv.Close()
 	client := NewClient(srv.URL, token)
+	client.PrivateKeyPEM = string(mustTestPEM(t))
 	client.HTTP = srv.Client()
 	_, err := client.ListDevices(context.Background())
 	if err == nil {
@@ -344,6 +384,7 @@ func (f roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
 func TestTransportURLErrorDoesNotLeakRequestQuery(t *testing.T) {
 	token := "transport key+/="
 	client := NewClient("https://example.test", token)
+	client.PrivateKeyPEM = string(mustTestPEM(t))
 	client.HTTP = &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
 		return nil, errors.New("dial failed for " + req.URL.String())
 	})}
@@ -375,6 +416,7 @@ func TestAuthenticatedRedirectIsNotFollowed(t *testing.T) {
 	defer source.Close()
 
 	client := NewClient(source.URL, token)
+	client.PrivateKeyPEM = string(mustTestPEM(t))
 	client.HTTP = source.Client()
 	_, err := client.ListDevices(context.Background())
 	if err == nil {

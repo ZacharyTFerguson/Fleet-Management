@@ -90,7 +90,7 @@ func readEnvFile(envKey string) string {
 	return string(b)
 }
 
-// DSN picks sqlite when OILCHANGE_DB is set so unit tests never touch live Supabase.
+// DSN picks sqlite when OILCHANGE_DB is set so unit tests never touch live Neon.
 func (c Config) DSN() (driver, dsn string, err error) {
 	if c.SQLitePath != "" {
 		return "sqlite", c.SQLitePath, nil
@@ -139,8 +139,8 @@ func (c Config) EnvReport() []string {
 	}
 	return []string{
 		line("OILCHANGE_DB", c.SQLitePath, ""),
-		line("DATABASE_URL", c.DatabaseURL, ""),
-		line("SUPABASE_URL", c.SupabaseURL, "ZacharyTFerguson's Project (fleet_*); never XRAY"),
+		line("DATABASE_URL", c.DatabaseURL, "Neon via Grok Build; do not wait on fleet-oil"),
+		line("SUPABASE_URL", c.SupabaseURL, "optional legacy sync only; never XRAY"),
 		line("SUPABASE_SERVICE_ROLE", c.ServiceRole, "server-side PostgREST sync only"),
 		line("SUPABASE_SYNC_SECRET", c.SyncSecret, "fleet-sync edge token when service role unset"),
 		line("EFLEETS_USERNAME", c.EFleetsUser, ""),

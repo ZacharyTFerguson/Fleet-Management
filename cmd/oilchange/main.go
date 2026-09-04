@@ -112,7 +112,11 @@ func cmdSyncOneStep(ctx context.Context, cfg config.Config, args []string) int {
 	}
 	defer done()
 	var client *onestep.Client
-	if cfg.OneStepToken != "" {
+	if cfg.OneStepToken != "" || cfg.OneStepPrivateKey != "" {
+		if cfg.OneStepToken == "" || cfg.OneStepPrivateKey == "" {
+			fmt.Fprintln(os.Stderr, "onestep: need token + PEM (RS256 JWS); not raw Bearer, not api-key query")
+			return model.ExitError
+		}
 		client = onestep.NewClient(cfg.OneStepBase, cfg.OneStepToken)
 		client.PrivateKeyPEM = cfg.OneStepPrivateKey
 	}

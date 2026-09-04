@@ -11,15 +11,17 @@ import (
 
 // ChromeSessionAdapter reuses an already-open Chrome eFleets tab via CDP.
 // It never types a password and never walks portal menus. Export bytes come
-// from Network-captured EFLEETS_*_URL only. Cookie reuse over the CDP
-// WebSocket is the next increment; this stub only proves attach + GET.
+// from Network-captured EFLEETS_*_URL only, with cookies pulled over the
+// CDP WebSocket. A login-page body is a hard error — not a password fallback.
 type ChromeSessionAdapter struct {
 	CDPURL     string
 	DetailsURL string
 	MaintURL   string
 	FleetURL   string
-	// Client is shared by the CDP probe and the export GET so tests stay on httptest.
+	// Client is shared by the CDP HTTP probe and the export GET so tests stay on httptest.
 	Client *http.Client
+	// Dial opens the DevTools WebSocket. Tests inject a fake; live uses DialCDP.
+	Dial func(ctx context.Context, wsURL string) (CDPConn, error)
 }
 
 // NewChromeSessionAdapter requires EFLEETS_CDP_URL so we never fall back to
@@ -44,8 +46,16 @@ func (a *ChromeSessionAdapter) HasReport(kind ReportKind) bool {
 	return err == nil
 }
 
-// Fetch attaches to the open Chrome, then GETs the captured export URL.
-// Missing attach or missing URL must fail before any parse.
+func (a *ChromeSessionAdapter) httpClient() *http.Client {
+	if a.Client != nil {
+		return a.Client
+	}
+	return &http.Client{Timeout: 120 * time.Second}
+}
+
+// Fetch attaches to the open Chrome, reuses session cookies over the CDP
+// WebSocket, then GETs the captured export URL. Missing attach, missing URL,
+// or login-page HTML must fail before any parse. No vision. No invented miles.
 func (a *ChromeSessionAdapter) Fetch(ctx context.Context, kind ReportKind) ([]byte, string, error) {
 	if err := a.probeCDP(ctx); err != nil {
 		return nil, "", err
@@ -54,15 +64,16 @@ func (a *ChromeSessionAdapter) Fetch(ctx context.Context, kind ReportKind) ([]by
 	if err != nil {
 		return nil, "", err
 	}
-	client := a.Client
-	if client == nil {
-		client = &http.Client{Timeout: 120 * time.Second}
+	cookies, err := a.sessionCookies(ctx, u)
+	if err != nil {
+		return nil, "", err
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
 		return nil, "", err
 	}
-	res, err := client.Do(req)
+	applyCDPCookies(req, cookies)
+	res, err := a.httpClient().Do(req)
 	if err != nil {
 		return nil, "", err
 	}
@@ -75,7 +86,7 @@ func (a *ChromeSessionAdapter) Fetch(ctx context.Context, kind ReportKind) ([]by
 		return nil, "", fmt.Errorf("eFleets %s: HTTP %s", kind, res.Status)
 	}
 	if looksLikeLoginHTML(b) {
-		return nil, "", fmt.Errorf("eFleets %s returned the login page; Chrome is attached but this stub does not pull cookies yet (no password typing). File-drop or leave the tab logged in after cookie reuse", kind)
+		return nil, "", fmt.Errorf("eFleets %s returned the login page after CDP cookie reuse; Chrome tab is not a logged-in session (no password typing, no HTTP login fallback)", kind)
 	}
 	return b, name, nil
 }
@@ -83,12 +94,8 @@ func (a *ChromeSessionAdapter) Fetch(ctx context.Context, kind ReportKind) ([]by
 // probeCDP hits /json/version so we know remote debugging is up without
 // driving the page or typing into the login form.
 func (a *ChromeSessionAdapter) probeCDP(ctx context.Context) error {
-	client := a.Client
-	if client == nil {
-		client = &http.Client{Timeout: 3 * time.Second}
-	}
-	u := a.CDPURL + "/json/version"
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+	client := a.httpClient()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, a.CDPURL+"/json/version", nil)
 	if err != nil {
 		return err
 	}
@@ -101,4 +108,75 @@ func (a *ChromeSessionAdapter) probeCDP(ctx context.Context) error {
 		return fmt.Errorf("EFLEETS_CDP_URL did not expose /json/version (is Chrome listening with remote debugging?)")
 	}
 	return nil
+}
+
+// sessionCookies pulls cookies from the logged-in tab over the CDP WebSocket.
+// It does not navigate, click, or type. Empty cookies are allowed — Fetch
+// still GETs and then fails hard if the body is login HTML.
+func (a *ChromeSessionAdapter) sessionCookies(ctx context.Context, exportURL string) ([]cdpCookie, error) {
+	client := a.httpClient()
+	wsURL, useStorage, err := a.debuggerURL(ctx, client, exportURL)
+	if err != nil {
+		return nil, err
+	}
+	dial := a.Dial
+	if dial == nil {
+		dial = DialCDP
+	}
+	conn, err := dial(ctx, wsURL)
+	if err != nil {
+		return nil, err
+	}
+	defer conn.Close()
+
+	if useStorage {
+		raw, err := conn.Call(ctx, "Storage.getCookies", nil)
+		if err != nil {
+			return nil, fmt.Errorf("CDP Storage.getCookies failed (no password typing): %w", err)
+		}
+		return parseCookieResult(raw)
+	}
+
+	if _, err := conn.Call(ctx, "Network.enable", nil); err != nil {
+		return nil, fmt.Errorf("CDP Network.enable failed (no password typing): %w", err)
+	}
+	raw, err := conn.Call(ctx, "Network.getCookies", map[string]any{"urls": []string{exportURL}})
+	if err != nil {
+		return nil, fmt.Errorf("CDP Network.getCookies failed (no password typing): %w", err)
+	}
+	cookies, err := parseCookieResult(raw)
+	if err != nil {
+		return nil, err
+	}
+	if len(cookies) > 0 {
+		return cookies, nil
+	}
+	raw, err = conn.Call(ctx, "Network.getAllCookies", nil)
+	if err != nil {
+		return nil, fmt.Errorf("CDP Network.getAllCookies failed (no password typing): %w", err)
+	}
+	return parseCookieResult(raw)
+}
+
+// debuggerURL prefers a page-target WebSocket (Network.getCookies). Browser
+// Storage.getCookies is the fallback when Chrome has no matching eFleets tab.
+func (a *ChromeSessionAdapter) debuggerURL(ctx context.Context, client *http.Client, exportURL string) (wsURL string, useStorage bool, err error) {
+	targets, listErr := listCDPTargets(ctx, client, a.CDPURL)
+	if listErr == nil {
+		if page, pickErr := pickEFleetsPage(targets, exportURL); pickErr == nil {
+			return rewriteWSHost(page.WebSocketDebuggerURL, a.CDPURL), false, nil
+		} else {
+			err = pickErr
+		}
+	} else {
+		err = listErr
+	}
+	ver, verErr := getCDPVersion(ctx, client, a.CDPURL)
+	if verErr == nil && strings.TrimSpace(ver.WebSocketDebuggerURL) != "" {
+		return rewriteWSHost(ver.WebSocketDebuggerURL, a.CDPURL), true, nil
+	}
+	if err != nil {
+		return "", false, err
+	}
+	return "", false, fmt.Errorf("Chrome DevTools WebSocket URL missing at EFLEETS_CDP_URL (no password typing)")
 }

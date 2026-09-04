@@ -260,11 +260,10 @@ func ClassifyLadder(gps GPSFirstResult, txs []model.CardTx, fleet []model.Car, d
 		rungsOut = append(rungsOut, rg)
 	}
 
-	eras := mergeLadderEras(gps.Eras, classified, info, byCardCar, nick)
 	calls, backEras := Backpropagate(gps.assigned, txs, classified, nick)
 	gps.Calls = calls
 	gps.Eras = backEras
-	eras = mergeLadderEras(backEras, classified, info, byCardCar, nick)
+	eras := mergeLadderEras(backEras, classified, info, byCardCar, nick)
 	cov := RosterCoverage(fleet, devices, eras, cars)
 	cov.Blocked = LadderBlocker(txs, nil)
 	return LadderResult{
@@ -276,6 +275,19 @@ func ClassifyLadder(gps GPSFirstResult, txs []model.CardTx, fleet []model.Car, d
 		Coverage: cov,
 		GPS:      gps,
 	}
+}
+
+func gpsSplitBelowRung(hits map[string]*carHit) bool {
+	if len(hits) < 2 {
+		return false
+	}
+	strong := 0
+	for _, h := range hits {
+		if h.evidence >= 2 || len(h.stations) >= 2 {
+			strong++
+		}
+	}
+	return strong >= 2
 }
 
 func classifyCard(card string, inf *cardInfo, hits map[string]*carHit, rungs []int) LadderCard {
@@ -362,8 +374,8 @@ func classifyCard(card string, inf *cardInfo, hits map[string]*carHit, rungs []i
 		return lc
 	}
 
-	// Below the first rung: GPS split (two cars) beats driver-kept person.
-	if len(any) >= 2 {
+	// Below the first rung: GPS split (two cars with real exclusive evidence) beats driver-kept.
+	if gpsSplitBelowRung(hits) {
 		lc.Bucket = HolderCar
 		lc.Split = true
 		lc.HolderKey = any[0].car

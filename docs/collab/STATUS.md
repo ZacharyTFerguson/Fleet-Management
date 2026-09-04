@@ -1,6 +1,6 @@
 # Shared status
 
-Updated: 2026-09-04 (UTC) after live nearby fill-day hunt (certain **0**, likely **1**, **0** eras persisted) + OneStep support.php rate/batch note. Known on this sqlite is still **62 / 205 (30.2%)**, vs **63 / 205 (30.7%)** recorded after the OBD VIN GPS fill — nearby did not raise it.
+Updated: 2026-09-04 (UTC) after live nearby fill-day hunt (certain **0**, likely **1**, **0** eras persisted) + OneStep support.php rate/batch note. Known on this sqlite is still **62 / 205 (30.2%)**, vs **63 / 205 (30.7%)** recorded after the OBD VIN GPS fill (PR #23) — nearby did not raise it.
 
 ## True now
 

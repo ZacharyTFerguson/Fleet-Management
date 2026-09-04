@@ -118,3 +118,51 @@ func TestGPSFirstRegionPicksHomeStateWhenTwoCarsSit(t *testing.T) {
 		t.Fatalf("VA pump + CT sit must call VA15: %+v", got.Calls)
 	}
 }
+
+func TestGPSFirstSkipsTrackerPlaceholderMerchant(t *testing.T) {
+	at := ny(2026, 8, 12, 10)
+	visits := []model.StopVisit{{
+		EFleetsID: "27SGXD", HasPos: true, Lat: 37.54, Lng: -77.43,
+		From: at, To: at.Add(10 * time.Minute),
+	}}
+	txs := []model.CardTx{{
+		CardID: "x10000", At: at.Add(2 * time.Minute),
+		StationName: "TRACKER", StationAddress: "1 MAIN,TOWN,VA",
+		RecordedEFleetsID: "27SGXD",
+	}}
+	got := MatchGPSFirst(visits, txs, []model.Car{{EFleetsID: "27SGXD", Nickname: "BING-1", Region: "BING"}}, DefaultStopSlack)
+	if len(got.Calls) != 0 || len(got.Matches) != 0 {
+		t.Fatalf("TRACKER is not a pump name: %+v", got)
+	}
+}
+
+func TestGPSFirstPicksCarSittingAtSharedPump(t *testing.T) {
+	at := ny(2026, 8, 30, 10)
+	earlier := ny(2026, 8, 20, 10)
+	shellLat, shellLng := 37.54, -77.43
+	homeLat, homeLng := 37.60, -77.50
+	visits := []model.StopVisit{
+		{EFleetsID: "27VA15", HasPos: true, Lat: shellLat, Lng: shellLng, From: at, To: at.Add(8 * time.Minute)},
+		{EFleetsID: "27VA19", HasPos: true, Lat: homeLat, Lng: homeLng, From: at, To: at.Add(8 * time.Minute)},
+		{EFleetsID: "27VA15", HasPos: true, Lat: shellLat, Lng: shellLng, From: earlier, To: earlier.Add(9 * time.Minute)},
+		{EFleetsID: "27VA21", HasPos: true, Lat: shellLat, Lng: shellLng, From: earlier.Add(24 * time.Hour), To: earlier.Add(24*time.Hour + 7*time.Minute)},
+		{EFleetsID: "27VA22", HasPos: true, Lat: shellLat, Lng: shellLng, From: earlier.Add(48 * time.Hour), To: earlier.Add(48*time.Hour + 6*time.Minute)},
+	}
+	txs := []model.CardTx{{
+		CardID: "CARD-IN-VA15", At: at.Add(3 * time.Minute),
+		StationName: "SHELL", StationAddress: "1 MAIN ST, TOWN, VA",
+		RecordedEFleetsID: "WRONGCAR",
+	}}
+	got := MatchGPSFirst(visits, txs, []model.Car{
+		{EFleetsID: "27VA15", Nickname: "VA15", Region: "VA"},
+		{EFleetsID: "27VA19", Nickname: "VA19", Region: "VA"},
+		{EFleetsID: "27VA21", Nickname: "VA21", Region: "VA"},
+		{EFleetsID: "27VA22", Nickname: "VA22", Region: "VA"},
+	}, DefaultStopSlack)
+	if got.Pumps == 0 {
+		t.Fatal("SHELL lot must cluster as a pump from three cars")
+	}
+	if len(got.Calls) != 1 || got.Calls[0].CalledCar != "27VA15" {
+		t.Fatalf("card at SHELL must be called VA15, not the car sitting at home: %+v", got.Calls)
+	}
+}

@@ -19,6 +19,7 @@ type GPSFirstResult struct {
 	Eras     []CardEra
 	Calls    []RecordCall
 	Stations []GeocodedStation
+	Pumps    int
 }
 
 // CardEra is one stretch where GPS says this card was in this car.
@@ -84,9 +85,10 @@ func MatchByStopTimes(visits []model.StopVisit, txs []model.CardTx, slack time.D
 // there. A swipe votes only when exactly one GPS-linked car is a candidate:
 //
 //  1. Short stop (≤ MaxPumpStop) covering the swipe (± slack).
-//  2. If the station is geocoded, the sit must be within StationRadiusMeters.
-//  3. Else if the merchant state is known, prefer cars whose unit region is that state.
-//  4. Two candidates still left → skip (do not guess).
+//  2. Prefer cars sitting at a GPS pump cluster (shared short-stop sites).
+//  3. If the station is geocoded, the sit must be within StationRadiusMeters.
+//  4. Else if the merchant state is known, prefer cars whose unit region is that state.
+//  5. Two candidates still left → skip (do not guess). TRACKER / empty merchants are skipped.
 //
 // A first exclusive hit geocodes that station from the box lat/lng, then a
 // second pass retries swipes that were ambiguous on time alone. Last Reading
@@ -111,6 +113,7 @@ func MatchGPSFirst(visits []model.StopVisit, txs []model.CardTx, fleet []model.C
 	}
 
 	buckets := bucketPumpVisits(visits, slack)
+	pumps := clusterPumps(visits)
 	geo := map[string]*geoAcc{}
 	assigned := map[string]gpsHit{} // swipe key → hit
 
@@ -118,6 +121,9 @@ func MatchGPSFirst(visits []model.StopVisit, txs []model.CardTx, fleet []model.C
 		for _, t := range txs {
 			card := strings.TrimSpace(t.CardID)
 			if card == "" || t.At.IsZero() {
+				continue
+			}
+			if skipStationName(t.StationName) {
 				continue
 			}
 			sk := swipeKey(t)
@@ -131,7 +137,7 @@ func MatchGPSFirst(visits []model.StopVisit, txs []model.CardTx, fleet []model.C
 				stState = stState[:2]
 			}
 			cands := uniqueCarsAt(buckets, t.At, slack)
-			cands = filterCandidates(cands, stKey, stState, region, geo, useGeo)
+			cands = filterCandidates(cands, stKey, stState, region, geo, pumps, useGeo)
 			if len(cands) != 1 {
 				continue
 			}
@@ -180,7 +186,7 @@ func MatchGPSFirst(visits []model.StopVisit, txs []model.CardTx, fleet []model.C
 	eras := splitEras(hits, nick)
 	calls := callRecords(txs, assigned, eras, nick)
 	stations := flattenGeo(geo)
-	return GPSFirstResult{Matches: matches, Eras: eras, Calls: calls, Stations: stations}
+	return GPSFirstResult{Matches: matches, Eras: eras, Calls: calls, Stations: stations, Pumps: len(pumps)}
 }
 
 // ApplyCalls copies GPS-called cars onto swipes. RecordedEFleetsID is unchanged.
@@ -265,7 +271,7 @@ func uniqueCarsAt(buckets map[int64][]model.StopVisit, at time.Time, slack time.
 	return out
 }
 
-func filterCandidates(cands []model.StopVisit, stKey, stState string, region map[string]string, geo map[string]*geoAcc, useGeo bool) []model.StopVisit {
+func filterCandidates(cands []model.StopVisit, stKey, stState string, region map[string]string, geo map[string]*geoAcc, pumps []pumpCluster, useGeo bool) []model.StopVisit {
 	if len(cands) <= 1 {
 		return cands
 	}
@@ -281,7 +287,24 @@ func filterCandidates(cands []model.StopVisit, stKey, stState string, region map
 				}
 			}
 			if len(near) > 0 {
-				return near
+				cands = near
+				if len(cands) <= 1 {
+					return cands
+				}
+			}
+		}
+	}
+	if len(pumps) > 0 {
+		var at []model.StopVisit
+		for _, v := range cands {
+			if sitAtPump(v, pumps) {
+				at = append(at, v)
+			}
+		}
+		if len(at) > 0 {
+			cands = at
+			if len(cands) <= 1 {
+				return cands
 			}
 		}
 	}
@@ -297,6 +320,63 @@ func filterCandidates(cands []model.StopVisit, stKey, stState string, region map
 		}
 	}
 	return cands
+}
+
+// pumpCluster is a GPS place many cars sit for a short time — usually a pump.
+type pumpCluster struct {
+	lat, lng float64
+}
+
+const pumpGridDeg = 0.002 // ~220m
+
+func clusterPumps(visits []model.StopVisit) []pumpCluster {
+	type acc struct {
+		lat, lng float64
+		n        int
+		cars     map[string]struct{}
+	}
+	by := map[[2]int]*acc{}
+	for _, v := range visits {
+		if !v.HasPos || strings.TrimSpace(v.EFleetsID) == "" || isUnknownCar(v.EFleetsID) {
+			continue
+		}
+		if v.From.IsZero() || v.To.IsZero() {
+			continue
+		}
+		sit := v.To.Sub(v.From)
+		if sit < 2*time.Minute || sit > MaxPumpStop {
+			continue
+		}
+		key := [2]int{int(math.Round(v.Lat / pumpGridDeg)), int(math.Round(v.Lng / pumpGridDeg))}
+		a := by[key]
+		if a == nil {
+			a = &acc{cars: map[string]struct{}{}}
+			by[key] = a
+		}
+		a.n++
+		a.lat += (v.Lat - a.lat) / float64(a.n)
+		a.lng += (v.Lng - a.lng) / float64(a.n)
+		a.cars[strings.TrimSpace(v.EFleetsID)] = struct{}{}
+	}
+	var out []pumpCluster
+	for _, a := range by {
+		if len(a.cars) >= 3 || a.n >= 8 {
+			out = append(out, pumpCluster{lat: a.lat, lng: a.lng})
+		}
+	}
+	return out
+}
+
+func sitAtPump(v model.StopVisit, pumps []pumpCluster) bool {
+	if !v.HasPos || len(pumps) == 0 {
+		return false
+	}
+	for _, p := range pumps {
+		if metersBetween(v.Lat, v.Lng, p.lat, p.lng) <= StationRadiusMeters {
+			return true
+		}
+	}
+	return false
 }
 
 func collapseMatches(hits []gpsHit) []model.GPSCardMatch {

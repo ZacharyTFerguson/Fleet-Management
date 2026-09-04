@@ -424,9 +424,7 @@ func parseDriveStopVisits(b []byte) ([]model.StopVisit, error) {
 			from, to = to, from
 		}
 		v := model.StopVisit{From: from, To: to}
-		if lat, lng, ok := latLngOf(m["first_valid_lat_lng"]); ok {
-			v.Lat, v.Lng, v.HasPos = lat, lng, true
-		} else if lat, lng, ok := latLngOf(m["last_valid_lat_lng"]); ok {
+		if lat, lng, ok := visitLatLng(m); ok {
 			v.Lat, v.Lng, v.HasPos = lat, lng, true
 		}
 		out = append(out, v)
@@ -452,6 +450,23 @@ func parseVisitTime(v any) (time.Time, error) {
 	}
 }
 
+// Live drive-stop rows use lat_lng_from / lat_lng_best_first (not first_valid_lat_lng).
+func visitLatLng(m map[string]any) (lat, lng float64, ok bool) {
+	for _, k := range []string{
+		"lat_lng_best_first",
+		"lat_lng_from",
+		"first_valid_lat_lng",
+		"lat_lng_best_last",
+		"lat_lng_to",
+		"last_valid_lat_lng",
+	} {
+		if lat, lng, ok := latLngOf(m[k]); ok {
+			return lat, lng, true
+		}
+	}
+	return latLngOf(m)
+}
+
 func latLngOf(v any) (lat, lng float64, ok bool) {
 	m, isMap := v.(map[string]any)
 	if !isMap {
@@ -463,6 +478,9 @@ func latLngOf(v any) (lat, lng float64, ok bool) {
 		return 0, 0, false
 	}
 	if lat < -90 || lat > 90 || lng < -180 || lng > 180 {
+		return 0, 0, false
+	}
+	if lat == 0 && lng == 0 {
 		return 0, 0, false
 	}
 	return lat, lng, true

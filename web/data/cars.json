@@ -1,5 +1,5 @@
 {
-  "synced_at": "2026-09-04T03:47:25.5718631Z",
+  "synced_at": "2026-09-04T10:23:03.212423842Z",
   "source": "mock-mirror",
   "cars": [
     {
@@ -9,13 +9,13 @@
       "plate": "8FF8801",
       "vin": "4S3GTAB64P3706782",
       "region": "MD",
-      "last_oil_miles": 102890,
-      "last_oil_date": "2026-08-17T04:00:00Z",
-      "last_reading_miles": 103923,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0151",
@@ -24,13 +24,13 @@
       "plate": "TUK6062",
       "vin": "4S3GTAB63P3706918",
       "region": "VA",
-      "last_oil_miles": 147367,
-      "last_oil_date": "2026-08-15T04:00:00Z",
-      "last_reading_miles": 148493,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0092",
@@ -39,13 +39,13 @@
       "plate": "M61RTJ",
       "vin": "4S3GTAB64P3706944",
       "region": "NJ",
-      "last_oil_miles": 202303,
-      "last_oil_date": "2026-06-02T04:00:00Z",
+      "last_oil_miles": null,
+      "last_oil_date": null,
       "last_reading_miles": null,
       "last_reading_at": null,
       "last_reading_source": null,
-      "hold_reason": "NO_DEVICE",
-      "interval_miles": 5000
+      "hold_reason": null,
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0190",
@@ -54,13 +54,13 @@
       "plate": "LBS1596",
       "vin": "4S3GTAB69P3705773",
       "region": "WNY",
-      "last_oil_miles": 157932,
-      "last_oil_date": "2025-10-21T04:00:00Z",
-      "last_reading_miles": 193990,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0204",
@@ -69,12 +69,12 @@
       "plate": "LBS1561",
       "vin": "4S3GTAB63P3707583",
       "region": "NYC",
-      "last_oil_miles": 55270,
-      "last_oil_date": "2025-08-08T04:00:00Z",
+      "last_oil_miles": null,
+      "last_oil_date": null,
       "last_reading_miles": null,
       "last_reading_at": null,
       "last_reading_source": null,
-      "hold_reason": "NO_DEVICE",
+      "hold_reason": null,
       "interval_miles": 0
     },
     {
@@ -84,13 +84,13 @@
       "plate": "MFA2752",
       "vin": "4S3GTAB62P3707851",
       "region": "PA",
-      "last_oil_miles": 78475,
-      "last_oil_date": "2026-08-03T04:00:00Z",
-      "last_reading_miles": 81474,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0002",
@@ -99,13 +99,13 @@
       "plate": "LAS5053",
       "vin": "4S3GTAB68P3707868",
       "region": "BING",
-      "last_oil_miles": 179598,
-      "last_oil_date": "2026-08-30T04:00:00Z",
-      "last_reading_miles": 180312,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0108",
@@ -114,13 +114,13 @@
       "plate": "MDT2072",
       "vin": "4S3GTAB68P3707708",
       "region": "PA",
-      "last_oil_miles": 162433,
-      "last_oil_date": "2026-08-05T04:00:00Z",
-      "last_reading_miles": 165578,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0191",
@@ -129,13 +129,13 @@
       "plate": "LAS4951",
       "vin": "4S3GTAB6XP3707614",
       "region": "WNY",
-      "last_oil_miles": 176423,
-      "last_oil_date": "2026-08-10T04:00:00Z",
+      "last_oil_miles": null,
+      "last_oil_date": null,
       "last_reading_miles": null,
       "last_reading_at": null,
       "last_reading_source": null,
-      "hold_reason": "NO_DEVICE",
-      "interval_miles": 5000
+      "hold_reason": null,
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0004",
@@ -144,13 +144,13 @@
       "plate": "LAS4950",
       "vin": "4S3GTAB61P3707503",
       "region": "BK",
-      "last_oil_miles": 108204,
-      "last_oil_date": "2026-06-30T04:00:00Z",
+      "last_oil_miles": null,
+      "last_oil_date": null,
       "last_reading_miles": null,
       "last_reading_at": null,
       "last_reading_source": null,
-      "hold_reason": "NO_DEVICE",
-      "interval_miles": 5000
+      "hold_reason": null,
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0139",
@@ -159,13 +159,13 @@
       "plate": "1PW860",
       "vin": "4S3GTAB63P3718096",
       "region": "RI",
-      "last_oil_miles": 108479,
-      "last_oil_date": "2026-08-04T04:00:00Z",
+      "last_oil_miles": null,
+      "last_oil_date": null,
       "last_reading_miles": null,
       "last_reading_at": null,
       "last_reading_source": null,
-      "hold_reason": "NO_DEVICE",
-      "interval_miles": 5000
+      "hold_reason": null,
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0111",
@@ -174,13 +174,13 @@
       "plate": "MGA4700",
       "vin": "4S3GTAB62P3719739",
       "region": "PA",
-      "last_oil_miles": 88826,
-      "last_oil_date": "2026-08-31T04:00:00Z",
-      "last_reading_miles": 89313,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0009",
@@ -189,13 +189,13 @@
       "plate": "C356104",
       "vin": "4S3GTAB65P3722098",
       "region": "CT",
-      "last_oil_miles": 148859,
-      "last_oil_date": "2026-08-04T04:00:00Z",
+      "last_oil_miles": null,
+      "last_oil_date": null,
       "last_reading_miles": null,
       "last_reading_at": null,
       "last_reading_source": null,
-      "hold_reason": "NO_DEVICE",
-      "interval_miles": 5000
+      "hold_reason": null,
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0089",
@@ -204,13 +204,13 @@
       "plate": "A62SHV",
       "vin": "4S3GTAB66P3721445",
       "region": "NJ",
-      "last_oil_miles": 104137,
-      "last_oil_date": "2026-05-29T04:00:00Z",
+      "last_oil_miles": null,
+      "last_oil_date": null,
       "last_reading_miles": null,
       "last_reading_at": null,
       "last_reading_source": null,
-      "hold_reason": "NO_DEVICE",
-      "interval_miles": 5000
+      "hold_reason": null,
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0041",
@@ -219,13 +219,13 @@
       "plate": "4FM1957",
       "vin": "4S3GTAB62P3721104",
       "region": "MD",
-      "last_oil_miles": 127111,
-      "last_oil_date": "2026-08-15T04:00:00Z",
-      "last_reading_miles": 130753,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0152",
@@ -234,13 +234,13 @@
       "plate": "TPR9171",
       "vin": "4S3GTAB66P3720473",
       "region": "VA",
-      "last_oil_miles": 161270,
-      "last_oil_date": "2026-08-13T04:00:00Z",
-      "last_reading_miles": 164601,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0082",
@@ -249,13 +249,13 @@
       "plate": "A77SHV",
       "vin": "4S3GTAB69P3721374",
       "region": "NJ",
-      "last_oil_miles": 79755,
-      "last_oil_date": "2026-08-03T04:00:00Z",
+      "last_oil_miles": null,
+      "last_oil_date": null,
       "last_reading_miles": null,
       "last_reading_at": null,
       "last_reading_source": null,
-      "hold_reason": "NO_DEVICE",
-      "interval_miles": 5000
+      "hold_reason": null,
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0140",
@@ -264,13 +264,13 @@
       "plate": "1RB561",
       "vin": "JF1GUABC6R8232994",
       "region": "RI",
-      "last_oil_miles": 58772,
-      "last_oil_date": "2026-08-15T04:00:00Z",
-      "last_reading_miles": 61264,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0153",
@@ -279,13 +279,13 @@
       "plate": "TPR9141",
       "vin": "JF1GUABC3R8249994",
       "region": "VA",
-      "last_oil_miles": 108512,
-      "last_oil_date": "2026-07-28T04:00:00Z",
-      "last_reading_miles": 110042,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0112",
@@ -294,13 +294,13 @@
       "plate": "MHK4715",
       "vin": "JF1GUABCXR8259910",
       "region": "PA",
-      "last_oil_miles": 58241,
-      "last_oil_date": "2026-06-04T04:00:00Z",
-      "last_reading_miles": 65154,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0042",
@@ -309,13 +309,13 @@
       "plate": "6FP6058",
       "vin": "JF1GUABC3R8259148",
       "region": "MD",
-      "last_oil_miles": 91295,
-      "last_oil_date": "2026-08-12T04:00:00Z",
-      "last_reading_miles": 93473,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0079",
@@ -324,13 +324,13 @@
       "plate": "L43SNE",
       "vin": "JF1GUABC4R8263144",
       "region": "NJ",
-      "last_oil_miles": 120809,
-      "last_oil_date": "2026-07-17T04:00:00Z",
+      "last_oil_miles": null,
+      "last_oil_date": null,
       "last_reading_miles": null,
       "last_reading_at": null,
       "last_reading_source": null,
-      "hold_reason": "NO_DEVICE",
-      "interval_miles": 5000
+      "hold_reason": null,
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0075",
@@ -339,13 +339,13 @@
       "plate": "B87VHS",
       "vin": "JF1GUABC5R8318359",
       "region": "NJ",
-      "last_oil_miles": 85930,
-      "last_oil_date": "2026-07-22T04:00:00Z",
+      "last_oil_miles": null,
+      "last_oil_date": null,
       "last_reading_miles": null,
       "last_reading_at": null,
       "last_reading_source": null,
-      "hold_reason": "NO_DEVICE",
-      "interval_miles": 5000
+      "hold_reason": null,
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0007",
@@ -354,13 +354,13 @@
       "plate": "LHP5398",
       "vin": "JF1GUABC6R8316491",
       "region": "BRONX",
-      "last_oil_miles": 68107,
-      "last_oil_date": "2026-06-09T04:00:00Z",
+      "last_oil_miles": null,
+      "last_oil_date": null,
       "last_reading_miles": null,
       "last_reading_at": null,
       "last_reading_source": null,
-      "hold_reason": "NO_DEVICE",
-      "interval_miles": 5000
+      "hold_reason": null,
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0157",
@@ -369,13 +369,13 @@
       "plate": "TLB9509",
       "vin": "JF1GUABC9R8318400",
       "region": "VA",
-      "last_oil_miles": 65925,
-      "last_oil_date": "2026-08-10T04:00:00Z",
-      "last_reading_miles": 67722,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0158",
@@ -384,13 +384,13 @@
       "plate": "TLB9601",
       "vin": "JF1GUABC9R8319496",
       "region": "VA",
-      "last_oil_miles": 80145,
-      "last_oil_date": "2026-08-07T04:00:00Z",
-      "last_reading_miles": 82107,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0044",
@@ -399,13 +399,13 @@
       "plate": "9GA3357",
       "vin": "JF1GUABC9R8307414",
       "region": "MD",
-      "last_oil_miles": 101507,
-      "last_oil_date": "2026-07-31T04:00:00Z",
-      "last_reading_miles": 105309,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0005",
@@ -414,13 +414,13 @@
       "plate": "LHP5399",
       "vin": "JF1GUABC3R8319509",
       "region": "BK",
-      "last_oil_miles": 48516,
-      "last_oil_date": "2026-06-16T04:00:00Z",
+      "last_oil_miles": null,
+      "last_oil_date": null,
       "last_reading_miles": null,
       "last_reading_at": null,
       "last_reading_source": null,
-      "hold_reason": "NO_DEVICE",
-      "interval_miles": 5000
+      "hold_reason": null,
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0006",
@@ -429,13 +429,13 @@
       "plate": "LHP5503",
       "vin": "JF1GUABCXR8318423",
       "region": "BK",
-      "last_oil_miles": 53797,
-      "last_oil_date": "2026-06-04T04:00:00Z",
+      "last_oil_miles": null,
+      "last_oil_date": null,
       "last_reading_miles": null,
       "last_reading_at": null,
       "last_reading_source": null,
-      "hold_reason": "NO_DEVICE",
-      "interval_miles": 5000
+      "hold_reason": null,
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0076",
@@ -444,13 +444,13 @@
       "plate": "X70UBT",
       "vin": "JF1GUABC5R8318376",
       "region": "NJ",
-      "last_oil_miles": 85104,
-      "last_oil_date": "2026-08-08T04:00:00Z",
-      "last_reading_miles": 86739,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0045",
@@ -459,13 +459,13 @@
       "plate": "9GA3341",
       "vin": "JF1GUABC7R8318945",
       "region": "MD",
-      "last_oil_miles": 61647,
-      "last_oil_date": "2026-08-11T04:00:00Z",
-      "last_reading_miles": 63602,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0072",
@@ -474,13 +474,13 @@
       "plate": "M58SNE",
       "vin": "JF1GUABC9R8270980",
       "region": "NJ",
-      "last_oil_miles": 89740,
-      "last_oil_date": "2026-08-27T04:00:00Z",
+      "last_oil_miles": null,
+      "last_oil_date": null,
       "last_reading_miles": null,
       "last_reading_at": null,
       "last_reading_source": null,
-      "hold_reason": "NO_DEVICE",
-      "interval_miles": 5000
+      "hold_reason": null,
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0137",
@@ -489,13 +489,13 @@
       "plate": "1RB498",
       "vin": "JF1GUABC7R8278057",
       "region": "RI",
-      "last_oil_miles": 88746,
-      "last_oil_date": "2026-03-02T05:00:00Z",
-      "last_reading_miles": 97533,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0156",
@@ -504,13 +504,13 @@
       "plate": "TMG1104",
       "vin": "JF1GUABC1R8278877",
       "region": "VA",
-      "last_oil_miles": 112743,
-      "last_oil_date": "2026-07-20T04:00:00Z",
-      "last_reading_miles": 118782,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0135",
@@ -519,13 +519,13 @@
       "plate": "1RB499",
       "vin": "JF1GUABC3R8272045",
       "region": "RI",
-      "last_oil_miles": 73150,
-      "last_oil_date": "2026-07-09T04:00:00Z",
-      "last_reading_miles": 77513,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0154",
@@ -534,13 +534,13 @@
       "plate": "TMG1103",
       "vin": "JF1GUABC0R8269717",
       "region": "VA",
-      "last_oil_miles": 70541,
-      "last_oil_date": "2026-07-21T04:00:00Z",
-      "last_reading_miles": 73100,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0136",
@@ -549,13 +549,13 @@
       "plate": "1RB497",
       "vin": "JF1GUABC2R8278077",
       "region": "RI",
-      "last_oil_miles": 73309,
-      "last_oil_date": "2026-04-23T04:00:00Z",
-      "last_reading_miles": 81134,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0155",
@@ -564,13 +564,13 @@
       "plate": "TMG1105",
       "vin": "JF1GUABC4R8267291",
       "region": "VA",
-      "last_oil_miles": 74724,
-      "last_oil_date": "2026-05-29T04:00:00Z",
-      "last_reading_miles": 79999,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0037",
@@ -579,13 +579,13 @@
       "plate": "9GC8715",
       "vin": "JF1GUABC9R8330692",
       "region": "MD",
-      "last_oil_miles": 46113,
-      "last_oil_date": "2026-07-10T04:00:00Z",
-      "last_reading_miles": 48922,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0087",
@@ -594,13 +594,13 @@
       "plate": "N33UBT",
       "vin": "JF1GUABCXR8343127",
       "region": "NJ",
-      "last_oil_miles": 67614,
-      "last_oil_date": "2026-08-14T04:00:00Z",
-      "last_reading_miles": 69155,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0013",
@@ -609,13 +609,13 @@
       "plate": "BN47403",
       "vin": "JF1GUABC5R8342113",
       "region": "CT",
-      "last_oil_miles": 71942,
-      "last_oil_date": "2026-07-03T04:00:00Z",
-      "last_reading_miles": 77548,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0046",
@@ -624,13 +624,13 @@
       "plate": "9GC8716",
       "vin": "JF1GUABC3R8325309",
       "region": "MD",
-      "last_oil_miles": 45446,
-      "last_oil_date": "2026-06-09T04:00:00Z",
-      "last_reading_miles": 50507,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0197",
@@ -639,13 +639,13 @@
       "plate": "MLV6810",
       "vin": "JF1GUABCXR8343094",
       "region": "WNY",
-      "last_oil_miles": 68041,
-      "last_oil_date": "2026-07-16T04:00:00Z",
-      "last_reading_miles": 72946,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0160",
@@ -654,13 +654,13 @@
       "plate": "TLM3024",
       "vin": "JF1GUABC2R8341680",
       "region": "VA",
-      "last_oil_miles": 75504,
-      "last_oil_date": "2026-08-30T04:00:00Z",
-      "last_reading_miles": 76201,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0048",
@@ -669,13 +669,13 @@
       "plate": "9GC8718",
       "vin": "JF1GUABC5R8327109",
       "region": "MD",
-      "last_oil_miles": 59567,
-      "last_oil_date": "2026-07-30T04:00:00Z",
-      "last_reading_miles": 62612,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0196",
@@ -684,13 +684,13 @@
       "plate": "LJZ5377",
       "vin": "JF1GUABC0R8342472",
       "region": "WNY",
-      "last_oil_miles": 123060,
-      "last_oil_date": "2026-08-20T04:00:00Z",
+      "last_oil_miles": null,
+      "last_oil_date": null,
       "last_reading_miles": null,
       "last_reading_at": null,
       "last_reading_source": null,
-      "hold_reason": "NO_DEVICE",
-      "interval_miles": 5000
+      "hold_reason": null,
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0193",
@@ -699,13 +699,13 @@
       "plate": "LGC5847",
       "vin": "JF2SKABCXRH415942",
       "region": "WNY",
-      "last_oil_miles": 151212,
-      "last_oil_date": "2026-05-28T04:00:00Z",
+      "last_oil_miles": null,
+      "last_oil_date": null,
       "last_reading_miles": null,
       "last_reading_at": null,
       "last_reading_source": null,
-      "hold_reason": "NO_DEVICE",
-      "interval_miles": 5000
+      "hold_reason": null,
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0192",
@@ -714,13 +714,13 @@
       "plate": "LGC5845",
       "vin": "JF2SKABC3RH417094",
       "region": "WNY",
-      "last_oil_miles": 173082,
-      "last_oil_date": "2026-08-12T04:00:00Z",
-      "last_reading_miles": 177961,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0019",
@@ -729,13 +729,13 @@
       "plate": "76EJQR",
       "vin": "JF1GUABC8R8306965",
       "region": "FL",
-      "last_oil_miles": 93694,
-      "last_oil_date": "2026-08-28T04:00:00Z",
-      "last_reading_miles": 94426,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0021",
@@ -744,13 +744,13 @@
       "plate": "RAXI41",
       "vin": "JF1GUABC9R8325203",
       "region": "FL",
-      "last_oil_miles": 136515,
-      "last_oil_date": "2026-05-04T04:00:00Z",
-      "last_reading_miles": 146519,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0194",
@@ -759,13 +759,13 @@
       "plate": "LGX3349",
       "vin": "JF2SKAAC7RH441545",
       "region": "WNY",
-      "last_oil_miles": 140211,
-      "last_oil_date": "2026-08-13T04:00:00Z",
+      "last_oil_miles": null,
+      "last_oil_date": null,
       "last_reading_miles": null,
       "last_reading_at": null,
       "last_reading_source": null,
-      "hold_reason": "NO_DEVICE",
-      "interval_miles": 5000
+      "hold_reason": null,
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0020",
@@ -774,13 +774,13 @@
       "plate": "75ELZI",
       "vin": "JF1GUABC1R8302935",
       "region": "FL",
-      "last_oil_miles": 108300,
-      "last_oil_date": "2026-07-22T04:00:00Z",
+      "last_oil_miles": null,
+      "last_oil_date": null,
       "last_reading_miles": null,
       "last_reading_at": null,
       "last_reading_source": null,
-      "hold_reason": "NO_DEVICE",
-      "interval_miles": 5000
+      "hold_reason": null,
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0011",
@@ -789,13 +789,13 @@
       "plate": "BK41385",
       "vin": "JF1GUABC7R8309839",
       "region": "CT",
-      "last_oil_miles": 73416,
-      "last_oil_date": "2026-05-23T04:00:00Z",
-      "last_reading_miles": 82296,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0073",
@@ -804,13 +804,13 @@
       "plate": "L22SYP",
       "vin": "JF1GUABCXR8317403",
       "region": "NJ",
-      "last_oil_miles": 54965,
-      "last_oil_date": "2026-08-31T04:00:00Z",
+      "last_oil_miles": null,
+      "last_oil_date": null,
       "last_reading_miles": null,
       "last_reading_at": null,
       "last_reading_source": null,
-      "hold_reason": "NO_DEVICE",
-      "interval_miles": 5000
+      "hold_reason": null,
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0025",
@@ -819,13 +819,13 @@
       "plate": "RKZB42",
       "vin": "JF1GUABC1R8355344",
       "region": "FL",
-      "last_oil_miles": 108260,
-      "last_oil_date": "2026-08-20T04:00:00Z",
-      "last_reading_miles": 110348,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0132",
@@ -834,13 +834,13 @@
       "plate": "LLM1291",
       "vin": "JF1GUABC1R8369129",
       "region": "PK",
-      "last_oil_miles": 75313,
-      "last_oil_date": "2026-07-15T04:00:00Z",
+      "last_oil_miles": null,
+      "last_oil_date": null,
       "last_reading_miles": null,
       "last_reading_at": null,
       "last_reading_source": null,
-      "hold_reason": "NO_DEVICE",
-      "interval_miles": 5000
+      "hold_reason": null,
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0186",
@@ -849,13 +849,13 @@
       "plate": "LLM1207",
       "vin": "JF1GUABC2R8359001",
       "region": "WESTCHESTER",
-      "last_oil_miles": 89740,
-      "last_oil_date": "2026-07-29T04:00:00Z",
+      "last_oil_miles": null,
+      "last_oil_date": null,
       "last_reading_miles": null,
       "last_reading_at": null,
       "last_reading_source": null,
-      "hold_reason": "NO_DEVICE",
-      "interval_miles": 5000
+      "hold_reason": null,
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0102",
@@ -864,13 +864,13 @@
       "plate": "LLM1139",
       "vin": "JF1GUABC5R8352124",
       "region": "NYC",
-      "last_oil_miles": 57403,
-      "last_oil_date": "2026-08-07T04:00:00Z",
-      "last_reading_miles": 59522,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0103",
@@ -879,13 +879,13 @@
       "plate": "LLM1208",
       "vin": "JF1GUABC0R8359028",
       "region": "NYC",
-      "last_oil_miles": 40192,
-      "last_oil_date": "2026-08-06T04:00:00Z",
-      "last_reading_miles": 42305,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0049",
@@ -894,13 +894,13 @@
       "plate": "4GD6894",
       "vin": "JF1GUABC5R8362930",
       "region": "MD",
-      "last_oil_miles": 86694,
-      "last_oil_date": "2026-08-04T04:00:00Z",
-      "last_reading_miles": 89981,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0051",
@@ -909,13 +909,13 @@
       "plate": "8GD8289",
       "vin": "JF1GUABC4R8362420",
       "region": "MD",
-      "last_oil_miles": 51596,
-      "last_oil_date": "2026-07-22T04:00:00Z",
-      "last_reading_miles": 54043,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0050",
@@ -924,13 +924,13 @@
       "plate": "4GD6895",
       "vin": "JF1GUABC3R8362912",
       "region": "MD",
-      "last_oil_miles": 53794,
-      "last_oil_date": "2026-06-19T04:00:00Z",
-      "last_reading_miles": 59185,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0052",
@@ -939,13 +939,13 @@
       "plate": "4GG5736`",
       "vin": "JF1GUABC4R8365396",
       "region": "MD",
-      "last_oil_miles": 46409,
-      "last_oil_date": "2026-08-17T04:00:00Z",
-      "last_reading_miles": 47304,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0023",
@@ -954,13 +954,13 @@
       "plate": "RAUQ86",
       "vin": "3N1CN8DV3RL817100",
       "region": "FL",
-      "last_oil_miles": 54287,
-      "last_oil_date": "2026-07-21T04:00:00Z",
-      "last_reading_miles": 58785,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0022",
@@ -969,13 +969,13 @@
       "plate": "RAUQ87",
       "vin": "3N1CN8DV3RL830526",
       "region": "FL",
-      "last_oil_miles": 75306,
-      "last_oil_date": "2026-08-20T04:00:00Z",
-      "last_reading_miles": 76880,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0024",
@@ -984,13 +984,13 @@
       "plate": "RKZB43",
       "vin": "JF1GUABC8R8355258",
       "region": "FL",
-      "last_oil_miles": 101412,
-      "last_oil_date": "2026-08-12T04:00:00Z",
-      "last_reading_miles": 103941,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0125",
@@ -999,13 +999,13 @@
       "plate": "MNP4794",
       "vin": "JF1GUABC8R8370116",
       "region": "PA",
-      "last_oil_miles": 106740,
-      "last_oil_date": "2026-08-14T04:00:00Z",
-      "last_reading_miles": 109363,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0101",
@@ -1014,13 +1014,13 @@
       "plate": "LLP1863",
       "vin": "JF1GUABC9R8361702",
       "region": "NYC",
-      "last_oil_miles": 49616,
-      "last_oil_date": "2026-07-08T04:00:00Z",
-      "last_reading_miles": 52084,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0142",
@@ -1029,13 +1029,13 @@
       "plate": "1WC424",
       "vin": "JF1GUABC9R8371050",
       "region": "RI",
-      "last_oil_miles": 48474,
-      "last_oil_date": "2026-04-22T04:00:00Z",
-      "last_reading_miles": 58340,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0083",
@@ -1044,13 +1044,13 @@
       "plate": "A36UMY",
       "vin": "JF1GUABC9R8371632",
       "region": "NJ",
-      "last_oil_miles": 63979,
-      "last_oil_date": "2026-08-01T04:00:00Z",
-      "last_reading_miles": 66972,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0054",
@@ -1059,13 +1059,13 @@
       "plate": "4GG5821",
       "vin": "JF1GUABC8R8369290",
       "region": "MD",
-      "last_oil_miles": 101362,
-      "last_oil_date": "2026-08-03T04:00:00Z",
-      "last_reading_miles": 105409,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0053",
@@ -1074,13 +1074,13 @@
       "plate": "4GG5752",
       "vin": "JF1GUABC5R8371000",
       "region": "MD",
-      "last_oil_miles": 48543,
-      "last_oil_date": "2026-07-20T04:00:00Z",
-      "last_reading_miles": 52334,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0124",
@@ -1089,13 +1089,13 @@
       "plate": "MNP4793",
       "vin": "JF1GUABC6R8370955",
       "region": "PA",
-      "last_oil_miles": 108916,
-      "last_oil_date": "2026-07-30T04:00:00Z",
-      "last_reading_miles": 114627,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0026",
@@ -1104,13 +1104,13 @@
       "plate": "RKYI18",
       "vin": "JF1GUABC7R8355283",
       "region": "FL",
-      "last_oil_miles": 116587,
-      "last_oil_date": "2026-08-08T04:00:00Z",
-      "last_reading_miles": 123974,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0027",
@@ -1119,13 +1119,13 @@
       "plate": "RKYI19",
       "vin": "JF1GUABC7R8355820",
       "region": "FL",
-      "last_oil_miles": 21395,
-      "last_oil_date": "2026-08-19T04:00:00Z",
-      "last_reading_miles": 22011,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0145",
@@ -1134,13 +1134,13 @@
       "plate": "8EX3760",
       "vin": "JN8AS5MV3FW262073",
       "region": "RPI",
-      "last_oil_miles": 236583,
-      "last_oil_date": "2026-04-14T04:00:00Z",
-      "last_reading_miles": 248275,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0147",
@@ -1149,13 +1149,13 @@
       "plate": "8EX3738",
       "vin": "KNMAT2MV4HP529869",
       "region": "RPI",
-      "last_oil_miles": 265877,
-      "last_oil_date": "2026-04-16T04:00:00Z",
-      "last_reading_miles": 274587,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0146",
@@ -1164,13 +1164,13 @@
       "plate": "8EX3757",
       "vin": "JN1BJ1CR4JW289343",
       "region": "RPI",
-      "last_oil_miles": 195308,
-      "last_oil_date": "2026-07-29T04:00:00Z",
-      "last_reading_miles": 197060,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0149",
@@ -1179,13 +1179,13 @@
       "plate": "1EZ6184",
       "vin": "5N1AT2MV7JC741397",
       "region": "RPI",
-      "last_oil_miles": 235858,
-      "last_oil_date": "2026-06-13T04:00:00Z",
-      "last_reading_miles": 239234,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0144",
@@ -1194,13 +1194,13 @@
       "plate": "8EX3759",
       "vin": "5N1AT2MV0JC772491",
       "region": "RPI",
-      "last_oil_miles": 256248,
-      "last_oil_date": "2026-08-25T04:00:00Z",
-      "last_reading_miles": 256553,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0070",
@@ -1209,13 +1209,13 @@
       "plate": "CSU019",
       "vin": "4S3GTAA67K3724168",
       "region": "MN",
-      "last_oil_miles": 148043,
-      "last_oil_date": "2026-06-29T04:00:00Z",
-      "last_reading_miles": 152245,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0159",
@@ -1224,13 +1224,13 @@
       "plate": "CST192",
       "vin": "3CZRU6H38KG713301",
       "region": "VA",
-      "last_oil_miles": 277991,
-      "last_oil_date": "2026-08-31T04:00:00Z",
-      "last_reading_miles": 278621,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0043",
@@ -1239,13 +1239,13 @@
       "plate": "CST194",
       "vin": "3CZRU6H3XKG710531",
       "region": "MD",
-      "last_oil_miles": 208509,
-      "last_oil_date": "2026-07-29T04:00:00Z",
-      "last_reading_miles": 211893,
-      "last_reading_at": "2026-08-13T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0106",
@@ -1254,13 +1254,13 @@
       "plate": "LFE-6212",
       "vin": "4S3GTAB63K3757909",
       "region": "PA",
-      "last_oil_miles": 220632,
-      "last_oil_date": "2026-06-15T04:00:00Z",
+      "last_oil_miles": null,
+      "last_oil_date": null,
       "last_reading_miles": null,
       "last_reading_at": null,
       "last_reading_source": null,
-      "hold_reason": "NO_DEVICE",
-      "interval_miles": 5000
+      "hold_reason": null,
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0161",
@@ -1269,13 +1269,13 @@
       "plate": "8FB4482",
       "vin": "5N1AT2MV2KC785258",
       "region": "VA",
-      "last_oil_miles": 310177,
-      "last_oil_date": "2026-08-10T04:00:00Z",
-      "last_reading_miles": 313643,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0030",
@@ -1284,13 +1284,13 @@
       "plate": "4FD7422",
       "vin": "4S3GTAB61L3715398",
       "region": "MD",
-      "last_oil_miles": 136275,
-      "last_oil_date": "2026-07-02T04:00:00Z",
-      "last_reading_miles": 137810,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0148",
@@ -1299,13 +1299,13 @@
       "plate": "1EZ6183",
       "vin": "JN8AT2MV2LW101723",
       "region": "RPI",
-      "last_oil_miles": 162395,
-      "last_oil_date": "2026-03-03T05:00:00Z",
-      "last_reading_miles": 173507,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0167",
@@ -1314,13 +1314,13 @@
       "plate": "1EZ6297",
       "vin": "KNMAT2MV5LP504360",
       "region": "VA",
-      "last_oil_miles": 193288,
-      "last_oil_date": "2026-07-14T04:00:00Z",
+      "last_oil_miles": null,
+      "last_oil_date": null,
       "last_reading_miles": null,
       "last_reading_at": null,
       "last_reading_source": null,
-      "hold_reason": "NO_DEVICE",
-      "interval_miles": 5000
+      "hold_reason": null,
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0001",
@@ -1329,13 +1329,13 @@
       "plate": "KLC8063",
       "vin": "4S3GTAB65M3715647",
       "region": "BING",
-      "last_oil_miles": 219872,
-      "last_oil_date": "2026-08-18T04:00:00Z",
+      "last_oil_miles": null,
+      "last_oil_date": null,
       "last_reading_miles": null,
       "last_reading_at": null,
       "last_reading_source": null,
-      "hold_reason": "NO_DEVICE",
-      "interval_miles": 5000
+      "hold_reason": null,
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0014",
@@ -1344,13 +1344,13 @@
       "plate": "BA15105",
       "vin": "4S3GTAB68M3706330",
       "region": "CT",
-      "last_oil_miles": 254516,
-      "last_oil_date": "2026-08-20T04:00:00Z",
+      "last_oil_miles": null,
+      "last_oil_date": null,
       "last_reading_miles": null,
       "last_reading_at": null,
       "last_reading_source": null,
-      "hold_reason": "NO_DEVICE",
-      "interval_miles": 5000
+      "hold_reason": null,
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0040",
@@ -1359,13 +1359,13 @@
       "plate": "5EJ0192",
       "vin": "4S3GTAB65M3707788",
       "region": "MD",
-      "last_oil_miles": 109876,
-      "last_oil_date": "2026-05-19T04:00:00Z",
-      "last_reading_miles": 113166,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0032",
@@ -1374,13 +1374,13 @@
       "plate": "5EJ0217",
       "vin": "4S3GTAB69M3708412",
       "region": "MD",
-      "last_oil_miles": 322373,
-      "last_oil_date": "2026-04-09T04:00:00Z",
-      "last_reading_miles": 333635,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0033",
@@ -1389,13 +1389,13 @@
       "plate": "5EJ0185",
       "vin": "4S3GTAB60M3706399",
       "region": "MD",
-      "last_oil_miles": 123882,
-      "last_oil_date": "2026-08-03T04:00:00Z",
-      "last_reading_miles": 126633,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0034",
@@ -1404,13 +1404,13 @@
       "plate": "2ES4797",
       "vin": "4S3GTAB62M3710860",
       "region": "MD",
-      "last_oil_miles": 120126,
-      "last_oil_date": "2026-05-20T04:00:00Z",
-      "last_reading_miles": 123474,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0035",
@@ -1419,13 +1419,13 @@
       "plate": "2ES4796",
       "vin": "4S3GTAB65M3714904",
       "region": "MD",
-      "last_oil_miles": 192829,
-      "last_oil_date": "2026-08-03T04:00:00Z",
-      "last_reading_miles": 194042,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0097",
@@ -1439,7 +1439,7 @@
       "last_reading_miles": null,
       "last_reading_at": null,
       "last_reading_source": null,
-      "hold_reason": "NO_DEVICE",
+      "hold_reason": null,
       "interval_miles": 0
     },
     {
@@ -1449,13 +1449,13 @@
       "plate": "C318315",
       "vin": "3CZRU6H34NM768981",
       "region": "CT",
-      "last_oil_miles": 194409,
-      "last_oil_date": "2026-07-22T04:00:00Z",
+      "last_oil_miles": null,
+      "last_oil_date": null,
       "last_reading_miles": null,
       "last_reading_at": null,
       "last_reading_source": null,
-      "hold_reason": "NO_DEVICE",
-      "interval_miles": 5000
+      "hold_reason": null,
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0168",
@@ -1464,13 +1464,13 @@
       "plate": "UAJ8969",
       "vin": "4S3GTAB6XN3700871",
       "region": "VA",
-      "last_oil_miles": 135088,
-      "last_oil_date": "2026-06-30T04:00:00Z",
+      "last_oil_miles": null,
+      "last_oil_date": null,
       "last_reading_miles": null,
       "last_reading_at": null,
       "last_reading_source": null,
-      "hold_reason": "NO_DEVICE",
-      "interval_miles": 5000
+      "hold_reason": null,
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0133",
@@ -1479,13 +1479,13 @@
       "plate": "C334536",
       "vin": "4S3GTAB64N3723885",
       "region": "PK",
-      "last_oil_miles": 128054,
-      "last_oil_date": "2026-08-07T04:00:00Z",
+      "last_oil_miles": null,
+      "last_oil_date": null,
       "last_reading_miles": null,
       "last_reading_at": null,
       "last_reading_source": null,
-      "hold_reason": "NO_DEVICE",
-      "interval_miles": 5000
+      "hold_reason": null,
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0141",
@@ -1494,13 +1494,13 @@
       "plate": "1IB396",
       "vin": "3CZRU6H38NM759331",
       "region": "RI",
-      "last_oil_miles": 216729,
-      "last_oil_date": "2026-07-24T04:00:00Z",
+      "last_oil_miles": null,
+      "last_oil_date": null,
       "last_reading_miles": null,
       "last_reading_at": null,
       "last_reading_source": null,
-      "hold_reason": "NO_DEVICE",
-      "interval_miles": 5000
+      "hold_reason": null,
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0150",
@@ -1509,13 +1509,13 @@
       "plate": "TRT8977",
       "vin": "4S3GTAV67N3725304",
       "region": "VA",
-      "last_oil_miles": 133187,
-      "last_oil_date": "2026-07-24T04:00:00Z",
+      "last_oil_miles": null,
+      "last_oil_date": null,
       "last_reading_miles": null,
       "last_reading_at": null,
       "last_reading_source": null,
-      "hold_reason": "NO_DEVICE",
-      "interval_miles": 5000
+      "hold_reason": null,
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0189",
@@ -1524,13 +1524,13 @@
       "plate": "KSY5071",
       "vin": "4S3GTAB61N3707448",
       "region": "WNY",
-      "last_oil_miles": 225489,
-      "last_oil_date": "2026-08-05T04:00:00Z",
-      "last_reading_miles": 229108,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0109",
@@ -1539,13 +1539,13 @@
       "plate": "LYR8205",
       "vin": "4S3GTAB60P3706035",
       "region": "PA",
-      "last_oil_miles": 93540,
-      "last_oil_date": "2026-07-14T04:00:00Z",
-      "last_reading_miles": 97238,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0031",
@@ -1554,13 +1554,13 @@
       "plate": "5EJ0120",
       "vin": "4S3GTAB63M3706641",
       "region": "MD",
-      "last_oil_miles": 222104,
-      "last_oil_date": "2026-06-09T04:00:00Z",
-      "last_reading_miles": 227410,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0036",
@@ -1569,13 +1569,13 @@
       "plate": "KNX8174",
       "vin": "3CZRU6H33MM747716",
       "region": "MD",
-      "last_oil_miles": 159755,
-      "last_oil_date": "2026-04-16T04:00:00Z",
-      "last_reading_miles": 169853,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0003",
@@ -1589,7 +1589,7 @@
       "last_reading_miles": null,
       "last_reading_at": null,
       "last_reading_source": null,
-      "hold_reason": "NO_DEVICE",
+      "hold_reason": null,
       "interval_miles": 0
     },
     {
@@ -1599,13 +1599,13 @@
       "plate": "LJH9253",
       "vin": "JF2SKAAC7RH477283",
       "region": "WNY",
-      "last_oil_miles": 136916,
-      "last_oil_date": "2026-07-15T04:00:00Z",
-      "last_reading_miles": 144618,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0123",
@@ -1614,13 +1614,13 @@
       "plate": "-",
       "vin": "3CZRU6H39MM734484",
       "region": "PA",
-      "last_oil_miles": 358389,
-      "last_oil_date": "2026-04-28T04:00:00Z",
+      "last_oil_miles": null,
+      "last_oil_date": null,
       "last_reading_miles": null,
       "last_reading_at": null,
       "last_reading_source": null,
-      "hold_reason": "NO_DEVICE",
-      "interval_miles": 5000
+      "hold_reason": null,
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0122",
@@ -1629,13 +1629,13 @@
       "plate": "-",
       "vin": "3CZRU6H35NM715982",
       "region": "PA",
-      "last_oil_miles": 251823,
-      "last_oil_date": "2026-08-27T04:00:00Z",
-      "last_reading_miles": 253320,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0115",
@@ -1644,13 +1644,13 @@
       "plate": "-",
       "vin": "1HGCV1F39NA100560",
       "region": "PA",
-      "last_oil_miles": 52615,
-      "last_oil_date": "2025-08-21T04:00:00Z",
-      "last_reading_miles": 68032,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0116",
@@ -1659,13 +1659,13 @@
       "plate": "-",
       "vin": "1HGCV1F35NA122958",
       "region": "PA",
-      "last_oil_miles": 124125,
-      "last_oil_date": "2026-08-21T04:00:00Z",
-      "last_reading_miles": 125968,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0117",
@@ -1674,13 +1674,13 @@
       "plate": "-",
       "vin": "5N1BT3AB0PC807978",
       "region": "PA",
-      "last_oil_miles": 121589,
-      "last_oil_date": "2026-06-12T04:00:00Z",
+      "last_oil_miles": null,
+      "last_oil_date": null,
       "last_reading_miles": null,
       "last_reading_at": null,
       "last_reading_source": null,
-      "hold_reason": "NO_DEVICE",
-      "interval_miles": 5000
+      "hold_reason": null,
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0187",
@@ -1689,13 +1689,13 @@
       "plate": "LLM1189",
       "vin": "JF2SKAAC2RH505247",
       "region": "WNY",
-      "last_oil_miles": 66207,
-      "last_oil_date": "2026-08-19T04:00:00Z",
-      "last_reading_miles": 67252,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0069",
@@ -1704,13 +1704,13 @@
       "plate": "LZU-063",
       "vin": "JF2SKABC0RH517248",
       "region": "MN",
-      "last_oil_miles": 75596,
-      "last_oil_date": "2026-08-05T04:00:00Z",
-      "last_reading_miles": 77502,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0068",
@@ -1719,13 +1719,13 @@
       "plate": "LZU-064",
       "vin": "JF2SKABC1RH513919",
       "region": "MN",
-      "last_oil_miles": 93559,
-      "last_oil_date": "2026-08-19T04:00:00Z",
-      "last_reading_miles": 95770,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0198",
@@ -1734,13 +1734,13 @@
       "plate": "LLM1190",
       "vin": "JF2SKAAC8RH497574",
       "region": "WNY",
-      "last_oil_miles": 93349,
-      "last_oil_date": "2026-06-09T04:00:00Z",
-      "last_reading_miles": 103807,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0099",
@@ -1749,13 +1749,13 @@
       "plate": "LRP3382",
       "vin": "JF1GUABC7R8879243",
       "region": "NYC",
-      "last_oil_miles": 20493,
-      "last_oil_date": "2026-02-02T05:00:00Z",
+      "last_oil_miles": null,
+      "last_oil_date": null,
       "last_reading_miles": null,
       "last_reading_at": null,
       "last_reading_source": null,
-      "hold_reason": "NO_DEVICE",
-      "interval_miles": 5000
+      "hold_reason": null,
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0131",
@@ -1764,13 +1764,13 @@
       "plate": "LRP3259",
       "vin": "JF1GUABC6R8867567",
       "region": "PK",
-      "last_oil_miles": 62210,
-      "last_oil_date": "2026-08-28T04:00:00Z",
+      "last_oil_miles": null,
+      "last_oil_date": null,
       "last_reading_miles": null,
       "last_reading_at": null,
       "last_reading_source": null,
-      "hold_reason": "NO_DEVICE",
-      "interval_miles": 5000
+      "hold_reason": null,
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0012",
@@ -1779,13 +1779,13 @@
       "plate": "C402349",
       "vin": "JF1GUABC6R8881484",
       "region": "CT",
-      "last_oil_miles": 89856,
-      "last_oil_date": "2026-08-25T04:00:00Z",
+      "last_oil_miles": null,
+      "last_oil_date": null,
       "last_reading_miles": null,
       "last_reading_at": null,
       "last_reading_source": null,
-      "hold_reason": "NO_DEVICE",
-      "interval_miles": 5000
+      "hold_reason": null,
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0008",
@@ -1794,13 +1794,13 @@
       "plate": "C402398",
       "vin": "JF1GUABCXR8881035",
       "region": "CT",
-      "last_oil_miles": 55736,
-      "last_oil_date": "2026-07-23T04:00:00Z",
-      "last_reading_miles": 59309,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0114",
@@ -1809,13 +1809,13 @@
       "plate": "MSA6525",
       "vin": "JF1GUABC7R8884636",
       "region": "PA",
-      "last_oil_miles": 23464,
-      "last_oil_date": "2025-12-20T05:00:00Z",
+      "last_oil_miles": null,
+      "last_oil_date": null,
       "last_reading_miles": null,
       "last_reading_at": null,
       "last_reading_source": null,
-      "hold_reason": "NO_TRUSTED_FILL",
-      "interval_miles": 5000
+      "hold_reason": null,
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0107",
@@ -1824,13 +1824,13 @@
       "plate": "MRA7882",
       "vin": "JF1GUABCXR8867510",
       "region": "PA",
-      "last_oil_miles": 59019,
-      "last_oil_date": "2026-07-06T04:00:00Z",
+      "last_oil_miles": null,
+      "last_oil_date": null,
       "last_reading_miles": null,
       "last_reading_at": null,
       "last_reading_source": null,
-      "hold_reason": "NO_DEVICE",
-      "interval_miles": 5000
+      "hold_reason": null,
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0091",
@@ -1839,13 +1839,13 @@
       "plate": "Y99UVB",
       "vin": "JF1GUABC9R8880538",
       "region": "NJ",
-      "last_oil_miles": 55529,
-      "last_oil_date": "2026-08-31T04:00:00Z",
-      "last_reading_miles": 56257,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0127",
@@ -1854,13 +1854,13 @@
       "plate": "MSA6526",
       "vin": "JF1GUABC4R8884660",
       "region": "PA",
-      "last_oil_miles": 91347,
-      "last_oil_date": "2026-08-27T04:00:00Z",
-      "last_reading_miles": 93207,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0113",
@@ -1869,13 +1869,13 @@
       "plate": "MSA6527",
       "vin": "JF1GUABC0R8879651",
       "region": "PA",
-      "last_oil_miles": 52156,
-      "last_oil_date": "2026-08-11T04:00:00Z",
-      "last_reading_miles": 53475,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0129",
@@ -1884,13 +1884,13 @@
       "plate": "MSC4739",
       "vin": "JF1GUABC4R8882214",
       "region": "PA",
-      "last_oil_miles": 47127,
-      "last_oil_date": "2026-06-24T04:00:00Z",
-      "last_reading_miles": 66948,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0128",
@@ -1899,13 +1899,13 @@
       "plate": "MSC4740",
       "vin": "JF1GUABC1R8880534",
       "region": "PA",
-      "last_oil_miles": 64639,
-      "last_oil_date": "2026-07-29T04:00:00Z",
+      "last_oil_miles": null,
+      "last_oil_date": null,
       "last_reading_miles": null,
       "last_reading_at": null,
       "last_reading_source": null,
-      "hold_reason": "NO_DEVICE",
-      "interval_miles": 5000
+      "hold_reason": null,
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0104",
@@ -1914,13 +1914,13 @@
       "plate": "KSF2914",
       "vin": "JF1GUABC8R8881518",
       "region": "OH",
-      "last_oil_miles": 96337,
-      "last_oil_date": "2026-08-08T04:00:00Z",
+      "last_oil_miles": null,
+      "last_oil_date": null,
       "last_reading_miles": null,
       "last_reading_at": null,
       "last_reading_source": null,
-      "hold_reason": "NO_DEVICE",
-      "interval_miles": 5000
+      "hold_reason": null,
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0126",
@@ -1929,13 +1929,13 @@
       "plate": "MSC4741",
       "vin": "JF1GUABC0R8879214",
       "region": "PA",
-      "last_oil_miles": 129622,
-      "last_oil_date": "2026-08-17T04:00:00Z",
+      "last_oil_miles": null,
+      "last_oil_date": null,
       "last_reading_miles": null,
       "last_reading_at": null,
       "last_reading_source": null,
-      "hold_reason": "NO_DEVICE",
-      "interval_miles": 5000
+      "hold_reason": null,
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0077",
@@ -1944,13 +1944,13 @@
       "plate": "Y59UVB",
       "vin": "JF1GUABC3R8884746",
       "region": "NJ",
-      "last_oil_miles": 80344,
-      "last_oil_date": "2026-08-12T04:00:00Z",
-      "last_reading_miles": 83625,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0078",
@@ -1959,13 +1959,13 @@
       "plate": "G41UVC",
       "vin": "JF1GUABC8R8883690",
       "region": "NJ",
-      "last_oil_miles": 57036,
-      "last_oil_date": "2026-07-03T04:00:00Z",
-      "last_reading_miles": 62951,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0203",
@@ -1974,13 +1974,13 @@
       "plate": "G40UVC",
       "vin": "JF1GUABC3R8884231",
       "region": "NJ",
-      "last_oil_miles": 74980,
-      "last_oil_date": "2026-08-06T04:00:00Z",
+      "last_oil_miles": null,
+      "last_oil_date": null,
       "last_reading_miles": null,
       "last_reading_at": null,
       "last_reading_source": null,
-      "hold_reason": "NO_DEVICE",
-      "interval_miles": 5000
+      "hold_reason": null,
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0138",
@@ -1989,13 +1989,13 @@
       "plate": "1XQ164",
       "vin": "JF1GUABC8R8880028",
       "region": "RI",
-      "last_oil_miles": 27982,
-      "last_oil_date": "2026-06-17T04:00:00Z",
+      "last_oil_miles": null,
+      "last_oil_date": null,
       "last_reading_miles": null,
       "last_reading_at": null,
       "last_reading_source": null,
-      "hold_reason": "NO_DEVICE",
-      "interval_miles": 5000
+      "hold_reason": null,
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0016",
@@ -2004,13 +2004,13 @@
       "plate": "545980",
       "vin": "JF1GUABC8R8885259",
       "region": "DE",
-      "last_oil_miles": 71306,
-      "last_oil_date": "2026-08-20T04:00:00Z",
-      "last_reading_miles": 72968,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0060",
@@ -2019,13 +2019,13 @@
       "plate": "8GH8974",
       "vin": "JF1GUABC1R8883742",
       "region": "MD",
-      "last_oil_miles": 29601,
-      "last_oil_date": "2026-07-13T04:00:00Z",
-      "last_reading_miles": 32106,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0057",
@@ -2034,13 +2034,13 @@
       "plate": "1GL9592",
       "vin": "JF1GUABC2R8881935",
       "region": "MD",
-      "last_oil_miles": 47846,
-      "last_oil_date": "2026-07-22T04:00:00Z",
-      "last_reading_miles": 51054,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0055",
@@ -2049,13 +2049,13 @@
       "plate": "8GH8963",
       "vin": "JF1GUABC7R8883678",
       "region": "MD",
-      "last_oil_miles": 65735,
-      "last_oil_date": "2026-07-30T04:00:00Z",
-      "last_reading_miles": 68505,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0143",
@@ -2064,13 +2064,13 @@
       "plate": "1XQ415",
       "vin": "JF1GUABCXR8879706",
       "region": "RI",
-      "last_oil_miles": 45430,
-      "last_oil_date": "2026-07-01T04:00:00Z",
-      "last_reading_miles": 51773,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0029",
@@ -2079,13 +2079,13 @@
       "plate": "7GK7050",
       "vin": "JF1GUABC0R8882498",
       "region": "MD",
-      "last_oil_miles": 65307,
-      "last_oil_date": "2026-08-25T04:00:00Z",
-      "last_reading_miles": 66639,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0058",
@@ -2094,13 +2094,13 @@
       "plate": "1GL9590",
       "vin": "JF1GUABCXR8882069",
       "region": "MD",
-      "last_oil_miles": 42352,
-      "last_oil_date": "2026-07-23T04:00:00Z",
-      "last_reading_miles": 45006,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0047",
@@ -2109,13 +2109,13 @@
       "plate": "1GL9591",
       "vin": "JF1GUABC1R8882025",
       "region": "MD",
-      "last_oil_miles": 51314,
-      "last_oil_date": "2026-07-16T04:00:00Z",
-      "last_reading_miles": 55413,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0056",
@@ -2124,13 +2124,13 @@
       "plate": "1GL9593",
       "vin": "JF1GUABC1R8881070",
       "region": "MD",
-      "last_oil_miles": 41271,
-      "last_oil_date": "2026-08-20T04:00:00Z",
-      "last_reading_miles": 42191,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0105",
@@ -2139,13 +2139,13 @@
       "plate": "KSF2916",
       "vin": "JF1GUABCXR8850335",
       "region": "OH",
-      "last_oil_miles": 68770,
-      "last_oil_date": "2026-07-31T04:00:00Z",
+      "last_oil_miles": null,
+      "last_oil_date": null,
       "last_reading_miles": null,
       "last_reading_at": null,
       "last_reading_source": null,
-      "hold_reason": "NO_DEVICE",
-      "interval_miles": 5000
+      "hold_reason": null,
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0028",
@@ -2154,13 +2154,13 @@
       "plate": "1GL9589",
       "vin": "JF1GUABC1R8882266",
       "region": "MD",
-      "last_oil_miles": 50460,
-      "last_oil_date": "2026-08-04T04:00:00Z",
-      "last_reading_miles": 53317,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0163",
@@ -2169,13 +2169,13 @@
       "plate": "TFJ5827",
       "vin": "JF1GUABC4R8881127",
       "region": "VA",
-      "last_oil_miles": 63187,
-      "last_oil_date": "2026-07-23T04:00:00Z",
-      "last_reading_miles": 66604,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0166",
@@ -2184,13 +2184,13 @@
       "plate": "TFJ5828",
       "vin": "JF1GUABC2R8882907",
       "region": "VA",
-      "last_oil_miles": 75001,
-      "last_oil_date": "2026-07-28T04:00:00Z",
-      "last_reading_miles": 80143,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0164",
@@ -2199,13 +2199,13 @@
       "plate": "TFJ5829",
       "vin": "JF1GUABC6R8880125",
       "region": "VA",
-      "last_oil_miles": 96384,
-      "last_oil_date": "2026-08-17T04:00:00Z",
-      "last_reading_miles": 98842,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0165",
@@ -2214,13 +2214,13 @@
       "plate": "TFJ5830",
       "vin": "JF1GUABC5R8880200",
       "region": "VA",
-      "last_oil_miles": 59764,
-      "last_oil_date": "2026-08-19T04:00:00Z",
-      "last_reading_miles": 61271,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0017",
@@ -2229,13 +2229,13 @@
       "plate": "546011",
       "vin": "JF1GUABC4R8880656",
       "region": "DE",
-      "last_oil_miles": 74670,
-      "last_oil_date": "2026-08-26T04:00:00Z",
-      "last_reading_miles": 77088,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0018",
@@ -2244,13 +2244,13 @@
       "plate": "545945",
       "vin": "JF1GUABC3R8879613",
       "region": "DE",
-      "last_oil_miles": 91417,
-      "last_oil_date": "2026-07-13T04:00:00Z",
-      "last_reading_miles": 96563,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0071",
@@ -2259,13 +2259,13 @@
       "plate": "RFT095",
       "vin": "JF2SLDAC1SH424082",
       "region": "MN",
-      "last_oil_miles": 56057,
-      "last_oil_date": "2026-07-29T04:00:00Z",
-      "last_reading_miles": 61157,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0177",
@@ -2274,13 +2274,13 @@
       "plate": "SZZ9413",
       "vin": "JF1GUABC4S8327687",
       "region": "VA",
-      "last_oil_miles": 23721,
-      "last_oil_date": "2026-07-18T04:00:00Z",
-      "last_reading_miles": 28546,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0121",
@@ -2289,13 +2289,13 @@
       "plate": "NCJ6194",
       "vin": "JF1GUABC5S8327911",
       "region": "PA",
-      "last_oil_miles": 20179,
-      "last_oil_date": "2026-07-02T04:00:00Z",
-      "last_reading_miles": 26779,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0119",
@@ -2304,13 +2304,13 @@
       "plate": "NCJ6193",
       "vin": "JF1GUABC4S8327835",
       "region": "PA",
-      "last_oil_miles": 11016,
-      "last_oil_date": "2026-05-15T04:00:00Z",
+      "last_oil_miles": null,
+      "last_oil_date": null,
       "last_reading_miles": null,
       "last_reading_at": null,
       "last_reading_source": null,
-      "hold_reason": "NO_DEVICE",
-      "interval_miles": 5000
+      "hold_reason": null,
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0175",
@@ -2319,13 +2319,13 @@
       "plate": "TBB9059",
       "vin": "JF1GUABC0S8320574",
       "region": "VA",
-      "last_oil_miles": 29146,
-      "last_oil_date": "2026-08-19T04:00:00Z",
-      "last_reading_miles": 29703,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0062",
@@ -2334,13 +2334,13 @@
       "plate": "7GT8592",
       "vin": "JF1GUABC7S8282521",
       "region": "MD",
-      "last_oil_miles": 15221,
-      "last_oil_date": "2026-06-10T04:00:00Z",
-      "last_reading_miles": 19504,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0064",
@@ -2349,13 +2349,13 @@
       "plate": "9GT9257",
       "vin": "JF1GUABC4S8322750",
       "region": "MD",
-      "last_oil_miles": 30341,
-      "last_oil_date": "2026-08-03T04:00:00Z",
-      "last_reading_miles": 33638,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0063",
@@ -2364,13 +2364,13 @@
       "plate": "9GT9258",
       "vin": "JF1GUABC9S8320458",
       "region": "MD",
-      "last_oil_miles": 10575,
-      "last_oil_date": "2026-03-09T04:00:00Z",
-      "last_reading_miles": 23863,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0065",
@@ -2379,13 +2379,13 @@
       "plate": "5GV7111",
       "vin": "JF1GUABC2S8331138",
       "region": "MD",
-      "last_oil_miles": 22896,
-      "last_oil_date": "2026-06-24T04:00:00Z",
-      "last_reading_miles": 26591,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0176",
@@ -2394,13 +2394,13 @@
       "plate": "TBB9170",
       "vin": "JF1GUABC8S8333931",
       "region": "VA",
-      "last_oil_miles": 70243,
-      "last_oil_date": "2026-08-29T04:00:00Z",
-      "last_reading_miles": 70897,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0162",
@@ -2409,13 +2409,13 @@
       "plate": "TBB9047",
       "vin": "JF1GUABC0S8305024",
       "region": "VA",
-      "last_oil_miles": 26691,
-      "last_oil_date": "2026-08-09T04:00:00Z",
-      "last_reading_miles": 28469,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0096",
@@ -2426,9 +2426,9 @@
       "region": "NYC",
       "last_oil_miles": null,
       "last_oil_date": null,
-      "last_reading_miles": 5209,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
       "interval_miles": 0
     },
@@ -2439,13 +2439,13 @@
       "plate": "LZN4076",
       "vin": "JF1GUABCXS8331193",
       "region": "NYC",
-      "last_oil_miles": 6855,
-      "last_oil_date": "2026-05-11T04:00:00Z",
+      "last_oil_miles": null,
+      "last_oil_date": null,
       "last_reading_miles": null,
       "last_reading_at": null,
       "last_reading_source": null,
-      "hold_reason": "NO_DEVICE",
-      "interval_miles": 5000
+      "hold_reason": null,
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0090",
@@ -2454,13 +2454,13 @@
       "plate": "N61WAM",
       "vin": "JF1GUABC4S8334249",
       "region": "NJ",
-      "last_oil_miles": 9142,
-      "last_oil_date": "2026-06-29T04:00:00Z",
+      "last_oil_miles": null,
+      "last_oil_date": null,
       "last_reading_miles": null,
       "last_reading_at": null,
       "last_reading_source": null,
-      "hold_reason": "NO_DEVICE",
-      "interval_miles": 5000
+      "hold_reason": null,
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0185",
@@ -2474,7 +2474,7 @@
       "last_reading_miles": null,
       "last_reading_at": null,
       "last_reading_source": null,
-      "hold_reason": "NO_DEVICE",
+      "hold_reason": null,
       "interval_miles": 0
     },
     {
@@ -2484,13 +2484,13 @@
       "plate": "N59WAM",
       "vin": "JF1GUABC4S8331013",
       "region": "NJ",
-      "last_oil_miles": 19936,
-      "last_oil_date": "2026-08-02T04:00:00Z",
-      "last_reading_miles": 25172,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0088",
@@ -2499,13 +2499,13 @@
       "plate": "K17VWS",
       "vin": "JF1GUABC6S8322832",
       "region": "NJ",
-      "last_oil_miles": 16825,
-      "last_oil_date": "2026-07-08T04:00:00Z",
+      "last_oil_miles": null,
+      "last_oil_date": null,
       "last_reading_miles": null,
       "last_reading_at": null,
       "last_reading_source": null,
-      "hold_reason": "NO_DEVICE",
-      "interval_miles": 5000
+      "hold_reason": null,
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0205",
@@ -2514,13 +2514,13 @@
       "plate": "LZN4077",
       "vin": "JF1GUABC6S8334009",
       "region": "OFFICE",
-      "last_oil_miles": 8923,
-      "last_oil_date": "2026-06-01T04:00:00Z",
+      "last_oil_miles": null,
+      "last_oil_date": null,
       "last_reading_miles": null,
       "last_reading_at": null,
       "last_reading_source": null,
-      "hold_reason": "NO_DEVICE",
-      "interval_miles": 5000
+      "hold_reason": null,
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0093",
@@ -2529,13 +2529,13 @@
       "plate": "K67VWS",
       "vin": "JF1GUABC2S8327784",
       "region": "NJ",
-      "last_oil_miles": 13920,
-      "last_oil_date": "2026-06-15T04:00:00Z",
-      "last_reading_miles": 18564,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0086",
@@ -2549,7 +2549,7 @@
       "last_reading_miles": null,
       "last_reading_at": null,
       "last_reading_source": null,
-      "hold_reason": "NO_DEVICE",
+      "hold_reason": null,
       "interval_miles": 0
     },
     {
@@ -2559,13 +2559,13 @@
       "plate": "TBY6896",
       "vin": "JF1GUABC7S8249504",
       "region": "VA",
-      "last_oil_miles": 36529,
-      "last_oil_date": "2026-07-27T04:00:00Z",
-      "last_reading_miles": 40081,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0170",
@@ -2574,13 +2574,13 @@
       "plate": "TBY6897",
       "vin": "JF1GUABC6S8256914",
       "region": "VA",
-      "last_oil_miles": 61364,
-      "last_oil_date": "2026-08-21T04:00:00Z",
-      "last_reading_miles": 62694,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0171",
@@ -2589,13 +2589,13 @@
       "plate": "TBY6898",
       "vin": "JF1GUABC2S8259390",
       "region": "VA",
-      "last_oil_miles": 57562,
-      "last_oil_date": "2026-08-20T04:00:00Z",
-      "last_reading_miles": 60647,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0172",
@@ -2604,13 +2604,13 @@
       "plate": "TBY6963",
       "vin": "JF1GUABC5S8258976",
       "region": "VA",
-      "last_oil_miles": 61718,
-      "last_oil_date": "2026-07-22T04:00:00Z",
-      "last_reading_miles": 68128,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0059",
@@ -2619,13 +2619,13 @@
       "plate": "4GT0927",
       "vin": "JF1GUABC7S8266268",
       "region": "MD",
-      "last_oil_miles": 22735,
-      "last_oil_date": "2026-05-20T04:00:00Z",
-      "last_reading_miles": 32108,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0173",
@@ -2634,13 +2634,13 @@
       "plate": "TBY6964",
       "vin": "JF1GUABC1S8243276",
       "region": "VA",
-      "last_oil_miles": 30020,
-      "last_oil_date": "2026-08-10T04:00:00Z",
-      "last_reading_miles": 32270,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0174",
@@ -2649,13 +2649,13 @@
       "plate": "TBY6899",
       "vin": "JF1GUABC1S8282868",
       "region": "VA",
-      "last_oil_miles": 86080,
-      "last_oil_date": "2026-08-09T04:00:00Z",
-      "last_reading_miles": 91493,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0084",
@@ -2664,13 +2664,13 @@
       "plate": "J79VWS",
       "vin": "JF1GUABC3S8303235",
       "region": "NJ",
-      "last_oil_miles": 35369,
-      "last_oil_date": "2026-06-18T04:00:00Z",
-      "last_reading_miles": 44291,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0085",
@@ -2679,13 +2679,13 @@
       "plate": "J77VWS",
       "vin": "JF1GUABCXS8293318",
       "region": "NJ",
-      "last_oil_miles": 20946,
-      "last_oil_date": "2026-08-16T04:00:00Z",
-      "last_reading_miles": 22270,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0118",
@@ -2694,13 +2694,13 @@
       "plate": "MZX3714",
       "vin": "JF1GUABC0S8311664",
       "region": "PA",
-      "last_oil_miles": 42212,
-      "last_oil_date": "2026-08-18T04:00:00Z",
-      "last_reading_miles": 44386,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0120",
@@ -2709,13 +2709,13 @@
       "plate": "NBB7076",
       "vin": "JF1GUABC6S8297835",
       "region": "PA",
-      "last_oil_miles": 29662,
-      "last_oil_date": "2026-07-29T04:00:00Z",
+      "last_oil_miles": null,
+      "last_oil_date": null,
       "last_reading_miles": null,
       "last_reading_at": null,
       "last_reading_source": null,
-      "hold_reason": "NO_DEVICE",
-      "interval_miles": 5000
+      "hold_reason": null,
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0081",
@@ -2724,13 +2724,13 @@
       "plate": "J78VWS",
       "vin": "JF1GUABC8S8287470",
       "region": "NJ",
-      "last_oil_miles": 29061,
-      "last_oil_date": "2026-08-25T04:00:00Z",
-      "last_reading_miles": 31695,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0061",
@@ -2739,13 +2739,13 @@
       "plate": "9GT9229",
       "vin": "JF1GUABC6S8294157",
       "region": "MD",
-      "last_oil_miles": 20475,
-      "last_oil_date": "2026-08-26T04:00:00Z",
-      "last_reading_miles": 20966,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0134",
@@ -2754,13 +2754,13 @@
       "plate": "-",
       "vin": "4S3GTAB60N3700779",
       "region": "RI",
-      "last_oil_miles": 103315,
-      "last_oil_date": "2026-02-16T05:00:00Z",
-      "last_reading_miles": 111070,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0188",
@@ -2769,13 +2769,13 @@
       "plate": "MAU2095",
       "vin": "JF2SLDAC9SH614471",
       "region": "WNY",
-      "last_oil_miles": 36212,
-      "last_oil_date": "2026-07-20T04:00:00Z",
-      "last_reading_miles": 43659,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0066",
@@ -2784,11 +2784,11 @@
       "plate": "2HB2147",
       "vin": "JF1GUAFCXT8244471",
       "region": "MD",
-      "last_oil_miles": 5170,
-      "last_oil_date": "2026-08-24T04:00:00Z",
-      "last_reading_miles": 5973,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
       "interval_miles": 0
     },
@@ -2804,7 +2804,7 @@
       "last_reading_miles": null,
       "last_reading_at": null,
       "last_reading_source": null,
-      "hold_reason": "NO_TRUSTED_FILL",
+      "hold_reason": null,
       "interval_miles": 0
     },
     {
@@ -2814,13 +2814,13 @@
       "plate": "E79WST",
       "vin": "JF1GUAFC9T8244607",
       "region": "NJ",
-      "last_oil_miles": 8267,
-      "last_oil_date": "2026-07-29T04:00:00Z",
-      "last_reading_miles": 12052,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0200",
@@ -2834,7 +2834,7 @@
       "last_reading_miles": null,
       "last_reading_at": null,
       "last_reading_source": null,
-      "hold_reason": "NO_TRUSTED_FILL",
+      "hold_reason": null,
       "interval_miles": 0
     },
     {
@@ -2844,13 +2844,13 @@
       "plate": "SWV1203",
       "vin": "JF1GUAFC0T8240638",
       "region": "VA",
-      "last_oil_miles": 11443,
-      "last_oil_date": "2026-08-15T04:00:00Z",
-      "last_reading_miles": 13020,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0182",
@@ -2859,13 +2859,13 @@
       "plate": "SWC8397",
       "vin": "JF1GUAFC3T8250659",
       "region": "VA",
-      "last_oil_miles": 5162,
-      "last_oil_date": "2026-07-21T04:00:00Z",
-      "last_reading_miles": 11215,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0183",
@@ -2876,9 +2876,9 @@
       "region": "VA",
       "last_oil_miles": null,
       "last_oil_date": null,
-      "last_reading_miles": 5193,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
       "interval_miles": 0
     },
@@ -2894,7 +2894,7 @@
       "last_reading_miles": null,
       "last_reading_at": null,
       "last_reading_source": null,
-      "hold_reason": "NO_DEVICE",
+      "hold_reason": null,
       "interval_miles": 0
     },
     {
@@ -2909,7 +2909,7 @@
       "last_reading_miles": null,
       "last_reading_at": null,
       "last_reading_source": null,
-      "hold_reason": "NO_DEVICE",
+      "hold_reason": null,
       "interval_miles": 0
     },
     {
@@ -2921,9 +2921,9 @@
       "region": "MD",
       "last_oil_miles": null,
       "last_oil_date": null,
-      "last_reading_miles": 4182,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
       "interval_miles": 0
     },
@@ -2936,9 +2936,9 @@
       "region": "NYC",
       "last_oil_miles": null,
       "last_oil_date": null,
-      "last_reading_miles": 4414,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
       "interval_miles": 0
     },
@@ -2954,7 +2954,7 @@
       "last_reading_miles": null,
       "last_reading_at": null,
       "last_reading_source": null,
-      "hold_reason": "NO_TRUSTED_FILL",
+      "hold_reason": null,
       "interval_miles": 0
     },
     {
@@ -2964,11 +2964,11 @@
       "plate": "7HC2634",
       "vin": "JF1GUAFC6T8262384",
       "region": "MD",
-      "last_oil_miles": 7021,
-      "last_oil_date": "2026-08-20T04:00:00Z",
-      "last_reading_miles": 9726,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
       "interval_miles": 0
     },
@@ -2979,13 +2979,13 @@
       "plate": "SWC8507",
       "vin": "JF1GUAFC9T8259477",
       "region": "VA",
-      "last_oil_miles": 4804,
-      "last_oil_date": "2026-08-08T04:00:00Z",
-      "last_reading_miles": 7468,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0130",
@@ -2996,9 +2996,9 @@
       "region": "PA",
       "last_oil_miles": null,
       "last_oil_date": null,
-      "last_reading_miles": 7154,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
       "interval_miles": 0
     },
@@ -3011,9 +3011,9 @@
       "region": "CT",
       "last_oil_miles": null,
       "last_oil_date": null,
-      "last_reading_miles": 15775,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
       "interval_miles": 0
     },
@@ -3024,13 +3024,13 @@
       "plate": "SWV1140",
       "vin": "7MUAAABGXTV172027",
       "region": "VA",
-      "last_oil_miles": 15469,
-      "last_oil_date": "2026-08-17T04:00:00Z",
-      "last_reading_miles": 17236,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0074",
@@ -3044,7 +3044,7 @@
       "last_reading_miles": null,
       "last_reading_at": null,
       "last_reading_source": null,
-      "hold_reason": "NO_DEVICE",
+      "hold_reason": null,
       "interval_miles": 0
     },
     {
@@ -3054,13 +3054,13 @@
       "plate": "SWV1285",
       "vin": "7MUAAABGXTV180192",
       "region": "VA",
-      "last_oil_miles": 14803,
-      "last_oil_date": "2026-08-25T04:00:00Z",
-      "last_reading_miles": 16271,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
+      "interval_miles": 0
     },
     {
       "pdi_id": "PDI-0179",
@@ -3069,1431 +3069,13 @@
       "plate": "SWV1166",
       "vin": "7MUAAABG3TV174346",
       "region": "VA",
-      "last_oil_miles": 11939,
-      "last_oil_date": "2026-07-25T04:00:00Z",
-      "last_reading_miles": 16296,
-      "last_reading_at": "2026-09-01T14:00:00Z",
-      "last_reading_source": "fuel_details",
+      "last_oil_miles": null,
+      "last_oil_date": null,
+      "last_reading_miles": null,
+      "last_reading_at": null,
+      "last_reading_source": null,
       "hold_reason": null,
-      "interval_miles": 5000
-    }
-  ],
-  "holds": [
-    {
-      "efleets_id": "26K8M5",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-03T18:33:29Z"
-    },
-    {
-      "efleets_id": "26LSZT",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-03T18:33:29Z"
-    },
-    {
-      "efleets_id": "26LSZZ",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-03T18:33:29Z"
-    },
-    {
-      "efleets_id": "26LT22",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-03T18:33:29Z"
-    },
-    {
-      "efleets_id": "26XFWJ",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-03T18:33:29Z"
-    },
-    {
-      "efleets_id": "26ZMJT",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-03T18:33:29Z"
-    },
-    {
-      "efleets_id": "26ZMK4",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-03T18:33:29Z"
-    },
-    {
-      "efleets_id": "273LKC",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-03T18:33:29Z"
-    },
-    {
-      "efleets_id": "279G47",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-03T18:33:29Z"
-    },
-    {
-      "efleets_id": "27BV6Z",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-03T18:33:29Z"
-    },
-    {
-      "efleets_id": "27BV73",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-03T18:33:29Z"
-    },
-    {
-      "efleets_id": "27BV79",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-03T18:33:29Z"
-    },
-    {
-      "efleets_id": "27BV7C",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-03T18:33:29Z"
-    },
-    {
-      "efleets_id": "27CKN3",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-03T18:33:29Z"
-    },
-    {
-      "efleets_id": "27F34S",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-03T18:33:29Z"
-    },
-    {
-      "efleets_id": "27J2TN",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-03T18:33:29Z"
-    },
-    {
-      "efleets_id": "27LB4C",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-03T18:33:29Z"
-    },
-    {
-      "efleets_id": "27LDCM",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-03T18:33:29Z"
-    },
-    {
-      "efleets_id": "27LDCQ",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-03T18:33:29Z"
-    },
-    {
-      "efleets_id": "27P5HZ",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-03T18:33:29Z"
-    },
-    {
-      "efleets_id": "27P5J4",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-03T18:33:29Z"
-    },
-    {
-      "efleets_id": "27SGWZ",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-03T18:33:29Z"
-    },
-    {
-      "efleets_id": "27SGXC",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-03T18:33:29Z"
-    },
-    {
-      "efleets_id": "27SGXD",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-03T18:33:29Z"
-    },
-    {
-      "efleets_id": "27SGXF",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-03T18:33:29Z"
-    },
-    {
-      "efleets_id": "27SGXM",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-03T18:33:29Z"
-    },
-    {
-      "efleets_id": "27SGXN",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-03T18:33:29Z"
-    },
-    {
-      "efleets_id": "27SGXP",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-03T18:33:29Z"
-    },
-    {
-      "efleets_id": "27SGXR",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-03T18:33:29Z"
-    },
-    {
-      "efleets_id": "27SGXT",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-03T18:33:29Z"
-    },
-    {
-      "efleets_id": "27SGXV",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-03T18:33:29Z"
-    },
-    {
-      "efleets_id": "27SKLJ",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-03T18:33:29Z"
-    },
-    {
-      "efleets_id": "27SW4R",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-03T18:33:29Z"
-    },
-    {
-      "efleets_id": "27SW52",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-03T18:33:29Z"
-    },
-    {
-      "efleets_id": "285JCC",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-03T18:33:29Z"
-    },
-    {
-      "efleets_id": "285JCD",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-03T18:33:29Z"
-    },
-    {
-      "efleets_id": "285JCF",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-03T18:33:29Z"
-    },
-    {
-      "efleets_id": "285JCH",
-      "reason": "NO_TRUSTED_FILL",
-      "detail": "no DETAILS fill or shop RO survived checks",
-      "at": "2026-09-03T18:33:29Z"
-    },
-    {
-      "efleets_id": "285JCJ",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-03T18:33:29Z"
-    },
-    {
-      "efleets_id": "285JCP",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-03T18:33:29Z"
-    },
-    {
-      "efleets_id": "285JCQ",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-03T18:33:29Z"
-    },
-    {
-      "efleets_id": "285JCR",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-03T18:33:29Z"
-    },
-    {
-      "efleets_id": "285JCV",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-03T18:33:29Z"
-    },
-    {
-      "efleets_id": "285JCX",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-03T18:33:29Z"
-    },
-    {
-      "efleets_id": "285JDB",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-03T18:33:29Z"
-    },
-    {
-      "efleets_id": "292NCX",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-03T18:33:29Z"
-    },
-    {
-      "efleets_id": "292NFQ",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-03T18:33:29Z"
-    },
-    {
-      "efleets_id": "292NFR",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-03T18:33:29Z"
-    },
-    {
-      "efleets_id": "292NFS",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-03T18:33:29Z"
-    },
-    {
-      "efleets_id": "292NFV",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-03T18:33:29Z"
-    },
-    {
-      "efleets_id": "292NFW",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-03T18:33:29Z"
-    },
-    {
-      "efleets_id": "292NFZ",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-03T18:33:29Z"
-    },
-    {
-      "efleets_id": "29FXD9",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-03T18:33:29Z"
-    },
-    {
-      "efleets_id": "2B7P7N",
-      "reason": "NO_TRUSTED_FILL",
-      "detail": "no DETAILS fill or shop RO survived checks",
-      "at": "2026-09-03T18:33:29Z"
-    },
-    {
-      "efleets_id": "2B7P7Q",
-      "reason": "NO_TRUSTED_FILL",
-      "detail": "no DETAILS fill or shop RO survived checks",
-      "at": "2026-09-03T18:33:29Z"
-    },
-    {
-      "efleets_id": "2B7P7V",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-03T18:33:29Z"
-    },
-    {
-      "efleets_id": "2B7P7W",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-03T18:33:29Z"
-    },
-    {
-      "efleets_id": "2B7P82",
-      "reason": "NO_TRUSTED_FILL",
-      "detail": "no DETAILS fill or shop RO survived checks",
-      "at": "2026-09-03T18:33:29Z"
-    },
-    {
-      "efleets_id": "2B8C3K",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-03T18:33:29Z"
-    },
-    {
-      "efleets_id": "26K8M5",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T01:02:44Z"
-    },
-    {
-      "efleets_id": "26LSZT",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T01:02:44Z"
-    },
-    {
-      "efleets_id": "26LSZZ",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T01:02:44Z"
-    },
-    {
-      "efleets_id": "26LT22",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T01:02:44Z"
-    },
-    {
-      "efleets_id": "26XFWJ",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T01:02:44Z"
-    },
-    {
-      "efleets_id": "26ZMJT",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T01:02:44Z"
-    },
-    {
-      "efleets_id": "26ZMK4",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T01:02:44Z"
-    },
-    {
-      "efleets_id": "273LKC",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T01:02:44Z"
-    },
-    {
-      "efleets_id": "279G47",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T01:02:44Z"
-    },
-    {
-      "efleets_id": "27BV6Z",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T01:02:44Z"
-    },
-    {
-      "efleets_id": "27BV73",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T01:02:44Z"
-    },
-    {
-      "efleets_id": "27BV79",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T01:02:44Z"
-    },
-    {
-      "efleets_id": "27BV7C",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T01:02:44Z"
-    },
-    {
-      "efleets_id": "27CKN3",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T01:02:44Z"
-    },
-    {
-      "efleets_id": "27F34S",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T01:02:44Z"
-    },
-    {
-      "efleets_id": "27J2TN",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T01:02:44Z"
-    },
-    {
-      "efleets_id": "27LB4C",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T01:02:44Z"
-    },
-    {
-      "efleets_id": "27LDCM",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T01:02:44Z"
-    },
-    {
-      "efleets_id": "27LDCQ",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T01:02:44Z"
-    },
-    {
-      "efleets_id": "27P5HZ",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T01:02:44Z"
-    },
-    {
-      "efleets_id": "27P5J4",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T01:02:44Z"
-    },
-    {
-      "efleets_id": "27SGWZ",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T01:02:44Z"
-    },
-    {
-      "efleets_id": "27SGXC",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T01:02:44Z"
-    },
-    {
-      "efleets_id": "27SGXD",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T01:02:44Z"
-    },
-    {
-      "efleets_id": "27SGXF",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T01:02:44Z"
-    },
-    {
-      "efleets_id": "27SGXM",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T01:02:44Z"
-    },
-    {
-      "efleets_id": "27SGXN",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T01:02:44Z"
-    },
-    {
-      "efleets_id": "27SGXP",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T01:02:44Z"
-    },
-    {
-      "efleets_id": "27SGXR",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T01:02:44Z"
-    },
-    {
-      "efleets_id": "27SGXT",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T01:02:44Z"
-    },
-    {
-      "efleets_id": "27SGXV",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T01:02:44Z"
-    },
-    {
-      "efleets_id": "27SKLJ",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T01:02:44Z"
-    },
-    {
-      "efleets_id": "27SW4R",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T01:02:44Z"
-    },
-    {
-      "efleets_id": "27SW52",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T01:02:44Z"
-    },
-    {
-      "efleets_id": "285JCC",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T01:02:44Z"
-    },
-    {
-      "efleets_id": "285JCD",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T01:02:44Z"
-    },
-    {
-      "efleets_id": "285JCF",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T01:02:44Z"
-    },
-    {
-      "efleets_id": "285JCH",
-      "reason": "NO_TRUSTED_FILL",
-      "detail": "no DETAILS fill or shop RO survived checks",
-      "at": "2026-09-04T01:02:44Z"
-    },
-    {
-      "efleets_id": "285JCJ",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T01:02:44Z"
-    },
-    {
-      "efleets_id": "285JCP",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T01:02:44Z"
-    },
-    {
-      "efleets_id": "285JCQ",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T01:02:45Z"
-    },
-    {
-      "efleets_id": "285JCR",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T01:02:45Z"
-    },
-    {
-      "efleets_id": "285JCV",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T01:02:45Z"
-    },
-    {
-      "efleets_id": "285JCX",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T01:02:45Z"
-    },
-    {
-      "efleets_id": "285JDB",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T01:02:45Z"
-    },
-    {
-      "efleets_id": "292NCX",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T01:02:45Z"
-    },
-    {
-      "efleets_id": "292NFQ",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T01:02:45Z"
-    },
-    {
-      "efleets_id": "292NFR",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T01:02:45Z"
-    },
-    {
-      "efleets_id": "292NFS",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T01:02:45Z"
-    },
-    {
-      "efleets_id": "292NFV",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T01:02:45Z"
-    },
-    {
-      "efleets_id": "292NFW",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T01:02:45Z"
-    },
-    {
-      "efleets_id": "292NFZ",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T01:02:45Z"
-    },
-    {
-      "efleets_id": "29FXD9",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T01:02:45Z"
-    },
-    {
-      "efleets_id": "2B7P7N",
-      "reason": "NO_TRUSTED_FILL",
-      "detail": "no DETAILS fill or shop RO survived checks",
-      "at": "2026-09-04T01:02:45Z"
-    },
-    {
-      "efleets_id": "2B7P7Q",
-      "reason": "NO_TRUSTED_FILL",
-      "detail": "no DETAILS fill or shop RO survived checks",
-      "at": "2026-09-04T01:02:45Z"
-    },
-    {
-      "efleets_id": "2B7P7V",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T01:02:45Z"
-    },
-    {
-      "efleets_id": "2B7P7W",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T01:02:45Z"
-    },
-    {
-      "efleets_id": "2B7P82",
-      "reason": "NO_TRUSTED_FILL",
-      "detail": "no DETAILS fill or shop RO survived checks",
-      "at": "2026-09-04T01:02:45Z"
-    },
-    {
-      "efleets_id": "2B8C3K",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T01:02:45Z"
-    },
-    {
-      "efleets_id": "26K8M5",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:40:24Z"
-    },
-    {
-      "efleets_id": "26LSZT",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:40:24Z"
-    },
-    {
-      "efleets_id": "26LSZZ",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:40:24Z"
-    },
-    {
-      "efleets_id": "26LT22",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:40:24Z"
-    },
-    {
-      "efleets_id": "26XFWJ",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:40:24Z"
-    },
-    {
-      "efleets_id": "26ZMJT",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:40:24Z"
-    },
-    {
-      "efleets_id": "26ZMK4",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:40:24Z"
-    },
-    {
-      "efleets_id": "273LKC",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:40:24Z"
-    },
-    {
-      "efleets_id": "279G47",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:40:24Z"
-    },
-    {
-      "efleets_id": "27BV6Z",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:40:24Z"
-    },
-    {
-      "efleets_id": "27BV73",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:40:24Z"
-    },
-    {
-      "efleets_id": "27BV79",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:40:24Z"
-    },
-    {
-      "efleets_id": "27BV7C",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:40:24Z"
-    },
-    {
-      "efleets_id": "27CKN3",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:40:24Z"
-    },
-    {
-      "efleets_id": "27F34S",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:40:25Z"
-    },
-    {
-      "efleets_id": "27J2TN",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:40:25Z"
-    },
-    {
-      "efleets_id": "27LB4C",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:40:25Z"
-    },
-    {
-      "efleets_id": "27LDCM",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:40:25Z"
-    },
-    {
-      "efleets_id": "27LDCQ",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:40:25Z"
-    },
-    {
-      "efleets_id": "27P5HZ",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:40:25Z"
-    },
-    {
-      "efleets_id": "27P5J4",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:40:25Z"
-    },
-    {
-      "efleets_id": "27SGWZ",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:40:25Z"
-    },
-    {
-      "efleets_id": "27SGXC",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:40:25Z"
-    },
-    {
-      "efleets_id": "27SGXD",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:40:25Z"
-    },
-    {
-      "efleets_id": "27SGXF",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:40:25Z"
-    },
-    {
-      "efleets_id": "27SGXM",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:40:25Z"
-    },
-    {
-      "efleets_id": "27SGXN",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:40:25Z"
-    },
-    {
-      "efleets_id": "27SGXP",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:40:25Z"
-    },
-    {
-      "efleets_id": "27SGXR",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:40:25Z"
-    },
-    {
-      "efleets_id": "27SGXT",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:40:25Z"
-    },
-    {
-      "efleets_id": "27SGXV",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:40:25Z"
-    },
-    {
-      "efleets_id": "27SKLJ",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:40:25Z"
-    },
-    {
-      "efleets_id": "27SW4R",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:40:25Z"
-    },
-    {
-      "efleets_id": "27SW52",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:40:25Z"
-    },
-    {
-      "efleets_id": "285JCC",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:40:25Z"
-    },
-    {
-      "efleets_id": "285JCD",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:40:25Z"
-    },
-    {
-      "efleets_id": "285JCF",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:40:25Z"
-    },
-    {
-      "efleets_id": "285JCH",
-      "reason": "NO_TRUSTED_FILL",
-      "detail": "no DETAILS fill or shop RO survived checks",
-      "at": "2026-09-04T02:40:25Z"
-    },
-    {
-      "efleets_id": "285JCJ",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:40:25Z"
-    },
-    {
-      "efleets_id": "285JCP",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:40:25Z"
-    },
-    {
-      "efleets_id": "285JCQ",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:40:25Z"
-    },
-    {
-      "efleets_id": "285JCR",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:40:25Z"
-    },
-    {
-      "efleets_id": "285JCV",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:40:25Z"
-    },
-    {
-      "efleets_id": "285JCX",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:40:25Z"
-    },
-    {
-      "efleets_id": "285JDB",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:40:25Z"
-    },
-    {
-      "efleets_id": "292NCX",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:40:25Z"
-    },
-    {
-      "efleets_id": "292NFQ",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:40:25Z"
-    },
-    {
-      "efleets_id": "292NFR",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:40:25Z"
-    },
-    {
-      "efleets_id": "292NFS",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:40:25Z"
-    },
-    {
-      "efleets_id": "292NFV",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:40:25Z"
-    },
-    {
-      "efleets_id": "292NFW",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:40:25Z"
-    },
-    {
-      "efleets_id": "292NFZ",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:40:25Z"
-    },
-    {
-      "efleets_id": "29FXD9",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:40:25Z"
-    },
-    {
-      "efleets_id": "2B7P7N",
-      "reason": "NO_TRUSTED_FILL",
-      "detail": "no DETAILS fill or shop RO survived checks",
-      "at": "2026-09-04T02:40:25Z"
-    },
-    {
-      "efleets_id": "2B7P7Q",
-      "reason": "NO_TRUSTED_FILL",
-      "detail": "no DETAILS fill or shop RO survived checks",
-      "at": "2026-09-04T02:40:25Z"
-    },
-    {
-      "efleets_id": "2B7P7V",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:40:25Z"
-    },
-    {
-      "efleets_id": "2B7P7W",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:40:25Z"
-    },
-    {
-      "efleets_id": "2B7P82",
-      "reason": "NO_TRUSTED_FILL",
-      "detail": "no DETAILS fill or shop RO survived checks",
-      "at": "2026-09-04T02:40:25Z"
-    },
-    {
-      "efleets_id": "2B8C3K",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:40:25Z"
-    },
-    {
-      "efleets_id": "26K8M5",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:57:39Z"
-    },
-    {
-      "efleets_id": "26LSZT",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:57:39Z"
-    },
-    {
-      "efleets_id": "26LSZZ",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:57:39Z"
-    },
-    {
-      "efleets_id": "26LT22",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:57:39Z"
-    },
-    {
-      "efleets_id": "26XFWJ",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:57:39Z"
-    },
-    {
-      "efleets_id": "26ZMJT",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:57:39Z"
-    },
-    {
-      "efleets_id": "26ZMK4",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:57:39Z"
-    },
-    {
-      "efleets_id": "273LKC",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:57:39Z"
-    },
-    {
-      "efleets_id": "279G47",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:57:39Z"
-    },
-    {
-      "efleets_id": "27BV6Z",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:57:39Z"
-    },
-    {
-      "efleets_id": "27BV73",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:57:39Z"
-    },
-    {
-      "efleets_id": "27BV79",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:57:39Z"
-    },
-    {
-      "efleets_id": "27BV7C",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:57:39Z"
-    },
-    {
-      "efleets_id": "27CKN3",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:57:39Z"
-    },
-    {
-      "efleets_id": "27F34S",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:57:39Z"
-    },
-    {
-      "efleets_id": "27J2TN",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:57:39Z"
-    },
-    {
-      "efleets_id": "27LB4C",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:57:39Z"
-    },
-    {
-      "efleets_id": "27LDCM",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:57:39Z"
-    },
-    {
-      "efleets_id": "27LDCQ",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:57:39Z"
-    },
-    {
-      "efleets_id": "27P5HZ",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:57:39Z"
-    },
-    {
-      "efleets_id": "27P5J4",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:57:39Z"
-    },
-    {
-      "efleets_id": "27SGWZ",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:57:39Z"
-    },
-    {
-      "efleets_id": "27SGXC",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:57:39Z"
-    },
-    {
-      "efleets_id": "27SGXD",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:57:39Z"
-    },
-    {
-      "efleets_id": "27SGXF",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:57:39Z"
-    },
-    {
-      "efleets_id": "27SGXM",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:57:39Z"
-    },
-    {
-      "efleets_id": "27SGXN",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:57:39Z"
-    },
-    {
-      "efleets_id": "27SGXP",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:57:39Z"
-    },
-    {
-      "efleets_id": "27SGXR",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:57:39Z"
-    },
-    {
-      "efleets_id": "27SGXT",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:57:39Z"
-    },
-    {
-      "efleets_id": "27SGXV",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:57:39Z"
-    },
-    {
-      "efleets_id": "27SKLJ",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:57:39Z"
-    },
-    {
-      "efleets_id": "27SW4R",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:57:39Z"
-    },
-    {
-      "efleets_id": "27SW52",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:57:39Z"
-    },
-    {
-      "efleets_id": "285JCC",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:57:39Z"
-    },
-    {
-      "efleets_id": "285JCD",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:57:39Z"
-    },
-    {
-      "efleets_id": "285JCF",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:57:39Z"
-    },
-    {
-      "efleets_id": "285JCH",
-      "reason": "NO_TRUSTED_FILL",
-      "detail": "no DETAILS fill or shop RO survived checks",
-      "at": "2026-09-04T02:57:39Z"
-    },
-    {
-      "efleets_id": "285JCJ",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:57:39Z"
-    },
-    {
-      "efleets_id": "285JCP",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:57:39Z"
-    },
-    {
-      "efleets_id": "285JCQ",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:57:39Z"
-    },
-    {
-      "efleets_id": "285JCR",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:57:39Z"
-    },
-    {
-      "efleets_id": "285JCV",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:57:39Z"
-    },
-    {
-      "efleets_id": "285JCX",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:57:39Z"
-    },
-    {
-      "efleets_id": "285JDB",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:57:39Z"
-    },
-    {
-      "efleets_id": "292NCX",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:57:39Z"
-    },
-    {
-      "efleets_id": "292NFQ",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:57:39Z"
-    },
-    {
-      "efleets_id": "292NFR",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:57:39Z"
-    },
-    {
-      "efleets_id": "292NFS",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:57:39Z"
-    },
-    {
-      "efleets_id": "292NFV",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:57:39Z"
-    },
-    {
-      "efleets_id": "292NFW",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:57:39Z"
-    },
-    {
-      "efleets_id": "292NFZ",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:57:39Z"
-    },
-    {
-      "efleets_id": "29FXD9",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:57:39Z"
-    },
-    {
-      "efleets_id": "2B7P7N",
-      "reason": "NO_TRUSTED_FILL",
-      "detail": "no DETAILS fill or shop RO survived checks",
-      "at": "2026-09-04T02:57:39Z"
-    },
-    {
-      "efleets_id": "2B7P7Q",
-      "reason": "NO_TRUSTED_FILL",
-      "detail": "no DETAILS fill or shop RO survived checks",
-      "at": "2026-09-04T02:57:39Z"
-    },
-    {
-      "efleets_id": "2B7P7V",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:57:39Z"
-    },
-    {
-      "efleets_id": "2B7P7W",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:57:39Z"
-    },
-    {
-      "efleets_id": "2B7P82",
-      "reason": "NO_TRUSTED_FILL",
-      "detail": "no DETAILS fill or shop RO survived checks",
-      "at": "2026-09-04T02:57:39Z"
-    },
-    {
-      "efleets_id": "2B8C3K",
-      "reason": "NO_DEVICE",
-      "detail": "no live factory_id linked; dead boxes are not summed",
-      "at": "2026-09-04T02:57:39Z"
+      "interval_miles": 0
     }
   ]
 }

@@ -419,13 +419,56 @@ func (a *App) CardsRebuild(ctx context.Context, fuelPath string) (int, error) {
 			best++
 		}
 	}
-	fmt.Fprintf(os.Stderr, "gps-first matches=%d best=%d eras=%d split_cards=%d calls=%d geocoded_stations=%d\n",
-		hits, best, len(gps.Eras), splits, len(gps.Calls), len(gps.Stations))
+	fmt.Fprintf(os.Stderr, "gps-first matches=%d best=%d eras=%d split_cards=%d calls=%d geocoded_stations=%d pumps=%d\n",
+		hits, best, len(gps.Eras), splits, len(gps.Calls), len(gps.Stations), gps.Pumps)
 	return len(txs), nil
 }
 
 func gpsStopsCachePath() string {
 	return filepath.Join("data", "runtime", "gps-stops.json")
+}
+
+const gpsLookback = 120 * 24 * time.Hour
+
+func clampGPSWindow(from, to time.Time) (time.Time, time.Time) {
+	from, to = from.UTC(), to.UTC()
+	if to.Sub(from) > gpsLookback {
+		from = to.Add(-gpsLookback)
+	}
+	return from.Add(-12 * time.Hour), to.Add(12 * time.Hour)
+}
+
+func countHasPos(visits []model.StopVisit) int {
+	n := 0
+	for _, v := range visits {
+		if v.HasPos {
+			n++
+		}
+	}
+	return n
+}
+
+func gpsCacheCovers(visits []model.StopVisit, from, to time.Time) bool {
+	var minF, maxT time.Time
+	for _, v := range visits {
+		if v.From.IsZero() {
+			continue
+		}
+		if minF.IsZero() || v.From.Before(minF) {
+			minF = v.From
+		}
+		end := v.To
+		if end.IsZero() {
+			end = v.From
+		}
+		if maxT.IsZero() || end.After(maxT) {
+			maxT = end
+		}
+	}
+	if minF.IsZero() || maxT.IsZero() {
+		return false
+	}
+	return !from.Before(minF.Add(-time.Hour)) && !to.After(maxT.Add(time.Hour))
 }
 
 func (a *App) matchCardsAtGPSStops(ctx context.Context, txs []model.CardTx) (cards.GPSFirstResult, error) {
@@ -438,14 +481,6 @@ func (a *App) matchCardsAtGPSStops(ctx context.Context, txs []model.CardTx) (car
 		return empty, err
 	}
 	cache := gpsStopsCachePath()
-	if a.OneStep == nil {
-		visits, err := cards.LoadStopVisits(cache)
-		if err != nil {
-			return empty, nil
-		}
-		fmt.Fprintf(os.Stderr, "gps-stops cache %d visits\n", len(visits))
-		return cards.MatchGPSFirst(visits, txs, fleet, cards.DefaultStopSlack), nil
-	}
 	var from, to time.Time
 	for _, t := range txs {
 		if t.At.IsZero() {
@@ -459,6 +494,20 @@ func (a *App) matchCardsAtGPSStops(ctx context.Context, txs []model.CardTx) (car
 		}
 	}
 	if from.IsZero() {
+		return empty, nil
+	}
+	from, to = clampGPSWindow(from, to)
+
+	if cached, err := cards.LoadStopVisits(cache); err == nil && len(cached) > 0 {
+		pos := countHasPos(cached)
+		useCache := a.OneStep == nil || (pos > 0 && gpsCacheCovers(cached, from, to))
+		if useCache {
+			gps := cards.MatchGPSFirst(cached, txs, fleet, cards.DefaultStopSlack)
+			fmt.Fprintf(os.Stderr, "gps-stops cache %d visits with_pos=%d pumps=%d\n", len(cached), pos, gps.Pumps)
+			return gps, nil
+		}
+	}
+	if a.OneStep == nil {
 		return empty, nil
 	}
 	devs, err := a.Store.ListDevices(ctx)
@@ -477,7 +526,7 @@ func (a *App) matchCardsAtGPSStops(ctx context.Context, txs []model.CardTx) (car
 			fmt.Fprintf(os.Stderr, "gps-stops %s factory_id %s: %v\n", *d.LinkedCarEFleetsID, d.FactoryID, err)
 			continue
 		}
-		fmt.Fprintf(os.Stderr, "gps-stops %s factory_id %s stops=%d\n", *d.LinkedCarEFleetsID, d.FactoryID, len(v))
+		fmt.Fprintf(os.Stderr, "gps-stops %s factory_id %s stops=%d with_pos=%d\n", *d.LinkedCarEFleetsID, d.FactoryID, len(v), countHasPos(v))
 		visits = append(visits, v...)
 	}
 	if n == 0 {
@@ -486,7 +535,7 @@ func (a *App) matchCardsAtGPSStops(ctx context.Context, txs []model.CardTx) (car
 	if err := cards.SaveStopVisits(cache, visits); err != nil {
 		fmt.Fprintf(os.Stderr, "gps-stops cache write: %v\n", err)
 	} else {
-		fmt.Fprintf(os.Stderr, "gps-stops cache wrote %d visits\n", len(visits))
+		fmt.Fprintf(os.Stderr, "gps-stops cache wrote %d visits with_pos=%d\n", len(visits), countHasPos(visits))
 	}
 	return cards.MatchGPSFirst(visits, txs, fleet, cards.DefaultStopSlack), nil
 }
@@ -516,6 +565,9 @@ func (a *App) gpsFirstFromCache(ctx context.Context) (cards.GPSFirstResult, []mo
 	if err != nil {
 		return empty, nil, err
 	}
+	one := a.OneStep
+	a.OneStep = nil
+	defer func() { a.OneStep = one }()
 	res, err := a.matchCardsAtGPSStops(ctx, txs)
 	if err != nil {
 		return empty, nil, err

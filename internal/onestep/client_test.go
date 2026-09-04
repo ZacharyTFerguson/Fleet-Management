@@ -42,6 +42,25 @@ func TestParseDriveStopVisitsStopsOnly(t *testing.T) {
 	}
 }
 
+func TestParseDriveStopVisitsLiveLatLngFields(t *testing.T) {
+	body := []byte(`{
+		"distance":{"value":1,"unit":"mi"},
+		"drive_stop_list":[
+			{"type":"drive","time_from":"2026-08-30T10:00:00Z","time_to":"2026-08-30T10:20:00Z","distance":{"value":1,"unit":"mi"}},
+			{"type":"stop","time_from":"2026-08-30T10:20:00Z","time_to":"2026-08-30T10:28:00Z",
+			 "lat_lng_best_first":{"lat":37.54,"lng":-77.43},"lat_lng_from":{"lat":37.54,"lng":-77.43},
+			 "odometer_from":{"value":999}}
+		]
+	}`)
+	v, err := parseDriveStopVisits(body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(v) != 1 || !v[0].HasPos || v[0].Lat < 37.5 || v[0].Lng > -77.4 {
+		t.Fatalf("live lat_lng_best_first %+v", v)
+	}
+}
+
 func TestDriveStopSumsMilesIgnoresOdometerJSON(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v3/api/public/route/drive-stop" {

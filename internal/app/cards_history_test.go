@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -151,6 +152,32 @@ func cardsPumpSeeds(lat, lng float64, around time.Time) []model.StopVisit {
 		})
 	}
 	return out
+}
+
+func TestCardsHistoryIngestsRosterBeforeDeviceMap(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "roster.sqlite")
+	st, err := store.Open("sqlite", p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	mapPath := filepath.Join(t.TempDir(), "map.csv")
+	if err := os.WriteFile(mapPath, []byte("factory_id,device_id,efleets_id\nF15,D15,27VA15\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	a := &App{Store: st}
+	if _, err := a.CardsHistory(context.Background(), CardsHistoryOpts{
+		VehiclesPath:   testdata("enterprise", "fleetsummary_wrongcard.csv"),
+		DevicesMapPath: mapPath,
+		DevicesOutPath: filepath.Join(t.TempDir(), "devices.csv"),
+		NoGPS:          true,
+	}); err != nil {
+		t.Fatalf("roster must land before factory_id map: %v", err)
+	}
+	devs, err := st.ListDevices(context.Background())
+	if err != nil || len(devs) != 1 || devs[0].LinkedCarEFleetsID == nil || *devs[0].LinkedCarEFleetsID != "27VA15" {
+		t.Fatalf("device link %+v %v", devs, err)
+	}
 }
 
 func TestCardsHistoryDoesNotWriteLastReading(t *testing.T) {

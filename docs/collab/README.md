@@ -40,6 +40,10 @@ Do **not** send `return_points` for miles-since (map-UI payload; hung fleet sync
 
 Code: `internal/onestep/client.go`. Ingest: `oilchange sync-onestep --map data/runtime/onestep-map.csv`.
 
+## Nearby Address (unknown cards)
+
+Fill-day ±1 (provider swipe, not bank posting), 1 mile, watch `factory_id` until exclusive. Live spec: `docs/collab/NEAR-ADDRESS.md`. CLI: `oilchange cards nearby`.
+
 ## Talk to the session that wrote this
 
 Point the other agent at this folder and `STATUS.md`. If you are Grok Bot / another Grok in this workspace, treat STATUS as shared working memory: what is true now, what is blocked, what the next step is. Update it when you finish a step.

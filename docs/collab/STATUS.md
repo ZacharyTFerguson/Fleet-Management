@@ -1,6 +1,6 @@
 # Shared status
 
-Updated: 2026-09-04 (UTC) after OBD VIN pairing + GPS fill for newly linked boxes (known **30.7%**, not 95%).
+Updated: 2026-09-04 (UTC) after live nearby fill-day hunt (certain **0**, likely **1**, **0** eras persisted) + OneStep support.php rate/batch note. Known on this sqlite is still **62 / 205 (30.2%)**, vs **63 / 205 (30.7%)** recorded after the OBD VIN GPS fill (PR #23) — nearby did not raise it.
 
 ## True now
 
@@ -42,7 +42,7 @@ Portal `EFLEETS_MAINT_URL` is still the HTML tab, not a CSV. Next live pull need
 
 Cache: `data/runtime/gps-stops.json` (gitignored). `--no-gps` rematches from cache without hitting OneStep.
 
-2026-09-04 later run (real Drive `DETAILS_583424_30-Days` + live OneStep stops, May 16–Jun 17 window, then VIN-linked boxes filled into the cache): **35,404** stop windows (`with_pos=35389`), **1,421** pump clusters, **214** GPS-first matches, **63** BEST, **1,098** calls, **119** geocoded stations. Adding boxes reduced exclusive sits (251 → 214) and still raised known cars. Synthetic TRACKER 10:00 AM file-drop is no longer the coverage input.
+2026-09-04 later run (real Drive `DETAILS_583424_30-Days` + live OneStep stops, May 16–Jun 17 window, then VIN-linked boxes filled into the cache): **35,404** stop windows (`with_pos=35389`), **1,421** pump clusters, **214** GPS-first matches, **63** BEST, **1,098** calls, **119** geocoded stations. Adding boxes reduced exclusive sits (251 → 214) and still raised known cars. Nearby `--live` later filled 260 uncovered boxes into the same gitignored cache (**72,074** visits / **1,737** pumps) without rewriting `card_eras`. Synthetic TRACKER 10:00 AM file-drop is no longer the coverage input.
 
 ## Station ladder (3 / 5 / 10) — this wave
 
@@ -79,12 +79,31 @@ Tests lock the ladder with synthetic exclusive pumps (`internal/cards/ladder_tes
 
 90-day DETAILS ingest skipped punches for vehicles not on the roster (do not invent cars). Station key is merchant name + city/state. `TRACKER` / empty names dropped.
 
+## Near-address hunt (2026-09-04)
+
+Live generate-reports type **`near_address`** exists. Spec that actually echoes: `report_options_near_address.search_address_string` + `range: {value:1, unit:mi}`, `datetime_from`/`datetime_to` = Eastern **fill day ±1** (provider swipe, not bank posting), `all_user_devices` + `exclude_inactive_devices`, `time_zone=America/New_York`, JSON output fields including `near_address_factory_id`. Top-level `address`/`radius` are dropped. Public JSON download 404s; hunt rows use drive-stop stops at 1 mile. CLI: `oilchange cards nearby [--live] [--report] [--persist] [--report-cap N]`. GPS-called fills and car-era fills are skipped. Exclusive **Eastern days** (1=watch, 2=likely, 3=certain). Incomplete GPS coverage is watch-only. `--persist` writes **certain linked** car eras only; never unpaired boxes, never PERSON cards, never Last Reading. Method: `docs/collab/NEAR-ADDRESS.md`.
+
+**OneStep support rate note** ([support.php](https://track.onestepgps.com/support.php) Data and Functionality): real-time API; recommend **15–30 s+** between routine pulls; **5,000 calls/hour** (~120k/day theoretical; large fleets often 5k–10k/day); prefer **batching multi-device** requests. `near_address` already batches via `all_user_devices`. Drive-stop is still **one `device_id` per GET** (no proven multi-id param) — nearby `--live` now paces ≥1 s between boxes + progress every 25; do not invent comma-lists. Do not spam `--report` (`--report-cap`). Do not re-fetch all 260 boxes unless drive-stop batching is proven.
+
+**Live `--live` run (2026-09-04T18:55:55Z–19:16:20Z, exit 0, ~20.4 min).** Cache-only first: `certain=0 likely=0 watch=45 cards=20 coverage_complete=false`. Then mutex-serialized drive-stop for **260** boxes not covered in the fill-day window (no `--report`, no `--persist`). Summary artifact: `/opt/cursor/artifacts/nearby_live_summary.txt`.
+
+| Metric | Cache-only | Live `--live` |
+|---|---|---|
+| certain / likely / watch | 0 / 0 / 45 | **0 / 1 / 47** |
+| unknown cards | 20 | 20 |
+| coverage_complete | false | **true** |
+| gps-stops visits | 35,404 (`with_pos=35389`, pumps=1421) | 72,074 (`with_pos=71798`, pumps=1737) |
+| car eras persisted | — | **0** (certain=0) |
+| Last Reading written | no | no |
+
+One **likely** (2 exclusive Eastern days at fill ±20 min; 3 would be certain): card `xxxxxxxxxxxxx57770` → `factory_id=7000335987` / `292NCX` (`fills=5 at_fill=2 exclusive=2 min_mi=0.21`). Keep watching. Two unpaired `factory_id`s showed up in the 1-mile list (`4572242789`, `3271251658`) and were **not** joined. 8 of 20 cards had no GPS box within 1 mile of a mapped pump. `cards coverage --no-gps` after the fetch: **known 62 / 205 (30.2%)**, device_link still **196 / 205 (95.6%)**. Nearby did not beat the VIN-wave **63 / 205**.
+
 ## Next (reasonable)
 
+- Nearby live hunt is done for this 30-day DETAILS window: **0 certain**, 1 likely (`292NCX` / `7000335987` needs a 3rd exclusive fill day). Do not persist watches. A **90-day** DETAILS file-drop would add more exclusive days — that is the next card-era path, not loosening 1-mile to a join.
 - File-drop a **90-day** (or current 30-day) Fuel DETAILS CSV — June 2026 30-day already proved the matcher. Do not ask for an eFleets password or MFA code in chat. Optional: `EFLEETS_DETAILS_URL` + CDP on an already-logged-in tab.
 - Remaining unpaired / no-VIN boxes (~8–9 roster cars, plus 14 VIN-linked boxes with no GPS in this window). Do not join on `display_name`.
 - Do not rewrite the GPS matcher to chase 95% — exclusive sit is the lock; more boxes correctly *reduce* exclusive votes.
-- Enterprise DETAILS for the 4 `NO_TRUSTED_FILL` cars.
 - Enterprise DETAILS for the 4 `NO_TRUSTED_FILL` cars.
 - Capture a real Maintenance Detail export URL (or CDP) so last oil is not stuck on Downloads CSVs.
 - Optional: collapse stacked `hold_events` so event count matches cars on HOLD.

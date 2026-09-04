@@ -1,0 +1,23 @@
+{
+  "result_list": [
+    {
+      "near_address_entity": "LABEL-NOT-A-JOIN",
+      "near_address_factory_id": "3271116717",
+      "near_address_device_id": "6hBKgc-2QbuMHF81f07--k",
+      "near_address_vin": "1FTFW1E84NFA12345",
+      "stop_start_time": "2026-06-16T14:10:00Z",
+      "stop_end_time": "2026-06-16T14:40:00Z",
+      "stop_duration": "30m0s",
+      "distance_from_location": {"value": 0.2, "unit": "mi"},
+      "position": {"lat": 40.61716, "lng": -79.722},
+      "address": "203 Craigdell Rd, Lower Burrell, PA"
+    },
+    {
+      "near_address_factory_id": "1111111111",
+      "near_address_device_id": "dev-watch",
+      "stop_start_time": "2026-06-15T12:00:00Z",
+      "stop_end_time": "2026-06-15T12:20:00Z",
+      "distance_from_location": {"value": 0.9, "unit": "mi"}
+    }
+  ]
+}

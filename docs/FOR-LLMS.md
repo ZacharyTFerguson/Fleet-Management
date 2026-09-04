@@ -37,6 +37,7 @@ SQLite (`OILCHANGE_DB`) is the working store for ingest, compute, and serve. Neo
 | `cards rebuild` | Score swipes into `card_pairings`. GPS-first stop windows from OneStep unless `--no-gps` (rematch from `data/runtime/gps-stops.json`). Persists `card_eras`. Never writes Last Reading. |
 | `cards history` | **One operator path**: devices CSV → DETAILS ingest (file or live `EFLEETS_*` in env) → GPS stops + rebuild → ladder 3/5/10 → `card_eras` + coverage. Never prompts for a password. Never Last Reading. |
 | `cards split` / `call` / `ladder` / `coverage` | GPS eras (SPLIT / PERSON / OFFICE). Ladder: exclusive pumps at 3 then 5 then 10 stations. Coverage is % roster with factory_id **and** a GPS-named car card era (target 95%). |
+| `cards nearby` | Unknown-card hunt: station, **provider fill second** (not bank posting), Eastern day-before through day-after, devices within **1 mile**. Exclusive Eastern days: 1=watch, 2=likely, 3=certain linked car. Incomplete GPS coverage is watch-only. `--live` fills missing boxes. `--report` queues up to `--report-cap` OneStep `near_address` jobs (download 404s; rows are drive-stop). `--persist` writes certain **linked** car eras only. Never Last Reading. Never invent unpaired `factory_id`. Never persist PERSON cards. |
 | `probe-onestep` | One-shot live drive-stop GET. Prints measured miles. Does **not** write Last Reading. |
 | `compute` | Last Reading + HOLD. `[--override-lower]` is the only way to write a lower reading. |
 | `oil-done` | Record an oil change (`--efleets-id` `--miles` `--date`). |

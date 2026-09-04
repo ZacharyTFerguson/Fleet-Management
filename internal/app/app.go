@@ -605,12 +605,16 @@ func (a *App) pullDriveStopVisits(ctx context.Context, devs []model.OneStepDevic
 	}
 	var visits []model.StopVisit
 	for _, d := range devs {
+		label := d.FactoryID
+		if d.LinkedCarEFleetsID != nil && strings.TrimSpace(*d.LinkedCarEFleetsID) != "" {
+			label = strings.TrimSpace(*d.LinkedCarEFleetsID)
+		}
 		v, err := a.OneStep.DriveStopVisitsFor(ctx, d, from, to)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "gps-stops %s factory_id %s: %v\n", *d.LinkedCarEFleetsID, d.FactoryID, err)
+			fmt.Fprintf(os.Stderr, "gps-stops %s factory_id %s: %v\n", label, d.FactoryID, err)
 			continue
 		}
-		fmt.Fprintf(os.Stderr, "gps-stops %s factory_id %s stops=%d with_pos=%d\n", *d.LinkedCarEFleetsID, d.FactoryID, len(v), countHasPos(v))
+		fmt.Fprintf(os.Stderr, "gps-stops %s factory_id %s stops=%d with_pos=%d\n", label, d.FactoryID, len(v), countHasPos(v))
 		visits = append(visits, v...)
 	}
 	return visits

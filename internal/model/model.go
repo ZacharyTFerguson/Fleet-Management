@@ -5,19 +5,19 @@ import "time"
 // Car is one PDI unit. EFleetsID is the only join key; display_name is never a join key.
 // PDIID is opaque (PDI-0042) and must not embed region.
 type Car struct {
-	PDIID              string
-	EFleetsID          string
-	Nickname           string
-	Plate              string
-	VIN                string
-	Region             string
-	LastOilMiles       *int
-	LastOilDate        *time.Time
-	LastReadingMiles   *int
-	LastReadingAt      *time.Time
-	LastReadingSource  *string // "fuel_details" | "shop_ro"
-	HoldReason         *string
-	IntervalMiles      int // 0 => 5000
+	PDIID             string
+	EFleetsID         string
+	Nickname          string
+	Plate             string
+	VIN               string
+	Region            string
+	LastOilMiles      *int
+	LastOilDate       *time.Time
+	LastReadingMiles  *int
+	LastReadingAt     *time.Time
+	LastReadingSource *string // "fuel_details" | "shop_ro"
+	HoldReason        *string
+	IntervalMiles     int // 0 => 5000
 }
 
 // Hold is a skip-the-write reason. Operators must not see a Last Reading beside it.
@@ -28,10 +28,10 @@ type Hold struct {
 
 // Card is a fuel card. linked_car_efleets_id is NULLed on CARD_MIX.
 type Card struct {
-	ID                    string
-	CompanyVehicleNumber  string
-	LinkedCarEFleetsID    *string
-	Notes                 string
+	ID                   string
+	CompanyVehicleNumber string
+	LinkedCarEFleetsID   *string
+	Notes                string
 }
 
 // GasStation is upserted from DETAILS merchant name/address for later matching, not Last Reading math.
@@ -85,6 +85,9 @@ type CardTx struct {
 	DriverLast        string
 	SourceRow         string
 	Odometer          *int
+	// CalledEFleetsID is the GPS-first vehicle for this swipe (in-memory).
+	// Enterprise Vehicle stays on RecordedEFleetsID. Last Reading must not read this.
+	CalledEFleetsID string
 }
 
 // StopVisit is one GPS stop (car sitting still). Card matching uses the time

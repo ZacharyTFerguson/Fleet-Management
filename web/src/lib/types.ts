@@ -69,6 +69,27 @@ export type GPSCardMatch = {
   best: boolean;
 };
 
+export type CardEra = {
+  card_id: string;
+  efleets_id: string;
+  nickname?: string;
+  from: string;
+  to: string;
+  evidence_n: number;
+  stations?: string[];
+  split: boolean;
+};
+
+export type RecordCall = {
+  card_id: string;
+  at: string;
+  station?: string;
+  enterprise_car?: string;
+  called_car: string;
+  called_name?: string;
+  why: string;
+};
+
 export type CardsSnapshot = {
   synced_at: string;
   source: string;
@@ -83,11 +104,16 @@ export type CardsSnapshot = {
     swipes: number;
     gps_best?: number;
     gps_matches?: number;
+    gps_splits?: number;
+    gps_calls?: number;
+    gps_disagree?: number;
   };
   unknown: UnknownMatchup[];
   stations: StationSummary[];
   cars_without_card: string[];
   gps_best?: GPSCardMatch[];
+  eras?: CardEra[];
+  calls?: RecordCall[];
   nicknames?: Record<string, string>;
 };
 

@@ -13,13 +13,16 @@ import (
 
 // Snapshot is the Cards desk payload. Never includes Last Reading math.
 type Snapshot struct {
-	SyncedAt         time.Time         `json:"synced_at"`
-	Source           string            `json:"source"`
-	Stats            SnapshotStats     `json:"stats"`
+	SyncedAt         time.Time            `json:"synced_at"`
+	Source           string               `json:"source"`
+	Stats            SnapshotStats        `json:"stats"`
 	Unknown          []UnknownMatchup     `json:"unknown"`
 	Stations         []StationSummary     `json:"stations"`
 	CarsWithoutCard  []string             `json:"cars_without_card"`
 	GPSBest          []model.GPSCardMatch `json:"gps_best"`
+	Eras             []CardEra            `json:"eras,omitempty"`
+	Calls            []RecordCall         `json:"calls,omitempty"`
+	GeocodedStations []GeocodedStation    `json:"geocoded_stations,omitempty"`
 	Nicknames        map[string]string    `json:"nicknames,omitempty"`
 }
 
@@ -35,10 +38,19 @@ type SnapshotStats struct {
 	Swipes          int `json:"swipes"`
 	GPSBest         int `json:"gps_best"`
 	GPSMatches      int `json:"gps_matches"`
+	GPSSplits       int `json:"gps_splits"`
+	GPSCalls        int `json:"gps_calls"`
+	GPSDisagree     int `json:"gps_disagree"`
 }
 
 // BuildSnapshot scores pairings if needed and maps stations + unknowns.
 func BuildSnapshot(txs []model.CardTx, pairings []model.CardPairing, gps []model.GPSCardMatch, nicknames map[string]string, now time.Time) Snapshot {
+	return BuildSnapshotFull(txs, pairings, gps, nil, nil, nicknames, now)
+}
+
+// BuildSnapshotFull includes GPS-first eras (card split across vehicles) and
+// the name to call each swipe. Pairings never write Last Reading.
+func BuildSnapshotFull(txs []model.CardTx, pairings []model.CardPairing, gps []model.GPSCardMatch, eras []CardEra, calls []RecordCall, nicknames map[string]string, now time.Time) Snapshot {
 	if now.IsZero() {
 		now = time.Now().UTC()
 	}
@@ -61,6 +73,18 @@ func BuildSnapshot(txs []model.CardTx, pairings []model.CardPairing, gps []model
 			gpsBestN++
 		}
 	}
+	splitCards := map[string]struct{}{}
+	for _, e := range eras {
+		if e.Split {
+			splitCards[e.CardID] = struct{}{}
+		}
+	}
+	disagree := 0
+	for _, c := range calls {
+		if c.EnterpriseCar != "" && c.CalledCar != "" && c.EnterpriseCar != c.CalledCar {
+			disagree++
+		}
+	}
 	stats := SnapshotStats{
 		Cards:           len(cards),
 		Stations:        len(stations),
@@ -69,6 +93,9 @@ func BuildSnapshot(txs []model.CardTx, pairings []model.CardPairing, gps []model
 		Swipes:          len(txs),
 		GPSBest:         gpsBestN,
 		GPSMatches:      gpsHits,
+		GPSSplits:       len(splitCards),
+		GPSCalls:        len(calls),
+		GPSDisagree:     disagree,
 	}
 	for _, u := range unknown {
 		switch u.Kind {
@@ -88,6 +115,8 @@ func BuildSnapshot(txs []model.CardTx, pairings []model.CardPairing, gps []model
 		Stations:        stations,
 		CarsWithoutCard: missing,
 		GPSBest:         gps,
+		Eras:            eras,
+		Calls:           calls,
 		Nicknames:       nicknames,
 	}
 }

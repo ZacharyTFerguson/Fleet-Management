@@ -11,8 +11,8 @@ export default function CardsPage() {
         <p className="brand">FLEET</p>
         <h1 className="headline">Card Desk</h1>
         <p className="lede">
-          GPS stop times at the marker, then the card that swiped in that
-          window. Enterprise Vehicle is not the join.
+          GPS stop times at the pump, then the card in that car. A card that
+          moved (VA15 then VA19) is split. Enterprise Vehicle is not the join.
         </p>
       </header>
       <CardsBoard />

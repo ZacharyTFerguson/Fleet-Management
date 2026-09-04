@@ -21,6 +21,7 @@ type Config struct {
 	EFleetsPass       string
 	EFleetsCust       string
 	EFleetsBase       string
+	EFleetsCDP        string
 	EFleetsDetails    string
 	EFleetsMaint      string
 	EFleetsFleet      string
@@ -51,6 +52,7 @@ func Load() Config {
 		EFleetsPass:       os.Getenv("EFLEETS_PASSWORD"),
 		EFleetsCust:       os.Getenv("EFLEETS_CUST_NUM"),
 		EFleetsBase:       getenv("EFLEETS_BASE_URL", "https://login.efleets.com"),
+		EFleetsCDP:        os.Getenv("EFLEETS_CDP_URL"),
 		EFleetsDetails:    os.Getenv("EFLEETS_DETAILS_URL"),
 		EFleetsMaint:      os.Getenv("EFLEETS_MAINT_URL"),
 		EFleetsFleet:      os.Getenv("EFLEETS_FLEETSUMMARY_URL"),
@@ -146,6 +148,7 @@ func (c Config) EnvReport() []string {
 		line("EFLEETS_USERNAME", c.EFleetsUser, ""),
 		line("EFLEETS_PASSWORD", c.EFleetsPass, ""),
 		line("EFLEETS_CUST_NUM", c.EFleetsCust, ""),
+		line("EFLEETS_CDP_URL", c.EFleetsCDP, "Chrome remote-debugging; no password typing"),
 		line("EFLEETS_DETAILS_URL", c.EFleetsDetails, page(c.EFleetsDetails)),
 		line("EFLEETS_MAINT_URL", c.EFleetsMaint, page(c.EFleetsMaint)),
 		line("EFLEETS_FLEETSUMMARY_URL", c.EFleetsFleet, page(c.EFleetsFleet)),

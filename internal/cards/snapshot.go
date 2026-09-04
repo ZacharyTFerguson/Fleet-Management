@@ -59,7 +59,7 @@ func BuildSnapshotFull(txs []model.CardTx, pairings []model.CardPairing, gps []m
 	}
 	unknown := UnknownMatchups(txs, pairings)
 	stations := MapStations(txs)
-	missing := CarsWithoutBestCard(txs, pairings)
+	missing := CarsWithoutBestCard(txs, pairings, nicknames)
 	if unknown == nil {
 		unknown = []UnknownMatchup{}
 	}

@@ -68,7 +68,7 @@ func MapStations(txs []model.CardTx) []StationSummary {
 			by[k] = a
 		}
 		a.swipes++
-		if car := strings.TrimSpace(t.RecordedEFleetsID); car != "" {
+		if car := strings.TrimSpace(t.RecordedEFleetsID); !isUnknownCar(car) {
 			a.cars[car] = struct{}{}
 		}
 		if card := strings.TrimSpace(t.CardID); card != "" {
@@ -193,11 +193,18 @@ func UnknownMatchups(txs []model.CardTx, pairings []model.CardPairing) []Unknown
 	return out
 }
 
-// CarsWithoutBestCard are cars that show up on swipes but no card votes them BEST.
-func CarsWithoutBestCard(txs []model.CardTx, pairings []model.CardPairing) []string {
+// CarsWithoutBestCard are roster or swipe cars that no card votes BEST.
+func CarsWithoutBestCard(txs []model.CardTx, pairings []model.CardPairing, rosters ...map[string]string) []string {
 	seen := map[string]struct{}{}
+	for _, roster := range rosters {
+		for id := range roster {
+			if car := strings.TrimSpace(id); !isUnknownCar(car) {
+				seen[car] = struct{}{}
+			}
+		}
+	}
 	for _, t := range txs {
-		if car := strings.TrimSpace(t.RecordedEFleetsID); car != "" {
+		if car := strings.TrimSpace(t.RecordedEFleetsID); !isUnknownCar(car) {
 			seen[car] = struct{}{}
 		}
 	}

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"oilchange/internal/cards"
@@ -23,8 +24,8 @@ import (
 type App struct {
 	Cfg         config.Config
 	Store       *store.Store
-	CardsMirror string           // web/data/cards.json; empty skips the Cards desk write
-	OneStep     *onestep.Client  // optional; GPS stop times for card matching
+	CardsMirror string          // web/data/cards.json; empty skips the Cards desk write
+	OneStep     *onestep.Client // optional; GPS stop times for card matching
 }
 
 // OpenStore opens sqlite or postgres from env.
@@ -388,17 +389,38 @@ func (a *App) CardsRebuild(ctx context.Context, fuelPath string) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	ps := cards.ScorePairings(txs, time.Now().UTC())
-	if err := a.Store.ReplacePairings(ctx, ps); err != nil {
-		return 0, err
-	}
 	gps, err := a.matchCardsAtGPSStops(ctx, txs)
 	if err != nil {
 		return 0, err
 	}
-	if err := a.writeCardsSnapshot(ctx, txs, ps, gps); err != nil {
+	scored := cards.ApplyCalls(txs, gps.Calls)
+	ps := cards.ScorePairings(scored, time.Now().UTC())
+	if err := a.Store.ReplacePairings(ctx, ps); err != nil {
 		return 0, err
 	}
+	if err := a.writeCardsSnapshot(ctx, scored, ps, gps); err != nil {
+		return 0, err
+	}
+	splits := 0
+	seen := map[string]struct{}{}
+	for _, e := range gps.Eras {
+		if e.Split {
+			if _, ok := seen[e.CardID]; !ok {
+				seen[e.CardID] = struct{}{}
+				splits++
+			}
+		}
+	}
+	best := 0
+	hits := 0
+	for _, g := range gps.Matches {
+		hits += g.EvidenceN
+		if g.Best {
+			best++
+		}
+	}
+	fmt.Fprintf(os.Stderr, "gps-first matches=%d best=%d eras=%d split_cards=%d calls=%d geocoded_stations=%d pumps=%d\n",
+		hits, best, len(gps.Eras), splits, len(gps.Calls), len(gps.Stations), gps.Pumps)
 	return len(txs), nil
 }
 
@@ -406,19 +428,59 @@ func gpsStopsCachePath() string {
 	return filepath.Join("data", "runtime", "gps-stops.json")
 }
 
-func (a *App) matchCardsAtGPSStops(ctx context.Context, txs []model.CardTx) ([]model.GPSCardMatch, error) {
+const gpsLookback = 120 * 24 * time.Hour
+
+func clampGPSWindow(from, to time.Time) (time.Time, time.Time) {
+	from, to = from.UTC(), to.UTC()
+	if to.Sub(from) > gpsLookback {
+		from = to.Add(-gpsLookback)
+	}
+	return from.Add(-12 * time.Hour), to.Add(12 * time.Hour)
+}
+
+func countHasPos(visits []model.StopVisit) int {
+	n := 0
+	for _, v := range visits {
+		if v.HasPos {
+			n++
+		}
+	}
+	return n
+}
+
+func gpsCacheCovers(visits []model.StopVisit, from, to time.Time) bool {
+	var minF, maxT time.Time
+	for _, v := range visits {
+		if v.From.IsZero() {
+			continue
+		}
+		if minF.IsZero() || v.From.Before(minF) {
+			minF = v.From
+		}
+		end := v.To
+		if end.IsZero() {
+			end = v.From
+		}
+		if maxT.IsZero() || end.After(maxT) {
+			maxT = end
+		}
+	}
+	if minF.IsZero() || maxT.IsZero() {
+		return false
+	}
+	return !from.Before(minF.Add(-time.Hour)) && !to.After(maxT.Add(time.Hour))
+}
+
+func (a *App) matchCardsAtGPSStops(ctx context.Context, txs []model.CardTx) (cards.GPSFirstResult, error) {
+	empty := cards.GPSFirstResult{}
 	if a == nil || a.Store == nil || len(txs) == 0 {
-		return nil, nil
+		return empty, nil
+	}
+	fleet, err := a.Store.ListCars(ctx)
+	if err != nil {
+		return empty, err
 	}
 	cache := gpsStopsCachePath()
-	if a.OneStep == nil {
-		visits, err := cards.LoadStopVisits(cache)
-		if err != nil {
-			return nil, nil
-		}
-		fmt.Fprintf(os.Stderr, "gps-stops cache %d visits\n", len(visits))
-		return cards.MatchByStopTimes(visits, txs, cards.DefaultStopSlack), nil
-	}
 	var from, to time.Time
 	for _, t := range txs {
 		if t.At.IsZero() {
@@ -432,11 +494,25 @@ func (a *App) matchCardsAtGPSStops(ctx context.Context, txs []model.CardTx) ([]m
 		}
 	}
 	if from.IsZero() {
-		return nil, nil
+		return empty, nil
+	}
+	from, to = clampGPSWindow(from, to)
+
+	if cached, err := cards.LoadStopVisits(cache); err == nil && len(cached) > 0 {
+		pos := countHasPos(cached)
+		useCache := a.OneStep == nil || (pos > 0 && gpsCacheCovers(cached, from, to))
+		if useCache {
+			gps := cards.MatchGPSFirst(cached, txs, fleet, cards.DefaultStopSlack)
+			fmt.Fprintf(os.Stderr, "gps-stops cache %d visits with_pos=%d pumps=%d\n", len(cached), pos, gps.Pumps)
+			return gps, nil
+		}
+	}
+	if a.OneStep == nil {
+		return empty, nil
 	}
 	devs, err := a.Store.ListDevices(ctx)
 	if err != nil {
-		return nil, err
+		return empty, err
 	}
 	var visits []model.StopVisit
 	n := 0
@@ -450,21 +526,21 @@ func (a *App) matchCardsAtGPSStops(ctx context.Context, txs []model.CardTx) ([]m
 			fmt.Fprintf(os.Stderr, "gps-stops %s factory_id %s: %v\n", *d.LinkedCarEFleetsID, d.FactoryID, err)
 			continue
 		}
-		fmt.Fprintf(os.Stderr, "gps-stops %s factory_id %s stops=%d\n", *d.LinkedCarEFleetsID, d.FactoryID, len(v))
+		fmt.Fprintf(os.Stderr, "gps-stops %s factory_id %s stops=%d with_pos=%d\n", *d.LinkedCarEFleetsID, d.FactoryID, len(v), countHasPos(v))
 		visits = append(visits, v...)
 	}
 	if n == 0 {
-		return nil, nil
+		return empty, nil
 	}
 	if err := cards.SaveStopVisits(cache, visits); err != nil {
 		fmt.Fprintf(os.Stderr, "gps-stops cache write: %v\n", err)
 	} else {
-		fmt.Fprintf(os.Stderr, "gps-stops cache wrote %d visits\n", len(visits))
+		fmt.Fprintf(os.Stderr, "gps-stops cache wrote %d visits with_pos=%d\n", len(visits), countHasPos(visits))
 	}
-	return cards.MatchByStopTimes(visits, txs, cards.DefaultStopSlack), nil
+	return cards.MatchGPSFirst(visits, txs, fleet, cards.DefaultStopSlack), nil
 }
 
-func (a *App) writeCardsSnapshot(ctx context.Context, txs []model.CardTx, ps []model.CardPairing, gps []model.GPSCardMatch) error {
+func (a *App) writeCardsSnapshot(ctx context.Context, txs []model.CardTx, ps []model.CardPairing, gps cards.GPSFirstResult) error {
 	if a == nil || a.CardsMirror == "" {
 		return nil
 	}
@@ -478,8 +554,91 @@ func (a *App) writeCardsSnapshot(ctx context.Context, txs []model.CardTx, ps []m
 			nicks[c.EFleetsID] = c.Nickname
 		}
 	}
-	snap := cards.BuildSnapshot(txs, ps, gps, nicks, time.Now().UTC())
+	snap := cards.BuildSnapshotFull(txs, ps, gps.Matches, gps.Eras, gps.Calls, nicks, time.Now().UTC())
+	snap.GeocodedStations = gps.Stations
 	return cards.WriteSnapshot(a.CardsMirror, snap)
+}
+
+func (a *App) gpsFirstFromCache(ctx context.Context) (cards.GPSFirstResult, []model.CardTx, error) {
+	empty := cards.GPSFirstResult{}
+	txs, err := a.Store.ListCardTxs(ctx, "")
+	if err != nil {
+		return empty, nil, err
+	}
+	one := a.OneStep
+	a.OneStep = nil
+	defer func() { a.OneStep = one }()
+	res, err := a.matchCardsAtGPSStops(ctx, txs)
+	if err != nil {
+		return empty, nil, err
+	}
+	return res, txs, nil
+}
+
+func (a *App) CardsSplit(ctx context.Context, cardID string) error {
+	res, _, err := a.gpsFirstFromCache(ctx)
+	if err != nil {
+		return err
+	}
+	cardID = strings.TrimSpace(cardID)
+	n := 0
+	for _, e := range res.Eras {
+		if cardID != "" && e.CardID != cardID {
+			continue
+		}
+		n++
+		name := firstNonEmpty(e.Nickname, e.EFleetsID)
+		flag := "HOME"
+		if e.Split {
+			flag = "SPLIT"
+		}
+		fmt.Printf("%s card=%s car=%s name=%s from=%s to=%s n=%d stations=%s\n",
+			flag, e.CardID, e.EFleetsID, name,
+			e.From.UTC().Format(time.RFC3339), e.To.UTC().Format(time.RFC3339),
+			e.EvidenceN, strings.Join(e.Stations, ","))
+	}
+	if n == 0 {
+		if cardID == "" {
+			fmt.Println("no GPS card eras (need gps-stops cache or live OneStep)")
+		} else {
+			fmt.Printf("no GPS eras for card %s\n", cardID)
+		}
+	}
+	return nil
+}
+
+func (a *App) CardsCall(ctx context.Context, cardID string, disagreeOnly bool) error {
+	res, _, err := a.gpsFirstFromCache(ctx)
+	if err != nil {
+		return err
+	}
+	cardID = strings.TrimSpace(cardID)
+	n := 0
+	for _, c := range res.Calls {
+		if cardID != "" && c.CardID != cardID {
+			continue
+		}
+		if disagreeOnly && (c.EnterpriseCar == "" || c.EnterpriseCar == c.CalledCar) {
+			continue
+		}
+		n++
+		fmt.Printf("CALL card=%s at=%s station=%s enterprise=%s called=%s (%s) why=%s\n",
+			c.CardID, c.At.UTC().Format(time.RFC3339), c.Station, c.EnterpriseCar,
+			c.CalledName, c.CalledCar, c.Why)
+	}
+	if n == 0 {
+		fmt.Println("no GPS-named swipes (try cards rebuild, then cards call)")
+	}
+	return nil
+}
+
+func firstNonEmpty(ss ...string) string {
+	for _, s := range ss {
+		if strings.TrimSpace(s) != "" {
+			return strings.TrimSpace(s)
+		}
+	}
+	return ""
 }
 
 func (a *App) CardsSuspects(ctx context.Context) error {

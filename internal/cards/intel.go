@@ -67,7 +67,14 @@ func ScorePairings(txs []model.CardTx, now time.Time) []model.CardPairing {
 		if now.Sub(t.At) >= 0 && now.Sub(t.At) <= RecentBonusDays*24*time.Hour {
 			w += 0.25
 		}
-		if car := strings.TrimSpace(t.RecordedEFleetsID); car != "" && !isUnknownCar(car) {
+		// GPS-called car is the join when present. Enterprise Vehicle is fallback.
+		car := strings.TrimSpace(t.CalledEFleetsID)
+		if car != "" && !isUnknownCar(car) {
+			w *= 2
+		} else {
+			car = strings.TrimSpace(t.RecordedEFleetsID)
+		}
+		if car != "" && !isUnknownCar(car) {
 			k := key{card, "car", car}
 			n[k]++
 			score[k] += w

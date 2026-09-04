@@ -75,6 +75,8 @@ func usage() {
   oilchange cards suspect
   oilchange cards trace --card ID [--window-days 2]
   oilchange cards pairings [--card ID]
+  oilchange cards split [--card ID]
+  oilchange cards call [--card ID] [--all]
   oilchange devices sync [--map PATH]
   oilchange devices list
   oilchange sync [--interval 5m] [--mirror web/data/cars.json] [--require-neon] [--no-remote]
@@ -250,15 +252,17 @@ func cmdHolds(ctx context.Context, cfg config.Config, args []string) int {
 
 func cmdCards(ctx context.Context, cfg config.Config, args []string) int {
 	if len(args) < 1 {
-		fmt.Fprintln(os.Stderr, "usage: oilchange cards rebuild|suspect|trace|pairings")
+		fmt.Fprintln(os.Stderr, "usage: oilchange cards rebuild|suspect|trace|pairings|split|call")
 		return model.ExitError
 	}
 	fs := flag.NewFlagSet("cards", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
 	details := fs.String("fuel-details", "", "optional DETAILS CSV to ingest before rebuild")
-	cardID := fs.String("card", "", "card id (trace/pairings)")
+	cardID := fs.String("card", "", "card id (trace/pairings/split/call)")
 	window := fs.Int("window-days", 2, "station co-occurrence window in days (trace)")
-	noGPS := fs.Bool("no-gps", false, "skip OneStep stop windows (swipe majority only)")
+	noGPS := fs.Bool("no-gps", false, "skip OneStep stop windows (use gps-stops.json cache)")
+	disagree := fs.Bool("disagree", true, "cards call: only swipes where GPS name ≠ Enterprise Vehicle")
+	allCalls := fs.Bool("all", false, "cards call: print every GPS-named swipe")
 	if err := fs.Parse(args[1:]); err != nil {
 		return model.ExitError
 	}
@@ -305,6 +309,19 @@ func cmdCards(ctx context.Context, cfg config.Config, args []string) int {
 	case "pairings":
 		if err := a.CardsPairings(ctx, *cardID); err != nil {
 			fmt.Fprintf(os.Stderr, "cards pairings: %v\n", err)
+			return model.ExitError
+		}
+		return model.ExitOK
+	case "split":
+		if err := a.CardsSplit(ctx, *cardID); err != nil {
+			fmt.Fprintf(os.Stderr, "cards split: %v\n", err)
+			return model.ExitError
+		}
+		return model.ExitOK
+	case "call":
+		onlyDisagree := *disagree && !*allCalls
+		if err := a.CardsCall(ctx, *cardID, onlyDisagree); err != nil {
+			fmt.Fprintf(os.Stderr, "cards call: %v\n", err)
 			return model.ExitError
 		}
 		return model.ExitOK

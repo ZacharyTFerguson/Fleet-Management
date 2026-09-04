@@ -30,10 +30,12 @@ Sit-still / important-location Node app lives in a separate PR (`cursor/importan
 | `pull-supabase` | GET `fleet_cars` from Zachary’s project using `SUPABASE_GROK_BUILD_KEY` (or service role). Merges non-null last_reading/HOLD into sqlite. Does not compute Last Reading. Never XRAY. |
 | `backup-neon` | Copy sqlite oilchange tables into **Neon** (`Fleet_Management_Neon` / `Fleet_Manage_Oil`). SQLite stays the working store. Alias: `backup`. |
 | `serve` | Host Oil Desk UI + `/api/cars` on `127.0.0.1:4739` from the **embedded** static export (`web/out`). **No npm/Node required.** `[--addr]` `[--mirror]` `[--web-dir]`. |
-| `cards rebuild` | ingest optional `--fuel-details` then score every swipe into `card_pairings` (never writes Last Reading). GPS stop windows from OneStep unless `--no-gps` (rematch from `data/runtime/gps-stops.json`) |
-| `cards suspect` | cards whose latest Enterprise Vehicle is not the swipe-majority car |
+| `cards rebuild` | ingest optional `--fuel-details` then score every swipe into `card_pairings` (never writes Last Reading). GPS-first: stop windows from OneStep unless `--no-gps` (rematch from `data/runtime/gps-stops.json`). Station lat/lng from exclusive GPS sits; later swipes match the car at that pump even when another box is sitting elsewhere. |
+| `cards suspect` | cards whose latest Enterprise Vehicle is not the swipe-majority / GPS-called car |
 | `cards trace` | `--card ID [--window-days 2]` other cars at the same station on nearby days |
 | `cards pairings` | `[--card ID]` scored car/person links; `BEST` is evidence, not Enterprise last-write-wins |
+| `cards split` | GPS eras: which vehicle each card was in over time (`SPLIT` when one card sat in two cars) |
+| `cards call` | what to call each swipe (`VA15`, not the DETAILS Vehicle column). Default: only rows where GPS ≠ Enterprise. `--all` prints every GPS-named swipe. |
 | `env` | which `oilchange.env` keys loaded (presence only; never prints values) |
 
 Exit: `0` ok, `1` error, `2` compute finished with open HOLDs (report still allowed).

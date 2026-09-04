@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState, useTransition } from "react";
-import type { CardsSnapshot, GPSCardMatch, UnknownMatchup } from "@/lib/types";
+import type { CardsSnapshot, CardEra, GPSCardMatch, UnknownMatchup } from "@/lib/types";
+import { normalizeCardsSnapshot } from "@/lib/cardsSnapshot";
 
 const REFRESH_MS = Number(process.env.NEXT_PUBLIC_REFRESH_MS || 120000);
 const DRIVER_MODE_KEY = "fleet-driver-mode";
@@ -25,7 +26,7 @@ export function CardsBoard() {
   const [pending, startTransition] = useTransition();
   const [driverMode, setDriverMode] = useState(true);
   const [query, setQuery] = useState("");
-  const [tab, setTab] = useState<"gps" | "unknown" | "stations">("gps");
+  const [tab, setTab] = useState<"gps" | "split" | "unknown" | "stations">("gps");
 
   useEffect(() => {
     try {
@@ -52,7 +53,7 @@ export function CardsBoard() {
         const res = await fetch("/api/cards", { cache: "no-store" });
         const body = await res.json();
         if (!res.ok) throw new Error(body.error || res.statusText);
-        setSnap(body as CardsSnapshot);
+        setSnap(normalizeCardsSnapshot(body as CardsSnapshot));
         setError(null);
       } catch (e) {
         setError(e instanceof Error ? e.message : "Could not load cards");
@@ -88,7 +89,7 @@ export function CardsBoard() {
   }
 
   const q = query.trim().toLowerCase();
-  const unknown = snap.unknown.filter((u) => {
+  const unknown = (snap.unknown ?? []).filter((u) => {
     if (!q) return true;
     const hay = [
       u.card_id,
@@ -105,10 +106,11 @@ export function CardsBoard() {
       .toLowerCase();
     return hay.includes(q);
   });
-  const stations = snap.stations.filter((s) => {
+  const stations = (snap.stations ?? []).filter((s) => {
     if (!q) return true;
     return `${s.name} ${s.address}`.toLowerCase().includes(q);
   });
+  const missingCars = snap.cars_without_card ?? [];
 
   return (
     <section className="roster" aria-label="Card matchups">
@@ -124,6 +126,12 @@ export function CardsBoard() {
         </p>
         <p>
           <span className="meta-label">GPS best</span> {snap.stats.gps_best ?? 0}
+        </p>
+        <p>
+          <span className="meta-label">Split cards</span> {snap.stats.gps_splits ?? 0}
+        </p>
+        <p>
+          <span className="meta-label">GPS ≠ Enterprise</span> {snap.stats.gps_disagree ?? 0}
         </p>
         <p>
           <span className="meta-label">Unknown</span> {snap.stats.unknown}
@@ -152,6 +160,15 @@ export function CardsBoard() {
           onClick={() => setTab("gps")}
         >
           GPS best {snap.stats.gps_best ?? 0}
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === "split"}
+          className={`cta ${tab === "split" ? "is-on" : "ghost"}`}
+          onClick={() => setTab("split")}
+        >
+          Split {snap.stats.gps_splits ?? 0}
         </button>
         <button
           type="button"
@@ -200,23 +217,93 @@ export function CardsBoard() {
           })}
           query={query}
         />
+      ) : tab === "split" ? (
+        <SplitList
+          snap={snap}
+          rows={(snap.eras ?? []).filter((e) => {
+            if (!q) return true;
+            const hay = [e.card_id, e.efleets_id, e.nickname, snap.nicknames?.[e.efleets_id], ...(e.stations ?? [])]
+              .filter(Boolean)
+              .join(" ")
+              .toLowerCase();
+            return hay.includes(q);
+          })}
+          query={query}
+        />
       ) : tab === "unknown" ? (
         <UnknownList snap={snap} rows={unknown} query={query} />
       ) : (
         <StationList rows={stations} query={query} />
       )}
 
-      {snap.cars_without_card.length > 0 && tab === "unknown" ? (
+      {missingCars.length > 0 && tab === "unknown" ? (
         <p className="search-empty">
-          {snap.cars_without_card.length} cars show up on swipes but no card votes them BEST:{" "}
-          {snap.cars_without_card
+          {missingCars.length} cars show up on swipes but no card votes them BEST:{" "}
+          {missingCars
             .slice(0, 12)
             .map((id) => nick(snap, id))
             .join(", ")}
-          {snap.cars_without_card.length > 12 ? "…" : ""}
+          {missingCars.length > 12 ? "…" : ""}
         </p>
       ) : null}
     </section>
+  );
+}
+
+function SplitList({
+  snap,
+  rows,
+  query,
+}: {
+  snap: CardsSnapshot;
+  rows: CardEra[];
+  query: string;
+}) {
+  if (rows.length === 0) {
+    return (
+      <p className="search-empty" role="status">
+        {query
+          ? `No card splits for “${query}”.`
+          : "No GPS eras yet. oilchange cards rebuild starts at GPS sits at pumps, then names the card in that car."}
+      </p>
+    );
+  }
+  return (
+    <ul className="car-cards">
+      {rows.map((e, i) => (
+        <li key={`${e.card_id}-${e.efleets_id}-${e.from}`} className={`car-card ${e.split ? "is-hold" : "is-live"}`} style={{ animationDelay: `${Math.min(i, 12) * 40}ms` }}>
+          <div className="car-card-top">
+            <div className="car-card-unit">
+              <span className="field-label">Call this card</span>
+              <span className="unit-name">{e.nickname || nick(snap, e.efleets_id)}</span>
+            </div>
+            <span className={`status-badge ${e.split ? "hold" : "ok"}`}>
+              <span className="field-label status-label">Era</span>
+              <span className="status-text">{e.split ? "Split" : "Home"}</span>
+            </span>
+          </div>
+          <div className="car-card-grid">
+            <div className="car-field">
+              <span className="field-label">Card</span>
+              <span className="field-value card-id">{e.card_id}</span>
+            </div>
+            <div className="car-field">
+              <span className="field-label">Hits</span>
+              <span className="field-value mono">{e.evidence_n}</span>
+            </div>
+            <div className="car-field">
+              <span className="field-label">From</span>
+              <span className="field-value mono">{e.from ? new Date(e.from).toLocaleString() : "—"}</span>
+            </div>
+            <div className="car-field">
+              <span className="field-label">To</span>
+              <span className="field-value mono">{e.to ? new Date(e.to).toLocaleString() : "—"}</span>
+            </div>
+          </div>
+          <p className="matchup-why">{(e.stations ?? []).slice(0, 6).join(" · ") || "GPS sit at the pump"}</p>
+        </li>
+      ))}
+    </ul>
   );
 }
 

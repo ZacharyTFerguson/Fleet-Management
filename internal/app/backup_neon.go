@@ -11,14 +11,14 @@ import (
 // BackupCounts is how many source rows the Neon/sqlite copier processed.
 type BackupCounts struct {
 	Cars, Fills, ShopROs, Stations, MaintLocs int
-	Cards, CardTxs, Pairings                  int
+	Cards, CardTxs, Pairings, Eras            int
 	Devices, Miles, Holds, OilChanges         int
 }
 
 // LogLine is the operator-facing summary. It never includes a DSN or password.
 func (c BackupCounts) LogLine() string {
-	return fmt.Sprintf("neon backup cars=%d fills=%d shop_ros=%d holds=%d oil_changes=%d devices=%d miles=%d cards=%d card_txs=%d pairings=%d stations=%d maint_locs=%d",
-		c.Cars, c.Fills, c.ShopROs, c.Holds, c.OilChanges, c.Devices, c.Miles, c.Cards, c.CardTxs, c.Pairings, c.Stations, c.MaintLocs)
+	return fmt.Sprintf("neon backup cars=%d fills=%d shop_ros=%d holds=%d oil_changes=%d devices=%d miles=%d cards=%d card_txs=%d pairings=%d eras=%d stations=%d maint_locs=%d",
+		c.Cars, c.Fills, c.ShopROs, c.Holds, c.OilChanges, c.Devices, c.Miles, c.Cards, c.CardTxs, c.Pairings, c.Eras, c.Stations, c.MaintLocs)
 }
 
 // validateNeonBackupURL refuses empty, pooled, XRAY, and Supabase DATABASE_URL values.
@@ -209,5 +209,14 @@ func CopyDurable(ctx context.Context, src, dest *store.Store) (BackupCounts, err
 		return c, fmt.Errorf("replace pairings: %w", err)
 	}
 	c.Pairings = len(pairs)
+
+	eras, err := src.ListEras(ctx)
+	if err != nil {
+		return c, fmt.Errorf("list eras: %w", err)
+	}
+	if err := dest.ReplaceEras(ctx, eras); err != nil {
+		return c, fmt.Errorf("replace eras: %w", err)
+	}
+	c.Eras = len(eras)
 	return c, nil
 }

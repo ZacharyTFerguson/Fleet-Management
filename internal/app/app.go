@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -228,6 +229,59 @@ func (a *App) SyncDevices(ctx context.Context, mapPath string, client *onestep.C
 	return len(devices), nil
 }
 
+// DevicesCSV writes the OneStep inventory CSV. display_name is a label only.
+// --live upserts from the API when a token is present; it does not fetch miles.
+func (a *App) DevicesCSV(ctx context.Context, w io.Writer, live bool, mapPath string, client *onestep.Client) (int, error) {
+	if live {
+		if client == nil || strings.TrimSpace(a.Cfg.OneStepToken) == "" {
+			fmt.Fprintln(os.Stderr, "devices csv --live: no OneStep token; writing sqlite registry")
+		} else {
+			n, err := a.SyncDevices(ctx, mapPath, client)
+			if err != nil {
+				return 0, err
+			}
+			fmt.Fprintf(os.Stderr, "devices sync: upserted %d by factory_id\n", n)
+		}
+	}
+	devs, err := a.Store.ListDevices(ctx)
+	if err != nil {
+		return 0, err
+	}
+	if err := onestep.WriteDevicesCSV(w, devs); err != nil {
+		return 0, err
+	}
+	return len(devs), nil
+}
+
+// CardsLadder climbs exclusive GPS pump sits (3, then 5, then 10 stations).
+// persist writes card_eras (car / person / office). Never writes Last Reading.
+func (a *App) CardsLadder(ctx context.Context, persist bool) (cards.LadderResult, error) {
+	empty := cards.LadderResult{}
+	txs, err := a.Store.ListCardTxs(ctx, "")
+	if err != nil {
+		return empty, err
+	}
+	fleet, err := a.Store.ListCars(ctx)
+	if err != nil {
+		return empty, err
+	}
+	devs, err := a.Store.ListDevices(ctx)
+	if err != nil {
+		return empty, err
+	}
+	gps, err := a.matchCardsAtGPSStops(ctx, txs)
+	if err != nil {
+		return empty, err
+	}
+	res := cards.ClassifyLadder(gps, txs, fleet, devs, cards.DefaultLadderRungs)
+	if persist {
+		if err := a.Store.ReplaceEras(ctx, res.Eras); err != nil {
+			return res, err
+		}
+	}
+	return res, nil
+}
+
 // SyncOneStep loads the device registry then drive-stop miles-since after each car's trusted second.
 func (a *App) SyncOneStep(ctx context.Context, mapPath string, client *onestep.Client) error {
 	if _, err := a.SyncDevices(ctx, mapPath, client); err != nil {
@@ -395,10 +449,22 @@ func (a *App) CardsRebuild(ctx context.Context, fuelPath string) (int, error) {
 	}
 	scored := cards.ApplyCalls(txs, gps.Calls)
 	ps := cards.ScorePairings(scored, time.Now().UTC())
+	fleet, err := a.Store.ListCars(ctx)
+	if err != nil {
+		return 0, err
+	}
+	devs, err := a.Store.ListDevices(ctx)
+	if err != nil {
+		return 0, err
+	}
+	ladder := cards.ClassifyLadder(gps, txs, fleet, devs, cards.DefaultLadderRungs)
 	if err := a.Store.ReplacePairings(ctx, ps); err != nil {
 		return 0, err
 	}
-	if err := a.writeCardsSnapshot(ctx, scored, ps, gps); err != nil {
+	if err := a.Store.ReplaceEras(ctx, ladder.Eras); err != nil {
+		return 0, err
+	}
+	if err := a.writeCardsSnapshot(ctx, scored, ps, gps, &ladder); err != nil {
 		return 0, err
 	}
 	splits := 0
@@ -421,6 +487,7 @@ func (a *App) CardsRebuild(ctx context.Context, fuelPath string) (int, error) {
 	}
 	fmt.Fprintf(os.Stderr, "gps-first matches=%d best=%d eras=%d split_cards=%d calls=%d geocoded_stations=%d pumps=%d\n",
 		hits, best, len(gps.Eras), splits, len(gps.Calls), len(gps.Stations), gps.Pumps)
+	fmt.Fprintf(os.Stderr, "%s", cards.FormatCoverage(ladder.Coverage))
 	return len(txs), nil
 }
 
@@ -540,7 +607,7 @@ func (a *App) matchCardsAtGPSStops(ctx context.Context, txs []model.CardTx) (car
 	return cards.MatchGPSFirst(visits, txs, fleet, cards.DefaultStopSlack), nil
 }
 
-func (a *App) writeCardsSnapshot(ctx context.Context, txs []model.CardTx, ps []model.CardPairing, gps cards.GPSFirstResult) error {
+func (a *App) writeCardsSnapshot(ctx context.Context, txs []model.CardTx, ps []model.CardPairing, gps cards.GPSFirstResult, ladder *cards.LadderResult) error {
 	if a == nil || a.CardsMirror == "" {
 		return nil
 	}
@@ -554,8 +621,17 @@ func (a *App) writeCardsSnapshot(ctx context.Context, txs []model.CardTx, ps []m
 			nicks[c.EFleetsID] = c.Nickname
 		}
 	}
-	snap := cards.BuildSnapshotFull(txs, ps, gps.Matches, gps.Eras, gps.Calls, nicks, time.Now().UTC())
+	eras := gps.Eras
+	if ladder != nil && len(ladder.Eras) > 0 {
+		eras = ladder.Eras
+	}
+	snap := cards.BuildSnapshotFull(txs, ps, gps.Matches, eras, gps.Calls, nicks, time.Now().UTC())
 	snap.GeocodedStations = gps.Stations
+	if ladder != nil {
+		cov := ladder.Coverage
+		snap.Coverage = &cov
+		snap.Ladder = ladder.Rungs
+	}
 	return cards.WriteSnapshot(a.CardsMirror, snap)
 }
 
@@ -576,7 +652,7 @@ func (a *App) gpsFirstFromCache(ctx context.Context) (cards.GPSFirstResult, []mo
 }
 
 func (a *App) CardsSplit(ctx context.Context, cardID string) error {
-	res, _, err := a.gpsFirstFromCache(ctx)
+	res, err := a.CardsLadder(ctx, false)
 	if err != nil {
 		return err
 	}
@@ -587,19 +663,29 @@ func (a *App) CardsSplit(ctx context.Context, cardID string) error {
 			continue
 		}
 		n++
-		name := firstNonEmpty(e.Nickname, e.EFleetsID)
+		ht := e.HolderType
+		if ht == "" {
+			ht = cards.HolderCar
+		}
+		name := firstNonEmpty(e.Nickname, e.HolderKey, e.EFleetsID)
 		flag := "HOME"
 		if e.Split {
 			flag = "SPLIT"
 		}
-		fmt.Printf("%s card=%s car=%s name=%s from=%s to=%s n=%d stations=%s\n",
-			flag, e.CardID, e.EFleetsID, name,
+		if ht == cards.HolderPerson {
+			flag = "PERSON"
+		}
+		if ht == cards.HolderOffice {
+			flag = "OFFICE"
+		}
+		fmt.Printf("%s card=%s type=%s key=%s car=%s name=%s from=%s to=%s n=%d rung=%d stations=%s\n",
+			flag, e.CardID, ht, firstNonEmpty(e.HolderKey, e.EFleetsID), e.EFleetsID, name,
 			e.From.UTC().Format(time.RFC3339), e.To.UTC().Format(time.RFC3339),
-			e.EvidenceN, strings.Join(e.Stations, ","))
+			e.EvidenceN, e.Rung, strings.Join(e.Stations, ","))
 	}
 	if n == 0 {
 		if cardID == "" {
-			fmt.Println("no GPS card eras (need gps-stops cache or live OneStep)")
+			fmt.Println("no GPS card eras (need gps-stops cache or live OneStep, and named pump merchants)")
 		} else {
 			fmt.Printf("no GPS eras for card %s\n", cardID)
 		}

@@ -24,6 +24,8 @@ type Snapshot struct {
 	Calls            []RecordCall         `json:"calls,omitempty"`
 	GeocodedStations []GeocodedStation    `json:"geocoded_stations,omitempty"`
 	Nicknames        map[string]string    `json:"nicknames,omitempty"`
+	Coverage         *Coverage            `json:"coverage,omitempty"`
+	Ladder           []LadderRung         `json:"ladder,omitempty"`
 }
 
 // SnapshotStats is the header strip.

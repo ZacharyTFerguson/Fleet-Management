@@ -23,7 +23,8 @@ Sit-still / important-location Node app lives in a separate PR (`cursor/importan
 | `sync-enterprise` | Live eFleets if `EFLEETS_*` is set, or `--vehicles` `--fuel-details` `[--shop-ro]` `[--mileage-history]`. Oil/lube shop ROs seed last oil. Does not compute Last Reading. |
 | `sync-onestep` | OneStep API devices + drive-stop miles-since after the trusted fill second. Join `factory_id` only. Optional `--map PATH`. |
 | `devices sync` | Upsert durable `onestep_devices` registry (`factory_id` PK, `device_id` history id, `display_name` label only). Optional `--map PATH`. Does not fetch miles. |
-| `devices list` | Print registry rows (status + optional `efleets_id` car link). |
+| `devices list` | Print registry rows (status + optional `efleets_id` car link). `--csv` writes the inventory CSV. |
+| `devices csv` | Write `factory_id,device_id,display_name,linked_car_efleets_id,status`. `display_name` is a label only. `[--out PATH]` `[--live]` `[--map PATH]`. `--live` refreshes from OneStep if a token is present (no miles). |
 | `compute` | Last Reading + HOLD. `[--override-lower]` is the only way to write a lower reading. |
 | `oil-done` | `--efleets-id ID --miles N --date YYYY-MM-DD [--location NAME]` |
 | `report` | `[--interval 5000] [--due-within N] [--out PATH.csv]` |
@@ -36,8 +37,10 @@ Sit-still / important-location Node app lives in a separate PR (`cursor/importan
 | `cards suspect` | cards whose latest Enterprise Vehicle is not the swipe-majority / GPS-called car |
 | `cards trace` | `--card ID [--window-days 2]` other cars at the same station on nearby days |
 | `cards pairings` | `[--card ID]` scored car/person links; `BEST` is evidence, not Enterprise last-write-wins |
-| `cards split` | GPS eras: which vehicle each card was in over time (`SPLIT` when one card sat in two cars) |
+| `cards split` | GPS eras: which vehicle each card was in over time (`SPLIT` when one card sat in two cars). Driver-kept / logistics cards print as `PERSON`. |
 | `cards call` | what to call each swipe (`VA15`, not the DETAILS Vehicle column). Default: only rows where GPS ≠ Enterprise. `--all` prints every GPS-named swipe. |
+| `cards ladder` | Exclusive GPS pump sits → cards at 3, then 5, then 10 stations. Buckets Cars / People / Offices. Persists `card_eras`. Prints coverage (device link + GPS-named card era). Never Last Reading. |
+| `cards coverage` | Coverage one-liner only (`cards ladder` metric). |
 | `env` | which `oilchange.env` keys loaded (presence only; never prints values) |
 
 Exit: `0` ok, `1` error, `2` compute finished with open HOLDs (report still allowed).

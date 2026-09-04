@@ -356,13 +356,20 @@ func TestMapCSVIgnoresLogisticsPersonnelLink(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	foundTyler := false
 	for _, d := range devs {
 		if d.FactoryID == "TYLERBOX" {
-			t.Fatal("tyler box must not appear as a linkable device")
+			foundTyler = true
+			if d.LinkedCarEFleetsID != nil {
+				t.Fatal("tyler box must not create a device↔car link")
+			}
 		}
 		if d.FactoryID == "FACT1" && (d.LinkedCarEFleetsID == nil || *d.LinkedCarEFleetsID != "27TESTA") {
 			t.Fatalf("FACT1 %+v", d)
 		}
+	}
+	if !foundTyler {
+		t.Fatal("tyler box stays in inventory unlinked (display_name is a label only)")
 	}
 }
 

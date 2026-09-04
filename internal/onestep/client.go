@@ -809,9 +809,7 @@ func LoadMapCSV(path string) ([]model.OneStepDevice, error) {
 		d.Active = !d.Dead
 		if oil.HasLogisticsPersonnel(name) {
 			d.LinkedCarEFleetsID = nil
-			continue
-		}
-		if eid != "" {
+		} else if eid != "" {
 			d.LinkedCarEFleetsID = &eid
 		}
 		out = append(out, d)

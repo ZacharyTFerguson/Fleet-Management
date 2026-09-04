@@ -113,10 +113,27 @@ type GPSCardMatch struct {
 	Best           bool     `json:"best"`
 }
 
-// CardPairing is a scored car or person link for one card over the full history.
+// CardEra is one stretch where a card sat in a car, with a person, or at an office.
+// HolderType car (default) / person / office. Logistics-personnel cards stay person
+// and must never create a device↔car join. Last Reading must not read this.
+type CardEra struct {
+	CardID     string    `json:"card_id"`
+	EFleetsID  string    `json:"efleets_id"`
+	Nickname   string    `json:"nickname,omitempty"`
+	HolderType string    `json:"holder_type,omitempty"` // car (default), person, office
+	HolderKey  string    `json:"holder_key,omitempty"`
+	From       time.Time `json:"from"`
+	To         time.Time `json:"to"`
+	EvidenceN  int       `json:"evidence_n"`
+	Stations   []string  `json:"stations,omitempty"`
+	Split      bool      `json:"split"`
+	Rung       int       `json:"rung,omitempty"`
+}
+
+// CardPairing is a scored car, person, or office link for one card over the full history.
 type CardPairing struct {
 	CardID     string
-	EntityType string // "car" or "person"
+	EntityType string // "car", "person", or "office"
 	EntityKey  string
 	EvidenceN  int
 	Score      float64

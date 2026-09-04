@@ -42,6 +42,7 @@ Sit-still / important-location Node app lives in a separate PR (`cursor/importan
 | `cards call` | what to call each swipe (`VA15`, not the DETAILS Vehicle column). Default: only rows where GPS ≠ Enterprise. `--all` prints every GPS-named swipe. |
 | `cards ladder` | Exclusive GPS pump sits → cards at 3, then 5, then 10 stations. Buckets Cars / People / Offices. Persists `card_eras`. Prints coverage (device link + GPS-named card era). Never Last Reading. |
 | `cards coverage` | Coverage one-liner only (`cards ladder` metric). |
+| `cards nearby` | Fill-day ±1, 1 mile: watch GPS boxes at unknown-card pumps (provider swipe time, not bank posting). `--live` / `--report` / `--persist`. Never Last Reading. |
 | `env` | which `oilchange.env` keys loaded (presence only; never prints values) |
 
 Exit: `0` ok, `1` error, `2` compute finished with open HOLDs (report still allowed).

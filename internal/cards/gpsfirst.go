@@ -639,6 +639,11 @@ func flattenGeo(geo map[string]*geoAcc) []GeocodedStation {
 	return out
 }
 
+// MetersBetween is haversine meters. Nearby hunt uses 1 mile; GPS-first pumps use StationRadiusMeters.
+func MetersBetween(lat1, lng1, lat2, lng2 float64) float64 {
+	return metersBetween(lat1, lng1, lat2, lng2)
+}
+
 func metersBetween(lat1, lng1, lat2, lng2 float64) float64 {
 	const r = 6371000.0
 	p1 := lat1 * math.Pi / 180

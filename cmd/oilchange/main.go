@@ -81,6 +81,7 @@ func usage() {
   oilchange cards call [--card ID] [--all]
   oilchange cards ladder [--no-gps]
   oilchange cards coverage [--no-gps]
+  oilchange cards nearby [--card ID] [--live] [--report] [--persist]
   oilchange devices sync [--map PATH]
   oilchange devices list [--csv [--out PATH] [--live] [--map PATH]]
   oilchange devices csv [--out PATH] [--live] [--map PATH]
@@ -257,7 +258,7 @@ func cmdHolds(ctx context.Context, cfg config.Config, args []string) int {
 
 func cmdCards(ctx context.Context, cfg config.Config, args []string) int {
 	if len(args) < 1 {
-		fmt.Fprintln(os.Stderr, "usage: oilchange cards rebuild|history|suspect|trace|pairings|split|call|ladder|coverage")
+		fmt.Fprintln(os.Stderr, "usage: oilchange cards rebuild|history|suspect|trace|pairings|split|call|ladder|coverage|nearby")
 		return model.ExitError
 	}
 	fs := flag.NewFlagSet("cards", flag.ContinueOnError)
@@ -272,6 +273,10 @@ func cmdCards(ctx context.Context, cfg config.Config, args []string) int {
 	devicesLive := fs.Bool("devices-live", false, "refresh OneStep devices if token present (history)")
 	devicesMap := fs.String("map", "", "factory_id map CSV for devices sync (history)")
 	devicesOut := fs.String("devices-out", "data/runtime/onestep-devices.csv", "devices inventory CSV path (history)")
+	liveStops := fs.Bool("live", false, "cards nearby: pull drive-stop for boxes missing from the GPS cache")
+	liveReport := fs.Bool("report", false, "cards nearby: queue OneStep near_address generate-reports jobs")
+	persistNearby := fs.Bool("persist", false, "cards nearby: persist certain linked-car eras (never unpaired factory_id)")
+	reportCap := fs.Int("report-cap", 3, "cards nearby --report max generate jobs")
 	if err := fs.Parse(args[1:]); err != nil {
 		return model.ExitError
 	}
@@ -360,6 +365,20 @@ func cmdCards(ctx context.Context, cfg config.Config, args []string) int {
 		} else {
 			fmt.Fprint(os.Stdout, cards.FormatLadder(res))
 		}
+		return model.ExitOK
+	case "nearby":
+		res, err := a.CardsNearby(ctx, app.CardsNearbyOpts{
+			CardID:     *cardID,
+			LiveStops:  *liveStops,
+			LiveReport: *liveReport,
+			Persist:    *persistNearby,
+			ReportCap:  *reportCap,
+		})
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "cards nearby: %v\n", err)
+			return model.ExitError
+		}
+		fmt.Fprint(os.Stdout, cards.FormatNearby(res))
 		return model.ExitOK
 	default:
 		fmt.Fprintf(os.Stderr, "unknown cards verb %q\n", args[0])

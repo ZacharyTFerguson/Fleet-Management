@@ -79,12 +79,15 @@ Tests lock the ladder with synthetic exclusive pumps (`internal/cards/ladder_tes
 
 90-day DETAILS ingest skipped punches for vehicles not on the roster (do not invent cars). Station key is merchant name + city/state. `TRACKER` / empty names dropped.
 
+## Near-address hunt (2026-09-04)
+
+Live generate-reports type **`near_address`** exists. Spec that actually echoes: `report_options_near_address.search_address_string` + `range: {value:1, unit:mi}`, `datetime_from`/`datetime_to` = Eastern **fill day ±1** (provider swipe, not bank posting), `all_user_devices` + `exclude_inactive_devices`, `time_zone=America/New_York`, JSON output fields including `near_address_factory_id`. Top-level `address`/`radius` are dropped. Public JSON download 404s; hunt rows use drive-stop stops at 1 mile. CLI: `oilchange cards nearby [--live] [--report] [--persist]`. One hit = watch, not a join. Method: `docs/collab/NEAR-ADDRESS.md`.
+
 ## Next (reasonable)
 
 - File-drop a **90-day** (or current 30-day) Fuel DETAILS CSV — June 2026 30-day already proved the matcher. Do not ask for an eFleets password or MFA code in chat. Optional: `EFLEETS_DETAILS_URL` + CDP on an already-logged-in tab.
 - Remaining unpaired / no-VIN boxes (~8–9 roster cars, plus 14 VIN-linked boxes with no GPS in this window). Do not join on `display_name`.
 - Do not rewrite the GPS matcher to chase 95% — exclusive sit is the lock; more boxes correctly *reduce* exclusive votes.
-- Enterprise DETAILS for the 4 `NO_TRUSTED_FILL` cars.
 - Enterprise DETAILS for the 4 `NO_TRUSTED_FILL` cars.
 - Capture a real Maintenance Detail export URL (or CDP) so last oil is not stuck on Downloads CSVs.
 - Optional: collapse stacked `hold_events` so event count matches cars on HOLD.

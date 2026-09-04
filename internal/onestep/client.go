@@ -1,6 +1,7 @@
 package onestep
 
 import (
+	"bytes"
 	"context"
 	"encoding/csv"
 	"encoding/json"
@@ -648,6 +649,71 @@ func asFloat(v any) (float64, bool) {
 		return 0, false
 	}
 	return n, true
+}
+
+// GetPublic is the live probe / smoketest GET. oil.LastReading never calls it.
+func (c *Client) GetPublic(ctx context.Context, path string, q url.Values) ([]byte, error) {
+	return c.get(ctx, path, q)
+}
+
+// PostPublic is the live probe / smoketest POST. oil.LastReading never calls it.
+func (c *Client) PostPublic(ctx context.Context, path string, body []byte) ([]byte, error) {
+	return c.post(ctx, path, body)
+}
+
+func (c *Client) post(ctx context.Context, path string, body []byte) ([]byte, error) {
+	var rdr io.Reader
+	if body != nil {
+		rdr = bytes.NewReader(body)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.resolve(path), rdr)
+	if err != nil {
+		return nil, safeHTTPError(path, "build request", err, c.Token)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	q := url.Values{}
+	var sentAuth string
+	if c.PrivateKeyPEM != "" && c.Token != "" {
+		tok, err := signAPIKeyJWT(c.PrivateKeyPEM, c.Token, time.Minute)
+		if err != nil {
+			return nil, safeHTTPError(path, "sign authentication", err, c.Token)
+		}
+		sentAuth = tok
+		req.Header.Set("Authorization", "Bearer "+tok)
+	} else if c.Token != "" {
+		sentAuth = c.Token
+		q.Set("api-key", c.Token)
+		req.URL.RawQuery = q.Encode()
+	}
+	httpClient := c.HTTP
+	if httpClient == nil {
+		httpClient = http.DefaultClient
+	}
+	redirectSafeClient := *httpClient
+	redirectSafeClient.CheckRedirect = func(_ *http.Request, _ []*http.Request) error {
+		return http.ErrUseLastResponse
+	}
+	res, err := redirectSafeClient.Do(req)
+	if err != nil {
+		return nil, safeHTTPError(path, "request failed", err, c.Token, sentAuth)
+	}
+	defer res.Body.Close()
+	b, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil, safeHTTPError(path, "read response", err, c.Token, sentAuth)
+	}
+	if res.StatusCode >= 300 {
+		msg := strings.TrimSpace(string(b))
+		msg = sanitizeAuthError(msg, c.Token, sentAuth)
+		if len(msg) > 400 {
+			msg = msg[:400] + "…"
+		}
+		if msg == "" {
+			return nil, fmt.Errorf("onestep %s: HTTP %s", path, res.Status)
+		}
+		return nil, fmt.Errorf("onestep %s: HTTP %s: %s", path, res.Status, msg)
+	}
+	return b, nil
 }
 
 // get is the only HTTP in this package; oil.LastReading never calls it.

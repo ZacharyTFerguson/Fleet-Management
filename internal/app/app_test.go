@@ -3,6 +3,10 @@ package app
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/pem"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -324,9 +328,19 @@ func TestSyncDevicesLinksAPIByFactoryIDNotDisplayName(t *testing.T) {
 	}))
 	defer srv.Close()
 
+	priv, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatal(err)
+	}
+	der, err := x509.MarshalPKCS8PrivateKey(priv)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pemBytes := pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: der})
 	client := onestep.NewClient(srv.URL, "tok")
+	client.PrivateKeyPEM = string(pemBytes)
 	client.HTTP = srv.Client()
-	a := &App{Cfg: config.Config{OneStepToken: "tok"}, Store: st}
+	a := &App{Cfg: config.Config{OneStepToken: "tok", OneStepPrivateKey: string(pemBytes)}, Store: st}
 	n, err := a.SyncDevices(ctx, mapPath, client)
 	if err != nil {
 		t.Fatal(err)

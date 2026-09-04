@@ -62,7 +62,9 @@ func (a FileAdapter) Fetch(_ context.Context, kind ReportKind) ([]byte, string, 
 	return b, filepath.Base(path), nil
 }
 
-// HTTPAdapter logs into fleetweb with a cookie jar. No browser, no Playwright.
+// HTTPAdapter is leftover password-form login. Tonight's lock is: reuse an
+// already-open Chrome eFleets session (no password typing); file drop if that
+// session is missing. Do not treat this adapter as always-on HTTP login.
 type HTTPAdapter struct {
 	BaseURL    string
 	Username   string

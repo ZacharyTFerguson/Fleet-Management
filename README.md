@@ -10,7 +10,7 @@ go test ./...
 
 Toolchain: Go 1.27.1.
 
-OneStep live auth: short-lived RS256 JWT when a PEM is present in gitignored `oilchange.env`; otherwise `api-key` query (see [`docs/onestep-api-auth.md`](docs/onestep-api-auth.md)).
+OneStep live auth: short-lived RS256 JWS `{access_token, exp}` signed with the account PEM → `Authorization: Bearer <jwt>`. Token + PEM are both required. Not raw Bearer, not `?api-key=` (see [`docs/onestep-api-auth.md`](docs/onestep-api-auth.md)). Live `/device` is 200; `drive-stop` 403 is HOLD/History — never invent miles or use OneStep odo as Last Reading.
 
 Sit-still / important-location Node app lives in a separate PR (`cursor/important-location-trigger-61d4`); it is intentionally not bundled here.
 
@@ -36,7 +36,7 @@ The binary loads `oilchange.env` on startup (or `OILCHANGE_ENV`, `secrets/oilcha
 
 `EFLEETS_CUST_NUM` has **no** hardcoded default — set it in env for live eFleets sync.
 
-Tests never hit live eFleets, OneStep, or Supabase.
+Tests never hit live eFleets, OneStep, or a live Postgres. App DB is Neon via `DATABASE_URL` when Grok Build provides it; SQLite is the offline / test path. Never XRAY.
 
 HOLD `LOGISTICS_PERSONNEL` (third-spec name `RICH_TYLER_PAIRING`): logistics-personnel names on a punch or OneStep label never create a device↔car link.
 

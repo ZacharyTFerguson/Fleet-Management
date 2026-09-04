@@ -32,13 +32,14 @@ type Client struct {
 	HTTP          *http.Client
 }
 
-// AuthMode is jwt-rs256 when oilchange.env has the OneStep usage-note PEM+key, else api-key query (Cursor guide).
+// AuthMode is jwt-rs256 when oilchange.env has token + PEM. This account
+// does not use ?api-key= or a raw Bearer API key.
 func (c *Client) AuthMode() string {
-	if c == nil || c.Token == "" {
+	if c == nil || strings.TrimSpace(c.Token) == "" {
 		return "none"
 	}
 	if strings.TrimSpace(c.PrivateKeyPEM) == "" {
-		return "api-key-query"
+		return "missing-pem"
 	}
 	if _, err := signAPIKeyJWT(c.PrivateKeyPEM, c.Token, time.Minute); err != nil {
 		return "jwt-rs256-invalid-pem"
@@ -289,7 +290,8 @@ func asFloat(v any) (float64, bool) {
 }
 
 // get is the only HTTP in this package; oil.LastReading never calls it.
-// With a PEM, auth is a per-request RS256 JWT (OneStep usage note). Without PEM, api-key query (Cursor guide).
+// Live auth is a per-request RS256 JWS {access_token, exp} as Authorization: Bearer <jwt>.
+// Token without PEM, raw Bearer of the API key, and ?api-key= are all refused.
 func (c *Client) get(ctx context.Context, path string, q url.Values) ([]byte, error) {
 	if q == nil {
 		q = url.Values{}
@@ -299,16 +301,18 @@ func (c *Client) get(ctx context.Context, path string, q url.Values) ([]byte, er
 		return nil, safeHTTPError(path, "build request", err, c.Token)
 	}
 	var sentAuth string
-	if c.PrivateKeyPEM != "" && c.Token != "" {
-		tok, err := signAPIKeyJWT(c.PrivateKeyPEM, c.Token, time.Minute)
+	token := strings.TrimSpace(c.Token)
+	pem := strings.TrimSpace(c.PrivateKeyPEM)
+	switch {
+	case token != "" && pem != "":
+		tok, err := signAPIKeyJWT(pem, token, time.Minute)
 		if err != nil {
 			return nil, safeHTTPError(path, "sign authentication", err, c.Token)
 		}
 		sentAuth = tok
 		req.Header.Set("Authorization", "Bearer "+tok)
-	} else if c.Token != "" {
-		sentAuth = c.Token
-		q.Set("api-key", c.Token)
+	case token != "" || pem != "":
+		return nil, fmt.Errorf("onestep %s: need token + PEM (RS256 JWS); not raw Bearer, not api-key query", path)
 	}
 	if len(q) > 0 {
 		req.URL.RawQuery = q.Encode()
@@ -338,7 +342,10 @@ func (c *Client) get(ctx context.Context, path string, q url.Values) ([]byte, er
 		if len(msg) > 240 {
 			msg = msg[:240] + "…"
 		}
-		// Never echo query strings (api-key) or Authorization material.
+		// Never echo query strings or Authorization material.
+		if res.StatusCode == http.StatusForbidden && strings.Contains(path, "drive-stop") {
+			return nil, fmt.Errorf("onestep %s: HTTP %s: HOLD/History — do not invent miles or use device odo", path, res.Status)
+		}
 		if msg == "" {
 			return nil, fmt.Errorf("onestep %s: HTTP %s", path, res.Status)
 		}

@@ -249,6 +249,10 @@ func TestLadderBlockerWhenMostMerchantsAreTracker(t *testing.T) {
 	if !strings.Contains(msg, "TRACKER") || !strings.Contains(msg, "named=1") {
 		t.Fatalf("blocker %q", msg)
 	}
+	visits := []model.StopVisit{{EFleetsID: "27SGXD", HasPos: true, Lat: 37.54, Lng: -77.43}}
+	if gpsMsg := LadderBlocker(txs, visits); gpsMsg != "" {
+		t.Fatalf("GPS positions mean TRACKER is not the merchant-name blocker: %q", gpsMsg)
+	}
 }
 
 func TestLadderBlockerEmptyWhenGPSHasPositions(t *testing.T) {
@@ -264,6 +268,30 @@ func TestLadderBlockerEmptyWhenGPSHasPositions(t *testing.T) {
 	}
 	if msg := LadderBlocker(txs, nil); msg == "" || !strings.Contains(msg, "TRACKER") {
 		t.Fatalf("without GPS, TRACKER must block: %q", msg)
+	}
+}
+
+func TestStationLadderTrackerGPSWithoutExclusiveSitExplainsGap(t *testing.T) {
+	at := ny(2026, 8, 12, 10)
+	lat, lng := 37.54, -77.43
+	visits := append(pumpClusterSeeds(lat, lng, at), model.StopVisit{
+		EFleetsID: "27SGXD", HasPos: true, Lat: lat, Lng: lng,
+		From: at.Add(6 * time.Hour), To: at.Add(6*time.Hour + 10*time.Minute),
+	})
+	txs := []model.CardTx{{
+		CardID: "x10000", At: at.Add(2 * time.Minute),
+		StationName: "TRACKER", StationAddress: "1 MAIN,TOWN,VA",
+		RecordedEFleetsID: "WRONG-ENTERPRISE", DriverFirst: "FLEET", DriverLast: "DRIVER",
+	}}
+	fleet := []model.Car{{EFleetsID: "27SGXD", Nickname: "BING-1", Region: "BING"}}
+	link := "27SGXD"
+	devs := []model.OneStepDevice{{FactoryID: "F1", DeviceID: "D1", LinkedCarEFleetsID: &link, Active: true}}
+	got := ClimbStationLadder(visits, txs, fleet, devs, DefaultStopSlack, DefaultLadderRungs)
+	if got.Coverage.KnownN != 0 || got.Coverage.CardEraN != 0 {
+		t.Fatalf("must not invent an era when GPS sit misses the swipe: %+v", got.Coverage)
+	}
+	if !strings.Contains(got.Coverage.Blocked, "exclusive") {
+		t.Fatalf("blocker should explain exclusive-sit gap, not missing pump names: %q", got.Coverage.Blocked)
 	}
 }
 

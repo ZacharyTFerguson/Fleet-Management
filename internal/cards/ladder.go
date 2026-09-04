@@ -266,6 +266,9 @@ func ClassifyLadder(gps GPSFirstResult, txs []model.CardTx, fleet []model.Car, d
 	eras := mergeLadderEras(backEras, classified, info, byCardCar, nick)
 	cov := RosterCoverage(fleet, devices, eras, cars)
 	cov.Blocked = LadderBlocker(txs, gpsPosVisits(gps))
+	if cov.Blocked == "" {
+		cov.Blocked = exclusiveSitBlocker(txs, gps)
+	}
 	return LadderResult{
 		Rungs:    rungsOut,
 		Cars:     cars,
@@ -631,6 +634,36 @@ func gpsPosVisits(gps GPSFirstResult) []model.StopVisit {
 	return []model.StopVisit{{HasPos: true, EFleetsID: "gps"}}
 }
 
+func gpsVisitsHavePos(visits []model.StopVisit) bool {
+	for _, v := range visits {
+		if v.HasPos && strings.TrimSpace(v.EFleetsID) != "" && !isUnknownCar(v.EFleetsID) {
+			return true
+		}
+	}
+	return false
+}
+
+// exclusiveSitBlocker explains remaining unknown % when GPS exists but no swipe
+// had exactly one fuel-length sit on a pump cluster.
+func exclusiveSitBlocker(txs []model.CardTx, gps GPSFirstResult) string {
+	if !gps.hasGPSPos || gps.Pumps == 0 || len(gps.Calls) > 0 {
+		return ""
+	}
+	skipped := 0
+	for _, t := range txs {
+		if strings.TrimSpace(t.CardID) == "" {
+			continue
+		}
+		if skipStationName(t.StationName) {
+			skipped++
+		}
+	}
+	if skipped == 0 {
+		return ""
+	}
+	return "GPS pump clusters exist but no exclusive fuel sit covers a swipe; TRACKER clock times collide with many cars. Live DETAILS with real punch times needed — do not invent punches"
+}
+
 // LadderBlocker explains why live coverage can sit below 95% without inventing punches.
 func LadderBlocker(txs []model.CardTx, visits []model.StopVisit) string {
 	named, skipped := 0, 0
@@ -645,14 +678,15 @@ func LadderBlocker(txs []model.CardTx, visits []model.StopVisit) string {
 		named++
 	}
 	if named == 0 && skipped > 0 {
-		for _, v := range visits {
-			if v.HasPos && strings.TrimSpace(v.EFleetsID) != "" && !isUnknownCar(v.EFleetsID) {
-				return ""
-			}
+		if gpsVisitsHavePos(visits) {
+			return ""
 		}
 		return "all DETAILS merchants are TRACKER/empty; station ladder cannot name cards without real pump names"
 	}
 	if skipped > 0 && named < skipped {
+		if gpsVisitsHavePos(visits) {
+			return ""
+		}
 		return fmt.Sprintf("DETAILS merchants are mostly TRACKER/empty (named=%d tracker_or_empty=%d); station ladder cannot name fleet cards without real pump names", named, skipped)
 	}
 	if named == 0 {

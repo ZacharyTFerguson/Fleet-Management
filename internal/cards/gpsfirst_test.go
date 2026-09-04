@@ -226,6 +226,40 @@ func TestGPSFirstBackpropNamesEarlierTrackerSwipe(t *testing.T) {
 	}
 }
 
+func TestGPSFirstSkipsSimultaneousTrackerCards(t *testing.T) {
+	at := ny(2026, 8, 12, 10)
+	lat, lng := 37.54, -77.43
+	visits := append(pumpClusterSeeds(lat, lng, at), model.StopVisit{
+		EFleetsID: "27SGXD", HasPos: true, Lat: lat, Lng: lng,
+		From: at, To: at.Add(10 * time.Minute),
+	})
+	txs := []model.CardTx{
+		{CardID: "x10000", At: at.Add(2 * time.Minute), StationName: "TRACKER", RecordedEFleetsID: "WRONG-A"},
+		{CardID: "x10001", At: at.Add(3 * time.Minute), StationName: "TRACKER", RecordedEFleetsID: "WRONG-B"},
+	}
+	got := MatchGPSFirst(visits, txs, []model.Car{{EFleetsID: "27SGXD", Nickname: "BING-1"}}, DefaultStopSlack)
+	if len(got.Calls) != 0 {
+		t.Fatalf("two TRACKER cards at once must not both inherit one GPS car: %+v", got.Calls)
+	}
+}
+
+func TestGPSFirstTrackerSkipsLongLotSit(t *testing.T) {
+	at := ny(2026, 8, 12, 10)
+	lat, lng := 37.54, -77.43
+	visits := append(pumpClusterSeeds(lat, lng, at), model.StopVisit{
+		EFleetsID: "27SGXD", HasPos: true, Lat: lat, Lng: lng,
+		From: at, To: at.Add(90 * time.Minute),
+	})
+	txs := []model.CardTx{{
+		CardID: "x10000", At: at.Add(2 * time.Minute),
+		StationName: "TRACKER", RecordedEFleetsID: "WRONG-ENTERPRISE",
+	}}
+	got := MatchGPSFirst(visits, txs, []model.Car{{EFleetsID: "27SGXD", Nickname: "BING-1"}}, DefaultStopSlack)
+	if len(got.Calls) != 0 {
+		t.Fatalf("90-minute lot sit is not a fuel: %+v", got.Calls)
+	}
+}
+
 func pumpClusterSeeds(lat, lng float64, around time.Time) []model.StopVisit {
 	cars := []string{"27SEDA", "27SEDB", "27SEDC"}
 	var out []model.StopVisit

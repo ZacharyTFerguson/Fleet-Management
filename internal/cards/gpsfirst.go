@@ -142,17 +142,29 @@ func MatchGPSFirst(visits []model.StopVisit, txs []model.CardTx, fleet []model.C
 				}
 			}
 			cands := uniqueCarsAt(buckets, t.At, slack)
-			cands = filterCandidates(cands, stKey, stState, region, geo, pumps, useGeo)
+			if placeholder {
+				// Fake merchant address must not geocode. Require a fuel-length
+				// sit on a pump cluster, and do not paint one car onto a pile of
+				// simultaneous TRACKER punches (synthetic 10:00 AM).
+				if placeholderCardsAt(txs, t.At, slack) != 1 {
+					continue
+				}
+				var fuel []model.StopVisit
+				for _, v := range cands {
+					if isFuelSit(v) && sitAtPump(v, pumps) {
+						fuel = append(fuel, v)
+					}
+				}
+				cands = fuel
+			} else {
+				cands = filterCandidates(cands, stKey, stState, region, geo, pumps, useGeo)
+			}
 			if len(cands) != 1 {
 				continue
 			}
 			v := cands[0]
 			station := firstNonEmpty(t.StationName, stKey)
 			if placeholder {
-				// Fake merchant address must not geocode; require a real pump cluster sit.
-				if !sitAtPump(v, pumps) {
-					continue
-				}
 				station = gpsPumpStation(v)
 			}
 			hit := gpsHit{
@@ -400,6 +412,42 @@ func sitAtPump(v model.StopVisit, pumps []pumpCluster) bool {
 		}
 	}
 	return false
+}
+
+func isFuelSit(v model.StopVisit) bool {
+	if v.From.IsZero() || v.To.IsZero() {
+		return false
+	}
+	sit := v.To.Sub(v.From)
+	if sit < 0 {
+		sit = -sit
+	}
+	return sit >= MinFuelSit && sit <= MaxTrackerFuelSit
+}
+
+func placeholderCardsAt(txs []model.CardTx, at time.Time, slack time.Duration) int {
+	if slack < 0 {
+		slack = -slack
+	}
+	at = at.UTC()
+	seen := map[string]struct{}{}
+	for _, t := range txs {
+		if !skipStationName(t.StationName) {
+			continue
+		}
+		card := strings.TrimSpace(t.CardID)
+		if card == "" || t.At.IsZero() {
+			continue
+		}
+		d := t.At.UTC().Sub(at)
+		if d < 0 {
+			d = -d
+		}
+		if d <= slack {
+			seen[card] = struct{}{}
+		}
+	}
+	return len(seen)
 }
 
 func collapseMatches(hits []gpsHit) []model.GPSCardMatch {

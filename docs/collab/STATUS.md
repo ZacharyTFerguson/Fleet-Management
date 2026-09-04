@@ -4,7 +4,7 @@ Updated: 2026-09-04 (UTC) after OneStep-first devices CSV + station ladder (3/5/
 
 ## True now
 
-- Daily driver is sqlite (`OILCHANGE_DB=./oilchange.sqlite`). Neon `Fleet_Manage_Oil` on project `Fleet_Management_Neon` (`icy-thunder-13848536`, branch `production`) is backup only. Unpooled `DATABASE_URL` (no `-pooler`, not XRAY `chjqcznyxvtjbamttqdj`).
+- Daily driver is sqlite (`OILCHANGE_DB=./oilchange.sqlite`). Neon `Fleet_Manage_Oil` on project `Fleet_Management_Neon` (`icy-thunder-13848536`, branch `production`) is the backup. Unpooled `DATABASE_URL` (no `-pooler`, not XRAY `chjqcznyxvtjbamttqdj`). Do not add S3, extra Neon, or direct AWS. This fleet’s Supabase is Oil Desk today; later a second full copy if Neon is down; today `sync` is Oil Desk `fleet_cars` only.
 - Oil Desk: `oilchange serve` at `http://127.0.0.1:4739`, mirror `web/data/cars.json` (`source=mock-mirror`, synced ~2026-09-04T03:03:06Z).
 - Roster: **205** cars on the operator desktop. **146** Last Reading (fill odo + drive-stop miles). **189** last oil from Enterprise shop ROs. **0** `NO_DRIVESTOP`. Open HOLDs: **55** `NO_DEVICE`, **4** `NO_TRUSTED_FILL`. This Cloud Agent sqlite is a file-drop mix (205 live ids + demo `27TESTA`/`27TESTB` = **207** rows) and does **not** hold those Last Reading values — do not copy an empty agent db over the desktop sqlite.
 - Live OneStep map: `data/runtime/onestep-map.csv` (gitignored) — 146 `factory_id,device_id,efleets_id`. Live `devices csv --live` (2026-09-04): **188** boxes, **148** with a car link, **40** unpaired. Do **not** use `testdata/onestep/map.csv` on this roster.
@@ -82,7 +82,7 @@ Tests lock the ladder with synthetic exclusive pumps (`internal/cards/ladder_tes
 - Capture a real Maintenance Detail export URL (or CDP) so last oil is not stuck on Downloads CSVs.
 - Optional: collapse stacked `hold_events` so event count matches cars on HOLD.
 - Do not “fill in” Last Reading for those HOLDs.
-- Later (not now): full sqlite-table backup onto this fleet’s Supabase so Neon/AWS down is not the only copy. Do not add AWS S3/RDS/extra Neon.
+- Later (not now): full sqlite-table copy onto this fleet’s Supabase so there is still a backup if Neon is down. Do not add S3, extra Neon, or direct AWS.
 
 ## Env (presence only)
 

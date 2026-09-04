@@ -21,6 +21,8 @@ eFleets / OneStep / compute  →  SQLite (OILCHANGE_DB)     ← daily driver
 
 SQLite stays the DSN whenever `OILCHANGE_DB` is set. `DATABASE_URL` is a **second** pgx connection used only by backup.
 
+Redundancy when needed: SQLite is the working store. Neon is the backup. This fleet’s Supabase is Oil Desk today; later a full sqlite-table copy if Neon is down. Do not add S3, extra Neon, or direct AWS.
+
 ## Project (already exists)
 
 Do **not** run `neon init` / `create_project`. CLI is authenticated. Node: `C:\Program Files\nodejs` (prepend to PATH if missing).
@@ -113,12 +115,15 @@ Last verified copy (approx): sqlite cars=205, fills=201, open holds=205, cards=2
 - Do not require npm for desktop `serve`.
 - Do not apply `supabase/migrations/*fleet*` SQL to Neon.
 - Do not unset `OILCHANGE_DB`. Desktop must keep working offline on sqlite.
+- Do not add S3, extra Neon, or direct AWS. The later full copy is this fleet’s Supabase when that work is asked for.
 - Default `go test ./...` must not hit live Neon (integration test skips unless `DATABASE_URL` is already in the process env).
 
 ## Out of scope unless the human asks
 
 - Neon Auth, Functions, AI Gateway, Data API
 - Using the `uploads` bucket for sqlite file dumps
+- Extra Neon, S3, or direct AWS
+- Building a full Supabase sqlite-table backup until the human asks (today `oilchange sync` is Oil Desk `fleet_cars` only)
 - Migrating Oil Desk reads off Supabase onto Neon
 - Nested untracked tree `Fleet-Management/` (implement in **repo root**)
 - Creating a second Neon project

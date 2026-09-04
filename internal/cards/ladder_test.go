@@ -196,7 +196,7 @@ func TestStationLadderTrackerMerchantsYieldZeroCarLocks(t *testing.T) {
 	txs := []model.CardTx{{
 		CardID: "x10000", At: at.Add(2 * time.Minute),
 		StationName: "TRACKER", StationAddress: "1 MAIN,TOWN,VA",
-		RecordedEFleetsID: "27SGXD",
+		RecordedEFleetsID: "27SGXD", DriverFirst: "FLEET", DriverLast: "DRIVER",
 	}}
 	fleet := []model.Car{{EFleetsID: "27SGXD", Nickname: "BING-1", Region: "BING"}}
 	link := "27SGXD"
@@ -205,11 +205,32 @@ func TestStationLadderTrackerMerchantsYieldZeroCarLocks(t *testing.T) {
 	if len(got.Cars) != 0 || got.Coverage.CardEraN != 0 {
 		t.Fatalf("TRACKER is not a pump name: cars=%+v cov=%+v", got.Cars, got.Coverage)
 	}
+	if len(got.People) != 0 {
+		t.Fatalf("FLEET DRIVER is not a person who keeps a card: %+v", got.People)
+	}
 	if got.Coverage.DeviceLinkedN != 1 || got.Coverage.KnownN != 0 {
 		t.Fatalf("device without named card era is not known: %+v", got.Coverage)
 	}
 	if !strings.Contains(got.Coverage.Blocked, "TRACKER") {
 		t.Fatalf("blocker %q", got.Coverage.Blocked)
+	}
+}
+
+func TestLadderBlockerWhenMostMerchantsAreTracker(t *testing.T) {
+	var txs []model.CardTx
+	at := ny(2026, 8, 12, 10)
+	for i := 0; i < 10; i++ {
+		txs = append(txs, model.CardTx{
+			CardID: fmt.Sprintf("x%d", i), At: at,
+			StationName: "TRACKER", RecordedEFleetsID: "27SGXD",
+		})
+	}
+	txs = append(txs, model.CardTx{
+		CardID: "xSHELL", At: at, StationName: "SHELL", StationAddress: "1 MAIN, TOWN, VA", RecordedEFleetsID: "27TESTA",
+	})
+	msg := LadderBlocker(txs, nil)
+	if !strings.Contains(msg, "TRACKER") || !strings.Contains(msg, "named=1") {
+		t.Fatalf("blocker %q", msg)
 	}
 }
 

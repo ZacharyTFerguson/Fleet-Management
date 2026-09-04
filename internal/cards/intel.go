@@ -283,6 +283,10 @@ func personKey(first, last string) string {
 	if f == "" || l == "" {
 		return ""
 	}
+	// DETAILS placeholder, not a driver who keeps a card.
+	if f == "FLEET" && l == "DRIVER" {
+		return ""
+	}
 	return f + " " + l
 }
 

@@ -608,6 +608,9 @@ func LadderBlocker(txs []model.CardTx, visits []model.StopVisit) string {
 	if named == 0 && skipped > 0 {
 		return "all DETAILS merchants are TRACKER/empty; station ladder cannot name cards without real pump names"
 	}
+	if skipped > 0 && named < skipped {
+		return fmt.Sprintf("DETAILS merchants are mostly TRACKER/empty (named=%d tracker_or_empty=%d); station ladder cannot name fleet cards without real pump names", named, skipped)
+	}
 	if named == 0 {
 		return "no named fuel-card stations in DETAILS"
 	}
@@ -634,11 +637,18 @@ func FormatCoverage(c Coverage) string {
 			b.WriteByte('\n')
 		}
 	}
-	if len(c.UnknownRemaining) > 0 {
+	if n := len(c.UnknownRemaining); n > 0 {
 		b.WriteString("unknown:")
-		for _, id := range c.UnknownRemaining {
+		limit := n
+		if limit > 40 {
+			limit = 40
+		}
+		for _, id := range c.UnknownRemaining[:limit] {
 			b.WriteByte(' ')
 			b.WriteString(id)
+		}
+		if n > 40 {
+			fmt.Fprintf(&b, " ... +%d", n-40)
 		}
 		b.WriteByte('\n')
 	}
@@ -658,10 +668,21 @@ func FormatLadder(res LadderResult) string {
 				flag, c.CardID, c.HolderKey, c.Nickname, c.StationN, c.Rung, c.EvidenceN)
 		}
 	}
-	for _, c := range res.People {
+	const peopleCap = 12
+	people := res.People
+	if len(people) > peopleCap {
+		fmt.Fprintf(&b, "PERSON showing %d of %d\n", peopleCap, len(people))
+		people = people[:peopleCap]
+	}
+	for _, c := range people {
 		fmt.Fprintf(&b, "PERSON card=%s holder=%s stations=%d n=%d\n", c.CardID, c.HolderKey, c.StationN, c.EvidenceN)
 	}
-	for _, c := range res.Offices {
+	offices := res.Offices
+	if len(offices) > peopleCap {
+		fmt.Fprintf(&b, "OFFICE showing %d of %d\n", peopleCap, len(offices))
+		offices = offices[:peopleCap]
+	}
+	for _, c := range offices {
 		fmt.Fprintf(&b, "OFFICE card=%s holder=%s stations=%d n=%d\n", c.CardID, c.HolderKey, c.StationN, c.EvidenceN)
 	}
 	b.WriteString(FormatCoverage(res.Coverage))

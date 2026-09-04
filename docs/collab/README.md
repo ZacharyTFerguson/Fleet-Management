@@ -7,7 +7,7 @@ Workspace: `C:\Users\Zacha\go\local9_3_2026` (repo root). Ignore nested `Fleet-M
 ## How to work here
 
 - Collaborator, not reviewer. Do the next real step.
-- Secrets stay in gitignored `oilchange.env`. Never paste keys, PEMs, JWTs, or Neon URLs into chat, git, or these files.
+- Secrets stay in gitignored `oilchange.env` or Cloud Agent secrets. Never paste keys, PEMs, JWTs, eFleets passwords, or Neon URLs into chat, git, or these files. Do not ask Zachary to log into eFleets in chat.
 - Do not invent miles. Last Reading is only `internal/oil`: Enterprise odo at the trusted fill second + stored OneStep **drive-stop miles-since**. HOLD skips the Last Reading write.
 - OneStep join is **`factory_id` only**. `display_name` / nickname is never a join key. `device_id` is History / drive-stop identity.
 - Live device map is `data/runtime/onestep-map.csv` (gitignored). Do **not** use `testdata/onestep/map.csv` on the live roster.

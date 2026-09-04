@@ -167,7 +167,7 @@ func (a *App) adapter(vehicles, fuel, shop, mileage string) (enterprise.Adapter,
 		return enterprise.FileAdapter{Vehicles: vehicles, Fuel: fuel, ShopRO: shop, Mileage: mileage}, nil
 	}
 	if a.Cfg.EFleetsUser == "" {
-		return nil, fmt.Errorf("pass --vehicles/--fuel-details or set EFLEETS_USERNAME")
+		return nil, fmt.Errorf("pass --vehicles/--fuel-details or %s", config.EFleetsSecretsHint)
 	}
 	h, err := enterprise.NewHTTPAdapter(a.Cfg.EFleetsBase, a.Cfg.EFleetsUser, a.Cfg.EFleetsPass, a.Cfg.EFleetsCust)
 	if err != nil {

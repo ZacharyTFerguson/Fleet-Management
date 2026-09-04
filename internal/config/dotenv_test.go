@@ -185,8 +185,7 @@ func TestLoadReadsOilchangeEnv(t *testing.T) {
 	}
 	t.Setenv("OILCHANGE_ENV", "")
 	_ = os.Unsetenv("OILCHANGE_ENV")
-	_ = os.Unsetenv("EFLEETS_USERNAME")
-	_ = os.Unsetenv("EFLEETS_CUST_NUM")
+	unsetEFleetsEnv(t)
 	_ = os.Unsetenv("OILCHANGE_DB")
 	_ = os.Unsetenv("ONESTEP_API_TOKEN")
 	_ = os.Unsetenv("ONESTEP_API_KEY")
@@ -200,5 +199,68 @@ func TestLoadReadsOilchangeEnv(t *testing.T) {
 	}
 	if cfg.SQLitePath != "./fromenv.sqlite" {
 		t.Fatalf("db %q", cfg.SQLitePath)
+	}
+}
+
+func TestLoadEFleetsCloudAliases(t *testing.T) {
+	dir := t.TempDir()
+	prev, _ := os.Getwd()
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(prev) })
+	unsetEFleetsEnv(t)
+	_ = os.Unsetenv("OILCHANGE_ENV")
+	t.Setenv("EFleetsUsername", "portal-user")
+	t.Setenv("EFleetsPassword", "portal-pass")
+	t.Setenv("EFleetsCustNum", "583424")
+	cfg := Load()
+	if cfg.EFleetsUser != "portal-user" {
+		t.Fatalf("user %q", cfg.EFleetsUser)
+	}
+	if cfg.EFleetsPass != "portal-pass" {
+		t.Fatalf("pass %q", cfg.EFleetsPass)
+	}
+	if cfg.EFleetsCust != "583424" {
+		t.Fatalf("cust %q", cfg.EFleetsCust)
+	}
+}
+
+func TestEnvReportEFleetsHintOmitsValues(t *testing.T) {
+	c := Config{EFleetsUser: "portal-user", EFleetsPass: "portal-pass", EFleetsCust: "583424"}
+	foundUser, foundPass := false, false
+	for _, line := range c.EnvReport() {
+		if strings.Contains(line, "portal-user") || strings.Contains(line, "portal-pass") {
+			t.Fatalf("leaked %q", line)
+		}
+		if strings.HasPrefix(line, "EFLEETS_USERNAME:") {
+			foundUser = true
+			if !strings.Contains(line, "Cloud Agent") || !strings.Contains(line, "never chat") {
+				t.Fatalf("expected secrets hint: %q", line)
+			}
+		}
+		if strings.HasPrefix(line, "EFLEETS_PASSWORD:") {
+			foundPass = true
+			if !strings.Contains(line, "set") {
+				t.Fatalf("expected presence: %q", line)
+			}
+		}
+	}
+	if !foundUser || !foundPass {
+		t.Fatal("eFleets env report lines missing")
+	}
+}
+
+func unsetEFleetsEnv(t *testing.T) {
+	t.Helper()
+	for _, k := range []string{
+		"EFLEETS_USERNAME", "EFLEETS_USER", "EFleetsUsername", "EFleetsUser",
+		"EFLEETS_PASSWORD", "EFLEETS_PASS", "EFleetsPassword", "EFleetsPass",
+		"EFLEETS_CUST_NUM", "EFLEETS_CUSTOMER", "EFleetsCustNum",
+		"EFLEETS_DETAILS_URL", "EFleetsDetailsURL",
+		"EFLEETS_MAINT_URL", "EFleetsMaintURL",
+		"EFLEETS_FLEETSUMMARY_URL", "EFleetsFleetSummaryURL",
+	} {
+		_ = os.Unsetenv(k)
 	}
 }

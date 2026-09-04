@@ -12,6 +12,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"oilchange/internal/config"
 )
 
 // ReportKind is which eFleets grid to pull. File drop and live download share this so parsers stay header-based.
@@ -77,10 +79,10 @@ type HTTPAdapter struct {
 // NewHTTPAdapter builds a session client. Missing username/password/cust must fail before any parse so we never invent files.
 func NewHTTPAdapter(base, user, pass, cust string) (*HTTPAdapter, error) {
 	if user == "" || pass == "" {
-		return nil, fmt.Errorf("EFLEETS_USERNAME and EFLEETS_PASSWORD are required for live download")
+		return nil, fmt.Errorf("live eFleets download needs username and password: %s", config.EFleetsSecretsHint)
 	}
 	if strings.TrimSpace(cust) == "" {
-		return nil, fmt.Errorf("EFLEETS_CUST_NUM is required for live download (no hardcoded default)")
+		return nil, fmt.Errorf("EFLEETS_CUST_NUM is required for live download (no hardcoded default): %s", config.EFleetsSecretsHint)
 	}
 	if base == "" {
 		base = "https://login.efleets.com"

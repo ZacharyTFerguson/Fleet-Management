@@ -199,6 +199,30 @@ func (a *App) SyncDevices(ctx context.Context, mapPath string, client *onestep.C
 		}
 	}
 
+	vinToCar := map[string]string{}
+	alreadyLinked := map[string]bool{}
+	if a.Store != nil {
+		if cars, err := a.Store.ListCars(ctx); err == nil {
+			vinToCar = onestep.VINToEFleets(cars)
+		}
+		if old, err := a.Store.ListDevices(ctx); err == nil {
+			for _, d := range old {
+				if d.LinkedCarEFleetsID != nil && strings.TrimSpace(*d.LinkedCarEFleetsID) != "" {
+					alreadyLinked[d.FactoryID] = true
+				}
+			}
+		}
+	}
+
+	pair := func(d model.OneStepDevice) model.OneStepDevice {
+		d = onestep.LinkByFactoryID(d, factoryToCar)
+		// VIN fills unpaired boxes only. It must not steal an existing factory_id map.
+		if !alreadyLinked[d.FactoryID] {
+			d = onestep.LinkByVIN(d, vinToCar)
+		}
+		return d
+	}
+
 	var devices []model.OneStepDevice
 	if client != nil && a.Cfg.OneStepToken != "" {
 		apiDevs, err := client.ListDevices(ctx)
@@ -206,7 +230,7 @@ func (a *App) SyncDevices(ctx context.Context, mapPath string, client *onestep.C
 			return 0, err
 		}
 		for _, d := range apiDevs {
-			devices = append(devices, onestep.LinkByFactoryID(d, factoryToCar))
+			devices = append(devices, pair(d))
 		}
 		// Keep map rows whose factory_id is absent from the live inventory (retired / offline boxes).
 		seen := make(map[string]bool, len(devices))
@@ -523,6 +547,75 @@ func countHasPos(visits []model.StopVisit) int {
 	return n
 }
 
+func linkedActive(d model.OneStepDevice) bool {
+	return !d.Dead && d.Active && d.LinkedCarEFleetsID != nil && strings.TrimSpace(*d.LinkedCarEFleetsID) != ""
+}
+
+func visitFactorySet(visits []model.StopVisit) map[string]struct{} {
+	seen := make(map[string]struct{}, len(visits))
+	for _, v := range visits {
+		if id := strings.TrimSpace(v.FactoryID); id != "" {
+			seen[id] = struct{}{}
+		}
+	}
+	return seen
+}
+
+// missingLinkedDevices is boxes that have a factory_id→car link but no GPS
+// windows in the stop cache. VIN pairing adds these after the first cache write.
+func missingLinkedDevices(devs []model.OneStepDevice, cached []model.StopVisit) []model.OneStepDevice {
+	seen := visitFactorySet(cached)
+	var out []model.OneStepDevice
+	for _, d := range devs {
+		if !linkedActive(d) {
+			continue
+		}
+		if _, ok := seen[d.FactoryID]; ok {
+			continue
+		}
+		out = append(out, d)
+	}
+	return out
+}
+
+// markFetched writes a HasPos=false placeholder so a box with no stops in-window
+// is not re-fetched on every rebuild. MatchGPSFirst ignores visits without HasPos.
+func markFetched(devs []model.OneStepDevice, visits []model.StopVisit) []model.StopVisit {
+	seen := visitFactorySet(visits)
+	for _, d := range devs {
+		if _, ok := seen[d.FactoryID]; ok {
+			continue
+		}
+		eid := ""
+		if d.LinkedCarEFleetsID != nil {
+			eid = *d.LinkedCarEFleetsID
+		}
+		visits = append(visits, model.StopVisit{
+			FactoryID: d.FactoryID,
+			DeviceID:  d.DeviceID,
+			EFleetsID: eid,
+		})
+	}
+	return visits
+}
+
+func (a *App) pullDriveStopVisits(ctx context.Context, devs []model.OneStepDevice, from, to time.Time) []model.StopVisit {
+	if a == nil || a.OneStep == nil {
+		return nil
+	}
+	var visits []model.StopVisit
+	for _, d := range devs {
+		v, err := a.OneStep.DriveStopVisitsFor(ctx, d, from, to)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "gps-stops %s factory_id %s: %v\n", *d.LinkedCarEFleetsID, d.FactoryID, err)
+			continue
+		}
+		fmt.Fprintf(os.Stderr, "gps-stops %s factory_id %s stops=%d with_pos=%d\n", *d.LinkedCarEFleetsID, d.FactoryID, len(v), countHasPos(v))
+		visits = append(visits, v...)
+	}
+	return visits
+}
+
 func gpsCacheCovers(visits []model.StopVisit, from, to time.Time) bool {
 	var minF, maxT time.Time
 	for _, v := range visits {
@@ -573,40 +666,44 @@ func (a *App) matchCardsAtGPSStops(ctx context.Context, txs []model.CardTx) (car
 	}
 	from, to = clampGPSWindow(from, to)
 
+	devs, err := a.Store.ListDevices(ctx)
+	if err != nil {
+		return empty, err
+	}
+
 	if cached, err := cards.LoadStopVisits(cache); err == nil && len(cached) > 0 {
 		pos := countHasPos(cached)
 		useCache := a.OneStep == nil || (pos > 0 && gpsCacheCovers(cached, from, to))
 		if useCache {
+			if a.OneStep != nil {
+				missing := missingLinkedDevices(devs, cached)
+				if len(missing) > 0 {
+					fmt.Fprintf(os.Stderr, "gps-stops cache missing %d linked boxes — fetching\n", len(missing))
+					extra := markFetched(missing, a.pullDriveStopVisits(ctx, missing, from, to))
+					cached = append(cached, extra...)
+					if err := cards.SaveStopVisits(cache, cached); err != nil {
+						fmt.Fprintf(os.Stderr, "gps-stops cache write: %v\n", err)
+					}
+				}
+			}
 			gps := cards.MatchGPSFirst(cached, txs, fleet, cards.DefaultStopSlack)
-			fmt.Fprintf(os.Stderr, "gps-stops cache %d visits with_pos=%d pumps=%d\n", len(cached), pos, gps.Pumps)
+			fmt.Fprintf(os.Stderr, "gps-stops cache %d visits with_pos=%d pumps=%d\n", len(cached), countHasPos(cached), gps.Pumps)
 			return gps, nil
 		}
 	}
 	if a.OneStep == nil {
 		return empty, nil
 	}
-	devs, err := a.Store.ListDevices(ctx)
-	if err != nil {
-		return empty, err
-	}
-	var visits []model.StopVisit
-	n := 0
+	var linked []model.OneStepDevice
 	for _, d := range devs {
-		if d.Dead || !d.Active || d.LinkedCarEFleetsID == nil || *d.LinkedCarEFleetsID == "" {
-			continue
+		if linkedActive(d) {
+			linked = append(linked, d)
 		}
-		n++
-		v, err := a.OneStep.DriveStopVisitsFor(ctx, d, from, to)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "gps-stops %s factory_id %s: %v\n", *d.LinkedCarEFleetsID, d.FactoryID, err)
-			continue
-		}
-		fmt.Fprintf(os.Stderr, "gps-stops %s factory_id %s stops=%d with_pos=%d\n", *d.LinkedCarEFleetsID, d.FactoryID, len(v), countHasPos(v))
-		visits = append(visits, v...)
 	}
-	if n == 0 {
+	if len(linked) == 0 {
 		return empty, nil
 	}
+	visits := a.pullDriveStopVisits(ctx, linked, from, to)
 	if err := cards.SaveStopVisits(cache, visits); err != nil {
 		fmt.Fprintf(os.Stderr, "gps-stops cache write: %v\n", err)
 	} else {

@@ -630,6 +630,9 @@ func (s *Store) SetHold(ctx context.Context, efleetsID, reason, detail string) e
 	if _, err := tx.ExecContext(ctx, s.pg(`UPDATE cars SET hold_reason=?, updated_at=? WHERE efleets_id=?`), reason, now, efleetsID); err != nil {
 		return err
 	}
+	if _, err := tx.ExecContext(ctx, s.pg(`UPDATE hold_events SET open=FALSE WHERE efleets_id=? AND open=TRUE`), efleetsID); err != nil {
+		return err
+	}
 	if _, err := tx.ExecContext(ctx, s.pg(`INSERT INTO hold_events (efleets_id, reason, detail, at, open) VALUES (?,?,?,?,?)`),
 		efleetsID, reason, detail, now, true); err != nil {
 		return err

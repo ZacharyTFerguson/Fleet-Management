@@ -11,7 +11,7 @@ import (
 	"oilchange/internal/onestep"
 )
 
-// CardsHistoryOpts is the operator one-path: devices → DETAILS → GPS rebuild → ladder eras → coverage.
+// CardsHistoryOpts is the operator one-path: roster → devices → DETAILS → GPS rebuild → ladder eras → coverage.
 // Live portals are used only when credentials are already in env — never prompts for a password.
 type CardsHistoryOpts struct {
 	VehiclesPath    string
@@ -30,10 +30,11 @@ type CardsHistoryResult struct {
 }
 
 // CardsHistory runs the card/vehicle history finder end to end:
-//  1. OneStep devices inventory (optional --live / --map) and CSV dump
-//  2. eFleets DETAILS ingest (file-drop or live when EFLEETS_* is in env)
-//  3. GPS stop cache + cards rebuild (pairings + card_eras)
-//  4. Station ladder 3 / 5 / 10 and coverage metrics
+//  1. Fleet Summary roster (file-drop) so factory_id map can FK to cars
+//  2. OneStep devices inventory (optional --live / --map) and CSV dump
+//  3. eFleets DETAILS ingest (file-drop or live when EFLEETS_* is in env)
+//  4. GPS stop cache + cards rebuild (pairings + card_eras)
+//  5. Station ladder 3 / 5 / 10 and coverage metrics
 //
 // Never writes Last Reading.
 func (a *App) CardsHistory(ctx context.Context, opt CardsHistoryOpts) (CardsHistoryResult, error) {
@@ -42,6 +43,15 @@ func (a *App) CardsHistory(ctx context.Context, opt CardsHistoryOpts) (CardsHist
 		return empty, fmt.Errorf("cards history: no store")
 	}
 	res := CardsHistoryResult{}
+
+	veh := strings.TrimSpace(opt.VehiclesPath)
+	fuel := strings.TrimSpace(opt.FuelDetailsPath)
+	if veh != "" {
+		if err := a.SyncEnterprise(ctx, veh, "", "", ""); err != nil {
+			return empty, fmt.Errorf("Fleet Summary ingest: %w", err)
+		}
+		fmt.Fprintln(os.Stderr, "history: ingested Fleet Summary roster")
+	}
 
 	if opt.DevicesLive || strings.TrimSpace(opt.DevicesMapPath) != "" {
 		client := a.oneStepClient()
@@ -77,21 +87,21 @@ func (a *App) CardsHistory(ctx context.Context, opt CardsHistoryOpts) (CardsHist
 	}
 	fmt.Fprintf(os.Stderr, "history: devices csv %d rows -> %s\n", n, outPath)
 
-	veh := strings.TrimSpace(opt.VehiclesPath)
-	fuel := strings.TrimSpace(opt.FuelDetailsPath)
 	switch {
-	case veh != "" || fuel != "":
-		if err := a.SyncEnterprise(ctx, veh, fuel, "", ""); err != nil {
+	case fuel != "":
+		if err := a.SyncEnterprise(ctx, "", fuel, "", ""); err != nil {
 			return empty, fmt.Errorf("DETAILS ingest: %w", err)
 		}
 		fmt.Fprintln(os.Stderr, "history: ingested enterprise file-drop")
-	case strings.TrimSpace(a.Cfg.EFleetsUser) != "":
+	case veh == "" && strings.TrimSpace(a.Cfg.EFleetsUser) != "":
 		if err := a.SyncEnterprise(ctx, "", "", "", ""); err != nil {
 			return empty, fmt.Errorf("live eFleets ingest: %w", err)
 		}
 		fmt.Fprintln(os.Stderr, "history: live eFleets ingest (EFLEETS_* in env)")
 	default:
-		fmt.Fprintln(os.Stderr, "history: no DETAILS path and no EFLEETS_* — using sqlite card_transactions")
+		if fuel == "" {
+			fmt.Fprintln(os.Stderr, "history: no DETAILS path and no EFLEETS_* — using sqlite card_transactions")
+		}
 	}
 
 	if opt.NoGPS {

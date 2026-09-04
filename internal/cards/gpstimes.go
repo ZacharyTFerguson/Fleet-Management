@@ -13,6 +13,11 @@ const DefaultStopSlack = 20 * time.Minute
 // MaxPumpStop drops overnight/home sits. A fuel marker is a short stop.
 const MaxPumpStop = 2 * time.Hour
 
+// MinFuelSit / MaxTrackerFuelSit are a typical pump fill. TRACKER/empty
+// merchants may only name a card from a sit in this window on a pump cluster.
+const MinFuelSit = 2 * time.Minute
+const MaxTrackerFuelSit = 45 * time.Minute
+
 func stopCovers(v model.StopVisit, at time.Time, slack time.Duration) bool {
 	if v.From.IsZero() || v.To.IsZero() {
 		return false

@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -91,7 +92,7 @@ func TestCardsHistoryFindsSplitCardErasWithNamedMerchants(t *testing.T) {
 	}
 }
 
-func TestCardsHistoryTrackerMerchantsReportBlockedCoverage(t *testing.T) {
+func TestCardsHistoryTrackerMerchantsLockViaGPSPump(t *testing.T) {
 	p := filepath.Join(t.TempDir(), "tracker.sqlite")
 	st, err := store.Open("sqlite", p)
 	if err != nil {
@@ -101,11 +102,13 @@ func TestCardsHistoryTrackerMerchantsReportBlockedCoverage(t *testing.T) {
 	ctx := context.Background()
 
 	at := time.Date(2026, 8, 12, 10, 0, 0, 0, time.UTC)
+	lat, lng := 37.54, -77.43
 	cachePath := filepath.Join(t.TempDir(), "gps-stops.json")
-	if err := cards.SaveStopVisits(cachePath, []model.StopVisit{{
-		EFleetsID: "27SGXD", HasPos: true, Lat: 37.54, Lng: -77.43,
+	visits := append(cardsPumpSeeds(lat, lng, at), model.StopVisit{
+		EFleetsID: "27SGXD", HasPos: true, Lat: lat, Lng: lng,
 		From: at, To: at.Add(10 * time.Minute),
-	}}); err != nil {
+	})
+	if err := cards.SaveStopVisits(cachePath, visits); err != nil {
 		t.Fatal(err)
 	}
 	if err := st.UpsertCar(ctx, model.Car{EFleetsID: "27SGXD", Nickname: "BING-1", Region: "BING"}); err != nil {
@@ -120,7 +123,7 @@ func TestCardsHistoryTrackerMerchantsReportBlockedCoverage(t *testing.T) {
 	if err := st.UpsertCardTx(ctx, model.CardTx{
 		CardID: "x10000", At: at.Add(2 * time.Minute),
 		StationName: "TRACKER", StationAddress: "1 MAIN,TOWN,VA",
-		RecordedEFleetsID: "27SGXD", DriverFirst: "FLEET", DriverLast: "DRIVER",
+		RecordedEFleetsID: "WRONG", DriverFirst: "FLEET", DriverLast: "DRIVER",
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -133,11 +136,47 @@ func TestCardsHistoryTrackerMerchantsReportBlockedCoverage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if res.Ladder.Coverage.CardEraN != 0 || len(res.Ladder.Cars) != 0 {
-		t.Fatalf("TRACKER must not name cards: cars=%+v cov=%+v", res.Ladder.Cars, res.Ladder.Coverage)
+	if res.Ladder.Coverage.CardEraN != 1 || res.Ladder.Coverage.KnownN != 1 {
+		t.Fatalf("GPS pump sit must name the card: cars=%+v cov=%+v", res.Ladder.Cars, res.Ladder.Coverage)
 	}
-	if res.Ladder.Coverage.Blocked == "" {
-		t.Fatalf("coverage must explain TRACKER blocker: %+v", res.Ladder.Coverage)
+}
+
+func cardsPumpSeeds(lat, lng float64, around time.Time) []model.StopVisit {
+	cars := []string{"27SEDA", "27SEDB", "27SEDC"}
+	var out []model.StopVisit
+	for i, c := range cars {
+		t0 := around.Add(-time.Duration(i+3) * 24 * time.Hour)
+		out = append(out, model.StopVisit{
+			EFleetsID: c, HasPos: true, Lat: lat, Lng: lng,
+			From: t0, To: t0.Add(8 * time.Minute),
+		})
+	}
+	return out
+}
+
+func TestCardsHistoryIngestsRosterBeforeDeviceMap(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "roster.sqlite")
+	st, err := store.Open("sqlite", p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	mapPath := filepath.Join(t.TempDir(), "map.csv")
+	if err := os.WriteFile(mapPath, []byte("factory_id,device_id,efleets_id\nF15,D15,27VA15\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	a := &App{Store: st}
+	if _, err := a.CardsHistory(context.Background(), CardsHistoryOpts{
+		VehiclesPath:   testdata("enterprise", "fleetsummary_wrongcard.csv"),
+		DevicesMapPath: mapPath,
+		DevicesOutPath: filepath.Join(t.TempDir(), "devices.csv"),
+		NoGPS:          true,
+	}); err != nil {
+		t.Fatalf("roster must land before factory_id map: %v", err)
+	}
+	devs, err := st.ListDevices(context.Background())
+	if err != nil || len(devs) != 1 || devs[0].LinkedCarEFleetsID == nil || *devs[0].LinkedCarEFleetsID != "27VA15" {
+		t.Fatalf("device link %+v %v", devs, err)
 	}
 }
 

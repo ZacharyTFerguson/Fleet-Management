@@ -1,6 +1,7 @@
 package cards
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -119,7 +120,7 @@ func TestGPSFirstRegionPicksHomeStateWhenTwoCarsSit(t *testing.T) {
 	}
 }
 
-func TestGPSFirstSkipsTrackerPlaceholderMerchant(t *testing.T) {
+func TestGPSFirstSkipsTrackerWithoutPumpCluster(t *testing.T) {
 	at := ny(2026, 8, 12, 10)
 	visits := []model.StopVisit{{
 		EFleetsID: "27SGXD", HasPos: true, Lat: 37.54, Lng: -77.43,
@@ -132,8 +133,144 @@ func TestGPSFirstSkipsTrackerPlaceholderMerchant(t *testing.T) {
 	}}
 	got := MatchGPSFirst(visits, txs, []model.Car{{EFleetsID: "27SGXD", Nickname: "BING-1", Region: "BING"}}, DefaultStopSlack)
 	if len(got.Calls) != 0 || len(got.Matches) != 0 {
-		t.Fatalf("TRACKER is not a pump name: %+v", got)
+		t.Fatalf("TRACKER at a one-off sit is not a pump: %+v", got)
 	}
+}
+
+func TestGPSFirstNamesTrackerSwipeFromExclusivePumpSit(t *testing.T) {
+	at := ny(2026, 8, 12, 10)
+	lat, lng := 37.54, -77.43
+	visits := append(pumpClusterSeeds(lat, lng, at), model.StopVisit{
+		EFleetsID: "27SGXD", HasPos: true, Lat: lat, Lng: lng,
+		From: at, To: at.Add(10 * time.Minute),
+	})
+	if n := len(clusterPumps(visits)); n == 0 {
+		t.Fatalf("need a pump cluster from seeds, got %d", n)
+	}
+	txs := []model.CardTx{{
+		CardID: "x10000", At: at.Add(2 * time.Minute),
+		StationName: "TRACKER", StationAddress: "1 MAIN,TOWN,VA",
+		RecordedEFleetsID: "WRONG-ENTERPRISE",
+		DriverFirst:       "FLEET", DriverLast: "DRIVER",
+	}}
+	cands := uniqueCarsAt(bucketPumpVisits(visits, DefaultStopSlack), txs[0].At, DefaultStopSlack)
+	if len(cands) != 1 || cands[0].EFleetsID != "27SGXD" {
+		t.Fatalf("exclusive sit at swipe, got %+v", cands)
+	}
+	if !sitAtPump(cands[0], clusterPumps(visits)) {
+		t.Fatal("exclusive sit must be on the seeded pump cluster")
+	}
+	got := MatchGPSFirst(visits, txs, []model.Car{{EFleetsID: "27SGXD", Nickname: "BING-1", Region: "BING"}}, DefaultStopSlack)
+	if len(got.Calls) != 1 || got.Calls[0].CalledCar != "27SGXD" {
+		t.Fatalf("exclusive GPS sit must name the card, not TRACKER/Enterprise: %+v", got.Calls)
+	}
+	if got.Calls[0].EnterpriseCar != "WRONG-ENTERPRISE" {
+		t.Fatalf("Enterprise Vehicle is not identity: %+v", got.Calls[0])
+	}
+	if !strings.HasPrefix(got.Calls[0].Station, "gps:") {
+		t.Fatalf("call station must be GPS cluster not TRACKER: %+v", got.Calls[0])
+	}
+	st := ""
+	if len(got.Matches) == 1 && len(got.Matches[0].Stations) > 0 {
+		st = got.Matches[0].Stations[0]
+	}
+	if !strings.HasPrefix(st, "gps:") {
+		t.Fatalf("station must be GPS cluster not TRACKER: matches=%+v", got.Matches)
+	}
+}
+
+func TestGPSFirstBackpropNamesEarlierTrackerSwipe(t *testing.T) {
+	later := ny(2026, 8, 12, 10)
+	lat, lng := 37.54, -77.43
+	visits := append(pumpClusterSeeds(lat, lng, later), model.StopVisit{
+		EFleetsID: "27SGXD", HasPos: true, Lat: lat, Lng: lng,
+		From: later, To: later.Add(10 * time.Minute),
+	})
+	early := later.Add(-26 * time.Hour)
+	txs := []model.CardTx{
+		{
+			CardID: "x10000", At: early.Add(2 * time.Minute),
+			StationName: "TRACKER", StationAddress: "1 MAIN,TOWN,VA",
+			RecordedEFleetsID: "WRONG-ENTERPRISE",
+			DriverFirst:       "FLEET", DriverLast: "DRIVER",
+		},
+		{
+			CardID: "x10000", At: later.Add(2 * time.Minute),
+			StationName: "TRACKER", StationAddress: "1 MAIN,TOWN,VA",
+			RecordedEFleetsID: "WRONG-ENTERPRISE",
+			DriverFirst:       "FLEET", DriverLast: "DRIVER",
+		},
+	}
+	got := MatchGPSFirst(visits, txs, []model.Car{{EFleetsID: "27SGXD", Nickname: "BING-1", Region: "BING"}}, DefaultStopSlack)
+	if len(got.Calls) != 2 {
+		t.Fatalf("later exclusive sit must backprop onto earlier TRACKER swipe: %+v", got.Calls)
+	}
+	var earlyCall, lateCall *RecordCall
+	for i := range got.Calls {
+		c := &got.Calls[i]
+		switch {
+		case c.At.Equal(txs[0].At):
+			earlyCall = c
+		case c.At.Equal(txs[1].At):
+			lateCall = c
+		}
+	}
+	if lateCall == nil || lateCall.CalledCar != "27SGXD" || lateCall.Why != "gps-stop" {
+		t.Fatalf("later swipe must be gps-stop 27SGXD: %+v", lateCall)
+	}
+	if earlyCall == nil || earlyCall.CalledCar != "27SGXD" || earlyCall.Why != "backprop" {
+		t.Fatalf("earlier TRACKER swipe must inherit GPS name: %+v", earlyCall)
+	}
+	if !strings.HasPrefix(earlyCall.Station, "gps:") {
+		t.Fatalf("backprop station must be GPS cluster: %+v", earlyCall)
+	}
+}
+
+func TestGPSFirstSkipsSimultaneousTrackerCards(t *testing.T) {
+	at := ny(2026, 8, 12, 10)
+	lat, lng := 37.54, -77.43
+	visits := append(pumpClusterSeeds(lat, lng, at), model.StopVisit{
+		EFleetsID: "27SGXD", HasPos: true, Lat: lat, Lng: lng,
+		From: at, To: at.Add(10 * time.Minute),
+	})
+	txs := []model.CardTx{
+		{CardID: "x10000", At: at.Add(2 * time.Minute), StationName: "TRACKER", RecordedEFleetsID: "WRONG-A"},
+		{CardID: "x10001", At: at.Add(3 * time.Minute), StationName: "TRACKER", RecordedEFleetsID: "WRONG-B"},
+	}
+	got := MatchGPSFirst(visits, txs, []model.Car{{EFleetsID: "27SGXD", Nickname: "BING-1"}}, DefaultStopSlack)
+	if len(got.Calls) != 0 {
+		t.Fatalf("two TRACKER cards at once must not both inherit one GPS car: %+v", got.Calls)
+	}
+}
+
+func TestGPSFirstTrackerSkipsLongLotSit(t *testing.T) {
+	at := ny(2026, 8, 12, 10)
+	lat, lng := 37.54, -77.43
+	visits := append(pumpClusterSeeds(lat, lng, at), model.StopVisit{
+		EFleetsID: "27SGXD", HasPos: true, Lat: lat, Lng: lng,
+		From: at, To: at.Add(90 * time.Minute),
+	})
+	txs := []model.CardTx{{
+		CardID: "x10000", At: at.Add(2 * time.Minute),
+		StationName: "TRACKER", RecordedEFleetsID: "WRONG-ENTERPRISE",
+	}}
+	got := MatchGPSFirst(visits, txs, []model.Car{{EFleetsID: "27SGXD", Nickname: "BING-1"}}, DefaultStopSlack)
+	if len(got.Calls) != 0 {
+		t.Fatalf("90-minute lot sit is not a fuel: %+v", got.Calls)
+	}
+}
+
+func pumpClusterSeeds(lat, lng float64, around time.Time) []model.StopVisit {
+	cars := []string{"27SEDA", "27SEDB", "27SEDC"}
+	var out []model.StopVisit
+	for i, c := range cars {
+		t := around.Add(-time.Duration(i+3) * 24 * time.Hour)
+		out = append(out, model.StopVisit{
+			EFleetsID: c, HasPos: true, Lat: lat, Lng: lng,
+			From: t, To: t.Add(8 * time.Minute),
+		})
+	}
+	return out
 }
 
 func TestGPSFirstPicksCarSittingAtSharedPump(t *testing.T) {

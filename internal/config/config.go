@@ -32,6 +32,7 @@ func Load() Config {
 	if err := loadDotEnv(); err != nil {
 		fmt.Fprintf(os.Stderr, "oilchange.env: %v\n", err)
 	}
+	applyBundledEnterpriseSecrets()
 	base := getenv("ONESTEP_BASE_URL", "https://track.onestepgps.com")
 	return Config{
 		DatabaseURL:     os.Getenv("DATABASE_URL"),
@@ -61,7 +62,7 @@ func Load() Config {
 }
 
 // EFleetsSecretsHint is the only place live portal creds belong. Do not ask for them in chat.
-const EFleetsSecretsHint = "set EFLEETS_USERNAME, EFLEETS_PASSWORD, and EFLEETS_CUST_NUM in gitignored oilchange.env or Cloud Agent secrets (aliases EFleetsUsername / EFleetsPassword / EFleetsCustNum). Never paste them into chat."
+const EFleetsSecretsHint = "set EFLEETS_USERNAME, EFLEETS_PASSWORD, and EFLEETS_CUST_NUM in gitignored oilchange.env or Cloud Agent secrets (aliases EFleetsUsername / EFleetsPassword / EFleetsCustNum, or one secret named efleets / Enterprise secrets). Never paste them into chat."
 
 // firstEnv is the first non-empty env value so oilchange.env names from OneStep's note still load.
 func firstEnv(keys ...string) string {

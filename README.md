@@ -119,7 +119,7 @@ cd web && npm ci && npm run dev          # App Router + /api/cars in Node
 
 | Where | Vars |
 |---|---|
-| CLI (`oilchange.env`) | `OILCHANGE_DB` (working sqlite), `DATABASE_URL` (Neon **unpooled** backup only — not the DSN while sqlite is set), `SUPABASE_URL`, then either `SUPABASE_SERVICE_ROLE` (PostgREST upsert into `fleet_cars`) or `SUPABASE_SYNC_SECRET` (`/functions/v1/fleet-sync`). Optional `FLEET_MIRROR_PATH`. Live eFleets: `EFLEETS_USERNAME` / `EFLEETS_PASSWORD` / `EFLEETS_CUST_NUM` (Cloud Agent aliases `EFleetsUsername`, `EFleetsPassword`, `EFleetsCustNum`). Never paste those into chat. |
+| CLI (`oilchange.env`) | `OILCHANGE_DB` (working sqlite), `DATABASE_URL` (Neon **unpooled** backup only — not the DSN while sqlite is set), `SUPABASE_URL`, then either `SUPABASE_SERVICE_ROLE` (PostgREST upsert into `fleet_cars`) or `SUPABASE_SYNC_SECRET` (`/functions/v1/fleet-sync`). Optional `FLEET_MIRROR_PATH`. Live eFleets: `EFLEETS_USERNAME` / `EFLEETS_PASSWORD` / `EFLEETS_CUST_NUM` (Cloud Agent aliases `EFleetsUsername` / `enterprise_login_name`, `EFleetsPassword` / `enterprise_password`, `EFleetsCustNum`). Never paste those into chat. |
 | Web (`web/.env.local`) | Only needed for `npm run dev`. `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`. Never put service role / sync secret in `NEXT_PUBLIC_*`. Templates: `oilchange.env.example`, `web/.env.local.example`. |
 
 Without Supabase credentials the CLI writes a **mock mirror** at `web/data/cars.json` and `oilchange serve` (or Next `/api/cars`) serves that. With credentials, sync upserts into `fleet_cars`. Schema/RLS: `supabase/migrations/` + `migrations/005_shared_project_fleet_prefix.sql` (anon SELECT on `fleet_cars` only).

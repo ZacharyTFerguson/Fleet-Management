@@ -50,10 +50,10 @@ func Load() Config {
 		),
 		OneStepPublicKey: firstEnv("ONESTEP_API_PUBLIC_KEY", "ONESTEP_API_PUBLICKEY"),
 		OneStepBase:      strings.TrimRight(base, "/"),
-		// Cloud Agent secret names match OneStep style (EFleetsUsername) plus oilchange.env names.
-		EFleetsUser:    firstEnv("EFLEETS_USERNAME", "EFLEETS_USER", "EFleetsUsername", "EFleetsUser"),
-		EFleetsPass:    firstEnv("EFLEETS_PASSWORD", "EFLEETS_PASS", "EFleetsPassword", "EFleetsPass"),
-		EFleetsCust:    firstEnv("EFLEETS_CUST_NUM", "EFLEETS_CUSTOMER", "EFleetsCustNum"),
+		// Cloud Agent secret names: EFleetsUsername, plus enterprise_login_name / enterprise_password.
+		EFleetsUser:    firstEnv(efleetsUserKeys...),
+		EFleetsPass:    firstEnv(efleetsPassKeys...),
+		EFleetsCust:    firstEnv(efleetsCustKeys...),
 		EFleetsBase:    getenv("EFLEETS_BASE_URL", "https://login.efleets.com"),
 		EFleetsDetails: firstEnv("EFLEETS_DETAILS_URL", "EFleetsDetailsURL"),
 		EFleetsMaint:   firstEnv("EFLEETS_MAINT_URL", "EFleetsMaintURL"),
@@ -62,7 +62,7 @@ func Load() Config {
 }
 
 // EFleetsSecretsHint is the only place live portal creds belong. Do not ask for them in chat.
-const EFleetsSecretsHint = "set EFLEETS_USERNAME, EFLEETS_PASSWORD, and EFLEETS_CUST_NUM in gitignored oilchange.env or Cloud Agent secrets (aliases EFleetsUsername / EFleetsPassword / EFleetsCustNum, or one secret named efleets / Enterprise secrets). Never paste them into chat."
+const EFleetsSecretsHint = "set EFLEETS_USERNAME, EFLEETS_PASSWORD, and EFLEETS_CUST_NUM in gitignored oilchange.env or Cloud Agent secrets (aliases EFleetsUsername / enterprise_login_name, EFleetsPassword / enterprise_password, EFleetsCustNum, or one secret named efleets / Enterprise secrets). Never paste them into chat."
 
 // firstEnv is the first non-empty env value so oilchange.env names from OneStep's note still load.
 func firstEnv(keys ...string) string {
@@ -154,9 +154,9 @@ func (c Config) EnvReport() []string {
 		line("SUPABASE_GROK_BUILD_KEY", c.SupabaseAnonKey, "publishable/anon SELECT on fleet_cars (alias SUPABASE_ANON_KEY)"),
 		line("SUPABASE_SERVICE_ROLE", c.ServiceRole, "server-side PostgREST sync only"),
 		line("SUPABASE_SYNC_SECRET", c.SyncSecret, "fleet-sync edge token when service role unset"),
-		line("EFLEETS_USERNAME", c.EFleetsUser, "(EFLEETS_USER / EFleetsUsername; oilchange.env or Cloud Agent secrets — never chat)"),
-		line("EFLEETS_PASSWORD", c.EFleetsPass, "(EFLEETS_PASS / EFleetsPassword; never printed)"),
-		line("EFLEETS_CUST_NUM", c.EFleetsCust, "(EFLEETS_CUSTOMER / EFleetsCustNum)"),
+		line("EFLEETS_USERNAME", c.EFleetsUser, "(EFLEETS_USER / EFleetsUsername / enterprise_login_name; oilchange.env or Cloud Agent secrets — never chat)"),
+		line("EFLEETS_PASSWORD", c.EFleetsPass, "(EFLEETS_PASS / EFleetsPassword / enterprise_password; never printed)"),
+		line("EFLEETS_CUST_NUM", c.EFleetsCust, "(EFLEETS_CUSTOMER / EFleetsCustNum / enterprise_cust_num)"),
 		line("EFLEETS_DETAILS_URL", c.EFleetsDetails, page(c.EFleetsDetails)),
 		line("EFLEETS_MAINT_URL", c.EFleetsMaint, page(c.EFleetsMaint)),
 		line("EFLEETS_FLEETSUMMARY_URL", c.EFleetsFleet, page(c.EFleetsFleet)),

@@ -259,6 +259,45 @@ func TestExplicitEFleetsUsernameWinsOverBundle(t *testing.T) {
 	}
 }
 
+func TestLoadEnterpriseLoginNameAliases(t *testing.T) {
+	dir := t.TempDir()
+	prev, _ := os.Getwd()
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(prev) })
+	unsetEFleetsEnv(t)
+	_ = os.Unsetenv("OILCHANGE_ENV")
+	t.Setenv("enterprise_login_name", "portal-user")
+	t.Setenv("enterprise_password", "portal-pass")
+	cfg := Load()
+	if cfg.EFleetsUser != "portal-user" {
+		t.Fatalf("user %q", cfg.EFleetsUser)
+	}
+	if cfg.EFleetsPass != "portal-pass" {
+		t.Fatalf("pass set=%v", cfg.EFleetsPass != "")
+	}
+}
+
+func TestExplicitEFleetsUsernameWinsOverLoginName(t *testing.T) {
+	dir := t.TempDir()
+	prev, _ := os.Getwd()
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(prev) })
+	unsetEFleetsEnv(t)
+	_ = os.Unsetenv("OILCHANGE_ENV")
+	t.Setenv("EFleetsUsername", "from-alias")
+	t.Setenv("EFleetsPassword", "from-alias-pass")
+	t.Setenv("enterprise_login_name", "scattered-user")
+	t.Setenv("enterprise_password", "scattered-pass")
+	cfg := Load()
+	if cfg.EFleetsUser != "from-alias" || cfg.EFleetsPass != "from-alias-pass" {
+		t.Fatalf("explicit names must win user=%q", cfg.EFleetsUser)
+	}
+}
+
 func TestLoadEFleetsCloudAliases(t *testing.T) {
 	dir := t.TempDir()
 	prev, _ := os.Getwd()
@@ -335,6 +374,9 @@ func unsetEFleetsEnv(t *testing.T) {
 		"EFLEETS_FLEETSUMMARY_URL", "EFleetsFleetSummaryURL",
 		"efleets", "EFleets", "EFLEETS", "enterprise", "Enterprise", "ENTERPRISE",
 		"Enterprise secrets", "ENTERPRISE_SECRETS", "EnterpriseSecrets",
+		"enterprise_login_name", "EnterpriseLoginName", "ENTERPRISE_LOGIN_NAME",
+		"enterprise_password", "EnterprisePassword", "ENTERPRISE_PASSWORD",
+		"enterprise_cust_num", "enterprise_cust", "EnterpriseCustNum",
 	} {
 		_ = os.Unsetenv(k)
 	}

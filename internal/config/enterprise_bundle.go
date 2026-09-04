@@ -8,14 +8,32 @@ import (
 )
 
 // applyBundledEnterpriseSecrets copies username/password/cust out of a single
-// Cloud Agent secret named efleets or Enterprise secrets (spaces/underscores ignored).
+// Cloud Agent secret named efleets or Enterprise secrets (spaces/underscores ignored),
+// and from scattered names like enterprise_login_name / enterprise_password.
 // Explicit EFLEETS_* / EFleetsUsername env already set wins (setEnvIfEmpty).
 func applyBundledEnterpriseSecrets() {
-	raw := bundledEnterpriseSecret()
-	if raw == "" {
-		return
+	got := scatteredEnterpriseFields()
+	if raw := bundledEnterpriseSecret(); raw != "" {
+		bundled := parseEnterpriseBundle(raw)
+		if got.user == "" {
+			got.user = bundled.user
+		}
+		if got.pass == "" {
+			got.pass = bundled.pass
+		}
+		if got.cust == "" {
+			got.cust = bundled.cust
+		}
+		if got.details == "" {
+			got.details = bundled.details
+		}
+		if got.maint == "" {
+			got.maint = bundled.maint
+		}
+		if got.fleet == "" {
+			got.fleet = bundled.fleet
+		}
 	}
-	got := parseEnterpriseBundle(raw)
 	if firstEnv("EFLEETS_USERNAME", "EFLEETS_USER", "EFleetsUsername", "EFleetsUser") == "" {
 		_ = setEnvIfEmpty("EFLEETS_USERNAME", got.user)
 	}
@@ -34,6 +52,43 @@ func applyBundledEnterpriseSecrets() {
 	if firstEnv("EFLEETS_FLEETSUMMARY_URL", "EFleetsFleetSummaryURL") == "" {
 		_ = setEnvIfEmpty("EFLEETS_FLEETSUMMARY_URL", got.fleet)
 	}
+}
+
+var (
+	efleetsUserKeys = []string{"EFLEETS_USERNAME", "EFLEETS_USER", "EFleetsUsername", "EFleetsUser", "enterprise_login_name", "EnterpriseLoginName", "ENTERPRISE_LOGIN_NAME"}
+	efleetsPassKeys = []string{"EFLEETS_PASSWORD", "EFLEETS_PASS", "EFleetsPassword", "EFleetsPass", "enterprise_password", "EnterprisePassword", "ENTERPRISE_PASSWORD"}
+	efleetsCustKeys = []string{"EFLEETS_CUST_NUM", "EFLEETS_CUSTOMER", "EFleetsCustNum", "enterprise_cust_num", "enterprise_cust", "EnterpriseCustNum"}
+)
+
+// scatteredEnterpriseFields reads Cloud Agent secrets that are already split
+// into enterprise_login_name / enterprise_password (not one JSON blob).
+func scatteredEnterpriseFields() enterpriseFields {
+	got := enterpriseFields{}
+	for _, e := range os.Environ() {
+		k, v, ok := strings.Cut(e, "=")
+		if !ok {
+			continue
+		}
+		v = strings.TrimSpace(v)
+		if v == "" {
+			continue
+		}
+		switch normalizeSecretName(k) {
+		case "enterpriseloginname", "enterpriselogin", "enterprisename":
+			if got.user == "" {
+				got.user = v
+			}
+		case "enterprisepassword", "enterprisepass":
+			if got.pass == "" {
+				got.pass = v
+			}
+		case "enterprisecustnum", "enterprisecust", "enterprisecustomer":
+			if got.cust == "" {
+				got.cust = v
+			}
+		}
+	}
+	return got
 }
 
 func bundledEnterpriseSecret() string {
@@ -114,7 +169,7 @@ func parseEnterpriseJSON(raw string) (enterpriseFields, bool) {
 		obj = inner
 	}
 	got := enterpriseFields{
-		user:    jsonString(obj, "EFLEETS_USERNAME", "EFLEETS_USER", "EFleetsUsername", "EFleetsUser", "username", "user"),
+		user:    jsonString(obj, "EFLEETS_USERNAME", "EFLEETS_USER", "EFleetsUsername", "EFleetsUser", "username", "user", "login_name", "loginname"),
 		pass:    jsonString(obj, "EFLEETS_PASSWORD", "EFLEETS_PASS", "EFleetsPassword", "EFleetsPass", "password", "pass"),
 		cust:    jsonString(obj, "EFLEETS_CUST_NUM", "EFLEETS_CUSTOMER", "EFleetsCustNum", "cust_num", "custnum", "customer", "cust"),
 		details: jsonString(obj, "EFLEETS_DETAILS_URL", "EFleetsDetailsURL", "details_url", "details"),
@@ -174,11 +229,11 @@ func parseEnterpriseDotEnv(raw string) enterpriseFields {
 			continue
 		}
 		switch normalizeSecretName(k) {
-		case "efleetsusername", "efleetsuser", "username", "user":
+		case "efleetsusername", "efleetsuser", "username", "user", "enterpriseloginname", "loginname", "login":
 			if got.user == "" {
 				got.user = v
 			}
-		case "efleetspassword", "efleetspass", "password", "pass":
+		case "efleetspassword", "efleetspass", "password", "pass", "enterprisepassword":
 			if got.pass == "" {
 				got.pass = v
 			}

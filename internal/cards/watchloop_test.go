@@ -163,6 +163,20 @@ func TestSeedPriorityFactoryIDsNewestVirginiaOnly(t *testing.T) {
 	}
 }
 
+func TestSeedPriorityFactoryIDsEmptyWhenNotVirginia(t *testing.T) {
+	car := "27SGXF"
+	devs := []model.OneStepDevice{
+		{FactoryID: "FACT-CT", DeviceID: "D-CT", Active: true, LinkedCarEFleetsID: &car},
+	}
+	fills := []model.CardTx{{
+		CardID: "C-CT", At: time.Date(2026, 8, 30, 12, 0, 0, 0, time.UTC), RecordedEFleetsID: car,
+	}}
+	got := SeedPriorityFactoryIDs(fills, devs, []model.Car{{EFleetsID: car, Nickname: "CT8", Region: "CT"}})
+	if len(got) != 0 {
+		t.Fatalf("non-VA DETAILS vehicle is not a persist rank: %v", got)
+	}
+}
+
 func TestPreserveUnladderedCarErasKeepsNearbyCertain(t *testing.T) {
 	ladder := []model.CardEra{{
 		CardID: "GPS-CARD", EFleetsID: "26LSZW", HolderType: HolderCar,

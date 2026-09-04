@@ -214,9 +214,11 @@ func SeedWatchedFactoryIDs(fills []model.CardTx, prior NearbyResult, devices []m
 	return out
 }
 
-// SeedPriorityFactoryIDs is the newest VA (or hypothesis) box we asked about.
+// SeedPriorityFactoryIDs is the newest VA box we asked about.
 // Mixed DETAILS Vehicle columns must not rank every historical VA car.
 // 1-mile spectators do not have to be spanning-fetched before persist.
+// When there is no VA seed, return empty so the caller ranks the hunt hits
+// that were actually fetched — a DETAILS Vehicle hypothesis is not a join.
 func SeedPriorityFactoryIDs(fills []model.CardTx, devices []model.OneStepDevice, cars []model.Car) []string {
 	seen := map[string]struct{}{}
 	var out []string
@@ -244,22 +246,7 @@ func SeedPriorityFactoryIDs(fills []model.CardTx, devices []model.OneStepDevice,
 			return out
 		}
 	}
-	for _, t := range fills {
-		rec := strings.TrimSpace(t.RecordedEFleetsID)
-		if isUnknownCar(rec) || oil.HasLogisticsPersonnel(rec) {
-			continue
-		}
-		ids := FactoryIDsForLinkedCar(devices, rec)
-		if len(ids) == 0 {
-			continue
-		}
-		for _, id := range ids {
-			add(id)
-		}
-		break
-	}
-	sort.Strings(out)
-	return out
+	return nil
 }
 
 type watchCardRank struct {

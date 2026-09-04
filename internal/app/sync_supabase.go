@@ -13,11 +13,7 @@ import (
 // SUPABASE_SYNC_SECRET) are set, and always refreshes the local JSON mirror.
 // Does not compute Last Reading. Never targets XRAY.
 func (a *App) SyncSupabase(ctx context.Context, mirrorPath string, noRemote bool) (*syncsupabase.Snapshot, error) {
-	cars, err := a.Store.ListCars(ctx)
-	if err != nil {
-		return nil, err
-	}
-	holds, err := a.Store.OpenHolds(ctx)
+	cars, holds, err := a.Store.ListCarsAndOpenHolds(ctx)
 	if err != nil {
 		return nil, err
 	}

@@ -186,7 +186,7 @@ func TestGPSFirstBackpropNamesEarlierTrackerSwipe(t *testing.T) {
 		EFleetsID: "27SGXD", HasPos: true, Lat: lat, Lng: lng,
 		From: later, To: later.Add(10 * time.Minute),
 	})
-	early := later.Add(-72 * time.Hour)
+	early := later.Add(-26 * time.Hour)
 	txs := []model.CardTx{
 		{
 			CardID: "x10000", At: early.Add(2 * time.Minute),

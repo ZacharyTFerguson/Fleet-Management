@@ -134,22 +134,38 @@ func (a *HTTPAdapter) Fetch(ctx context.Context, kind ReportKind) ([]byte, strin
 
 // urlFor refuses to guess portal export paths; wrong CSV would silently feed fake miles.
 func (a *HTTPAdapter) urlFor(kind ReportKind) (string, string, error) {
+	return exportURL(kind, a.DetailsURL, a.MaintURL, a.FleetURL)
+}
+
+// HasReport is true when a Network-captured export URL is set, so sync can skip a live probe.
+func (a *HTTPAdapter) HasReport(kind ReportKind) bool {
+	_, _, err := a.urlFor(kind)
+	return err == nil
+}
+
+// HasReport is false for file drop: CLI paths already decide which reports to read.
+func (a FileAdapter) HasReport(kind ReportKind) bool {
+	return false
+}
+
+// exportURL uses only operator-pasted DevTools Network URLs. Menu hunting is forbidden.
+func exportURL(kind ReportKind, details, maint, fleet string) (string, string, error) {
 	switch kind {
 	case ReportFuelDetails:
-		if a.DetailsURL != "" {
-			return a.DetailsURL, "DETAILS.csv", nil
+		if details != "" {
+			return details, "DETAILS.csv", nil
 		}
-		return "", "", fmt.Errorf("set EFLEETS_DETAILS_URL to the Fuel DETAILS export (portal path is not public)")
+		return "", "", fmt.Errorf("set EFLEETS_DETAILS_URL from DevTools Network on a logged-in tab (do not hunt menus)")
 	case ReportShopRO:
-		if a.MaintURL != "" {
-			return a.MaintURL, "Maintenance.csv", nil
+		if maint != "" {
+			return maint, "Maintenance.csv", nil
 		}
-		return "", "", fmt.Errorf("set EFLEETS_MAINT_URL to the Maintenance Detail export (see fleetweb/maintenanceSummary?maintenanceTab=detail)")
+		return "", "", fmt.Errorf("set EFLEETS_MAINT_URL from DevTools Network on a logged-in tab (do not hunt menus)")
 	case ReportVehicles:
-		if a.FleetURL != "" {
-			return a.FleetURL, "FleetSummary.csv", nil
+		if fleet != "" {
+			return fleet, "FleetSummary.csv", nil
 		}
-		return "", "", fmt.Errorf("set EFLEETS_FLEETSUMMARY_URL to the Fleet Summary CSV export")
+		return "", "", fmt.Errorf("set EFLEETS_FLEETSUMMARY_URL from DevTools Network on a logged-in tab (do not hunt menus)")
 	case ReportMileage:
 		return "", "", fmt.Errorf("mileage history is optional; pass --mileage-history")
 	default:

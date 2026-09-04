@@ -406,8 +406,20 @@ func TestIsOilChangeService(t *testing.T) {
 	if !IsOilChangeService("Full Synthetic Lube Oil Filter") {
 		t.Fatal("lube oil filter")
 	}
+	if !IsOilChangeService("Semi Synthetic Engine Oil") {
+		t.Fatal("semi synthetic engine oil is an oil change line")
+	}
+	if !IsOilChangeService("Conventional Lube Oil and Filter") {
+		t.Fatal("conventional lube oil and filter")
+	}
 	if IsOilChangeService("R/R OIL PAN") {
 		t.Fatal("oil pan is not an oil change")
+	}
+	if IsOilChangeService("Oil Filter Engine") {
+		t.Fatal("filter-only line is not last oil")
+	}
+	if IsOilChangeService("Engine Oil Drain Plug Gasket") {
+		t.Fatal("drain plug is not an oil change")
 	}
 	if IsOilChangeService("Wiper Blade") {
 		t.Fatal("wiper")

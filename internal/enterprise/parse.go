@@ -83,8 +83,13 @@ func ParseFills(r io.Reader) ([]model.Fill, []model.GasStation, []model.Card, er
 			col(idx, row, "Provider Transaction Site State"),
 		}, ", "))
 		merchant := col(idx, row, "Provider Location")
+		cardID := col(idx, row, "Provider Card Number")
+		if cardID == "" {
+			cardID = col(idx, row, "Provider Vehicle Number")
+		}
 		f := model.Fill{
 			EFleetsID:                    id,
+			CardID:                       cardID,
 			CardCompanyVehicleNumber:     col(idx, row, "Provider Company Vehicle Number"),
 			ProviderCompanyVehicleNumber: col(idx, row, "Provider Company Vehicle Number"),
 			Odometer:                     odo,
@@ -95,15 +100,14 @@ func ParseFills(r io.Reader) ([]model.Fill, []model.GasStation, []model.Card, er
 			Source:                       model.SourceFuelDetails,
 			DriverFirst:                  col(idx, row, "Provider Driver First Name"),
 			DriverLast:                   col(idx, row, "Provider Driver Last Name"),
+			Plate:                        col(idx, row, "License Num"),
+			Gallons:                      parseOptFloat(col(idx, row, "Provider Units Purchased")),
+			Amount:                       parseOptFloat(col(idx, row, "Provider Net Dollars", "Provider Gross Dollars")),
 		}
 		fills = append(fills, f)
 		if merchant != "" {
 			sid := stableID("gs", merchant, addr)
 			stations[sid] = model.GasStation{ID: sid, Name: merchant, Address: addr}
-		}
-		cardID := col(idx, row, "Provider Card Number")
-		if cardID == "" {
-			cardID = col(idx, row, "Provider Vehicle Number")
 		}
 		if cardID != "" {
 			cvn := f.ProviderCompanyVehicleNumber
@@ -143,7 +147,7 @@ func ParseShopROs(r io.Reader) ([]model.ShopRO, []model.MaintenanceLocation, []m
 			continue
 		}
 		dateStr := col(idx, row, "RO Completed Date", "RO Complete Date")
-		if dateStr == "" {
+		if emptyCell(dateStr) {
 			dateStr = col(idx, row, "RO Created Date")
 		}
 		at, err := ParseDate(dateStr)
@@ -169,7 +173,7 @@ func ParseShopROs(r io.Reader) ([]model.ShopRO, []model.MaintenanceLocation, []m
 			lid := stableID("ml", shop)
 			locs[lid] = model.MaintenanceLocation{ID: lid, Name: shop}
 		}
-		if oil.IsOilChangeService(desc) && roid != "" {
+		if oil.IsOilChangeService(desc) && roid != "" && !at.IsZero() {
 			oilByRO[key] = model.OilChange{
 				EFleetsID: id,
 				Miles:     odo,
@@ -227,6 +231,11 @@ func readCSV(r io.Reader) ([][]string, map[string]int, error) {
 }
 
 // parseInt accepts eFleets "71306.0" and "100,000" without inventing a mile from junk text.
+func emptyCell(s string) bool {
+	s = strings.TrimSpace(s)
+	return s == "" || s == "-"
+}
+
 func parseInt(s string) (int, error) {
 	s = strings.TrimSpace(s)
 	s = strings.ReplaceAll(s, ",", "")
@@ -245,6 +254,18 @@ func parseInt(s string) (int, error) {
 		return int(f), nil
 	}
 	return n, nil
+}
+
+func parseOptFloat(s string) *float64 {
+	s = strings.TrimSpace(strings.ReplaceAll(s, ",", ""))
+	if s == "" || s == "-" {
+		return nil
+	}
+	f, err := strconv.ParseFloat(s, 64)
+	if err != nil {
+		return nil
+	}
+	return &f
 }
 
 // formatPDI builds an opaque id. Region is not encoded here so VA/CT cannot leak into the primary key.

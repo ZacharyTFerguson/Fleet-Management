@@ -2,5 +2,6 @@
 .env*.local
 node_modules
 .next
-out
+# web/out is the committed static Oil Desk export for oilchange serve (no npm on desktop).
+# Rebuild with: npm run build:static
 *.log

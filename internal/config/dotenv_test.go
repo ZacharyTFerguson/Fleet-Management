@@ -27,11 +27,60 @@ func TestParseDotEnvLine(t *testing.T) {
 }
 
 func TestEnvReportOmitsValues(t *testing.T) {
-	c := Config{EFleetsPass: "secret-pass", OneStepToken: "secret-token"}
+	c := Config{EFleetsPass: "secret-pass", OneStepToken: "secret-token", SupabaseAnonKey: "sb_publishable_secret"}
 	for _, line := range c.EnvReport() {
-		if strings.Contains(line, "secret-pass") || strings.Contains(line, "secret-token") {
+		if strings.Contains(line, "secret-pass") || strings.Contains(line, "secret-token") || strings.Contains(line, "sb_publishable_secret") {
 			t.Fatalf("leaked %q", line)
 		}
+	}
+}
+
+func TestEnvReportGrokBuildKey(t *testing.T) {
+	c := Config{SupabaseAnonKey: "sb_publishable_secret"}
+	found := false
+	for _, line := range c.EnvReport() {
+		if strings.Contains(line, "sb_publishable_secret") {
+			t.Fatalf("leaked %q", line)
+		}
+		if strings.HasPrefix(line, "SUPABASE_GROK_BUILD_KEY:") {
+			found = true
+			if !strings.Contains(line, "set") || !strings.Contains(line, "publishable") {
+				t.Fatalf("expected presence note: %q", line)
+			}
+		}
+	}
+	if !found {
+		t.Fatal("SUPABASE_GROK_BUILD_KEY line missing")
+	}
+}
+
+func TestDSNPrefersSQLiteWhenBothSet(t *testing.T) {
+	c := Config{SQLitePath: "./oilchange.sqlite", DatabaseURL: "postgres://u:p@ep-x.us-east-2.aws.neon.tech/db"}
+	driver, dsn, err := c.DSN()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if driver != "sqlite" || dsn != "./oilchange.sqlite" {
+		t.Fatalf("dsn %s %s", driver, dsn)
+	}
+}
+
+func TestEnvReportDatabaseURLIsBackup(t *testing.T) {
+	c := Config{DatabaseURL: "postgres://secret-user:secret-pass@ep-x.neon.tech/db"}
+	found := false
+	for _, line := range c.EnvReport() {
+		if strings.Contains(line, "secret-pass") || strings.Contains(line, "secret-user") {
+			t.Fatalf("leaked %q", line)
+		}
+		if strings.HasPrefix(line, "DATABASE_URL:") {
+			found = true
+			if !strings.Contains(line, "backup") {
+				t.Fatalf("expected backup note: %q", line)
+			}
+		}
+	}
+	if !found {
+		t.Fatal("DATABASE_URL line missing")
 	}
 }
 

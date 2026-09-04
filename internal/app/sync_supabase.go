@@ -12,7 +12,7 @@ import (
 // project (fleet_cars) when SUPABASE_URL + (SUPABASE_SERVICE_ROLE or
 // SUPABASE_SYNC_SECRET) are set, and always refreshes the local JSON mirror.
 // Does not compute Last Reading. Never targets XRAY.
-func (a *App) SyncSupabase(ctx context.Context, mirrorPath string) (*syncsupabase.Snapshot, error) {
+func (a *App) SyncSupabase(ctx context.Context, mirrorPath string, noRemote bool) (*syncsupabase.Snapshot, error) {
 	cars, err := a.Store.ListCars(ctx)
 	if err != nil {
 		return nil, err
@@ -26,6 +26,7 @@ func (a *App) SyncSupabase(ctx context.Context, mirrorPath string) (*syncsupabas
 		ServiceRole: a.Cfg.ServiceRole,
 		SyncSecret:  a.Cfg.SyncSecret,
 		MirrorPath:  mirrorPath,
+		NoRemote:    noRemote,
 	}
 	snap, err := syncsupabase.Run(ctx, cfg, syncsupabase.FromCars(cars), syncsupabase.FromHolds(holds), nil)
 	if err != nil {

@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"oilchange/internal/model"
 	"oilchange/internal/oil"
 )
 
@@ -54,17 +55,28 @@ func TestParseShopROOilSeedAndNotOilPan(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(ros) != 2 {
+	if len(ros) != 3 {
 		t.Fatalf("ros collapsed by RO ID, got %d", len(ros))
 	}
 	if len(locs) != 2 {
 		t.Fatalf("locs %d", len(locs))
 	}
-	if len(oils) != 1 {
-		t.Fatalf("oil changes %d (oil pan must not seed)", len(oils))
+	if len(oils) != 2 {
+		t.Fatalf("oil changes %d (oil pan must not seed; dash completed date must still seed)", len(oils))
 	}
-	if oils[0].Miles != 100500 {
-		t.Fatalf("miles %d", oils[0].Miles)
+	byCar := map[string]model.OilChange{}
+	for _, o := range oils {
+		byCar[o.EFleetsID] = o
+	}
+	if byCar["27TESTA"].Miles != 100500 {
+		t.Fatalf("completed RO miles %+v", byCar["27TESTA"])
+	}
+	open := byCar["27TESTB"]
+	if open.Miles != 179598 {
+		t.Fatalf("under-review RO miles %+v", open)
+	}
+	if open.Date.IsZero() || open.Date.Format("2006-01-02") != "2026-08-30" {
+		t.Fatalf("under-review RO should use created date, got %v", open.Date)
 	}
 	if !oil.IsOilChangeService("Full Synthetic Lube Oil Filter") {
 		t.Fatal()
@@ -95,6 +107,30 @@ func TestOpaquePDIID(t *testing.T) {
 	}
 	if cars[0].EFleetsID != "27TESTA" {
 		t.Fatalf("join key %s", cars[0].EFleetsID)
+	}
+}
+
+func TestParseWrongCardSynthetic(t *testing.T) {
+	f, err := os.Open(testdata(t, "enterprise", "details_wrongcard.csv"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	fills, _, _, err := ParseFills(f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(fills) != 6 {
+		t.Fatalf("fills %d", len(fills))
+	}
+	var mixOn19 int
+	for _, fl := range fills {
+		if fl.CardID == "CARD-MIX-99" && fl.EFleetsID == "27VA19" {
+			mixOn19++
+		}
+	}
+	if mixOn19 != 1 {
+		t.Fatalf("want one CARD-MIX-99 swipe on 27VA19, got %d", mixOn19)
 	}
 }
 

@@ -28,6 +28,69 @@ export type FleetSnapshot = {
   holds?: Hold[];
 };
 
+export type CardNeighbor = {
+  efleets_id: string;
+  card_id: string;
+  station: string;
+  days_apart: number;
+  at: string;
+};
+
+export type UnknownMatchup = {
+  kind: "suspect" | "ambiguous" | "singleton" | string;
+  card_id: string;
+  enterprise_car: string;
+  best_car: string;
+  best_n: number;
+  best_score: number;
+  runner_up_car?: string;
+  runner_up_n?: number;
+  latest_station: string;
+  latest_at: string;
+  neighbors?: CardNeighbor[];
+  why: string;
+};
+
+export type StationSummary = {
+  key: string;
+  name: string;
+  address: string;
+  swipes: number;
+  cars: number;
+  cards: number;
+};
+
+export type GPSCardMatch = {
+  efleets_id: string;
+  card_id: string;
+  evidence_n: number;
+  stations?: string[];
+  enterprise_cars?: string[];
+  best: boolean;
+};
+
+export type CardsSnapshot = {
+  synced_at: string;
+  source: string;
+  stats: {
+    cards: number;
+    stations: number;
+    unknown: number;
+    suspects: number;
+    ambiguous: number;
+    singletons: number;
+    cars_without_card: number;
+    swipes: number;
+    gps_best?: number;
+    gps_matches?: number;
+  };
+  unknown: UnknownMatchup[];
+  stations: StationSummary[];
+  cars_without_card: string[];
+  gps_best?: GPSCardMatch[];
+  nicknames?: Record<string, string>;
+};
+
 export function remainingMiles(car: Car): number | null {
   if (car.hold_reason) return null;
   if (car.last_oil_miles == null || car.last_reading_miles == null) return null;
@@ -36,6 +99,6 @@ export function remainingMiles(car: Car): number | null {
 }
 
 export function formatMiles(n: number | null | undefined): string {
-  if (n == null || Number.isNaN(n)) return "\u2014";
+  if (n == null || Number.isNaN(n)) return "—";
   return n.toLocaleString("en-US");
 }

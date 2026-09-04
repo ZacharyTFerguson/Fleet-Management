@@ -13,6 +13,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"oilchange/internal/model"
@@ -30,6 +31,8 @@ type Client struct {
 	Token         string
 	PrivateKeyPEM string
 	HTTP          *http.Client
+	now           func() time.Time
+	mu            sync.Mutex // serializes drive-stop HTTP (probes and sync)
 }
 
 // AuthMode is jwt-rs256 when oilchange.env has the OneStep usage-note PEM+key, else api-key query (Cursor guide).
@@ -154,8 +157,8 @@ func parseDevices(b []byte) ([]model.OneStepDevice, error) {
 			FactoryID:   fid,
 			DeviceID:    did,
 			DisplayName: name,
-			// This branch's model uses Dead as its only non-live state.
-			Dead: d.Dead || !active,
+			Active:      active,
+			Dead:        d.Dead,
 		})
 	}
 	return out, nil
@@ -176,19 +179,138 @@ func (c *Client) DriveStopMilesFor(ctx context.Context, d model.OneStepDevice, s
 }
 
 func (c *Client) driveStopMiles(ctx context.Context, factoryID, deviceID string, since time.Time) (float64, error) {
-	q := url.Values{}
-	if factoryID != "" {
-		q.Set("factory_id", factoryID)
+	if deviceID == "" {
+		deviceID = factoryID
 	}
-	if deviceID != "" {
-		q.Set("device_id", deviceID)
+	if deviceID == "" {
+		return 0, fmt.Errorf("drive-stop needs a device_id")
 	}
-	q.Set("from", since.UTC().Format(time.RFC3339))
-	b, err := c.get(ctx, "/v3/api/public/route/drive-stop", q)
+	from := since.UTC()
+	to := time.Now().UTC()
+	if c != nil && c.now != nil {
+		to = c.now().UTC()
+	}
+	if !to.After(from) {
+		to = from.Add(time.Second)
+	}
+	n, err := c.fetchDriveStopWindow(ctx, deviceID, from, to)
+	if err != nil && c.PrivateKeyPEM != "" && driveStopAuthFallback(err) {
+		// Do not copy c: that would copy mu. JWT-off fallback is a distinct client.
+		plain := &Client{Base: c.Base, Token: c.Token, HTTP: c.HTTP, now: c.now}
+		n, err = plain.fetchDriveStopWindow(ctx, deviceID, from, to)
+	}
+	if err != nil && driveStopRetryChunked(err) {
+		n, err = c.fetchDriveStopChunked(ctx, deviceID, from, to)
+	}
+	return n, err
+}
+
+// Live apidoc names (alexbeattie/OneStepGPS + portal): device_id, dt_tracker_from, dt_tracker_to, stop_duration.
+// Do not send factory_id or from — those 500. Do not request return_points (map UI only; it hung fleet sync).
+func (c *Client) fetchDriveStopWindow(ctx context.Context, deviceID string, from, to time.Time) (float64, error) {
+	b, err := c.fetchDriveStopBytes(ctx, deviceID, from, to)
 	if err != nil {
 		return 0, err
 	}
 	return sumDriveStop(b)
+}
+
+func (c *Client) fetchDriveStopBytes(ctx context.Context, deviceID string, from, to time.Time) ([]byte, error) {
+	if c != nil {
+		c.mu.Lock()
+		defer c.mu.Unlock()
+	}
+	q := url.Values{}
+	q.Set("device_id", deviceID)
+	q.Set("dt_tracker_from", from.Format(time.RFC3339))
+	q.Set("dt_tracker_to", to.Format(time.RFC3339))
+	q.Set("stop_duration", "5m0s")
+	return c.get(ctx, "/v3/api/public/route/drive-stop", q)
+}
+
+// DriveStopVisitsFor returns GPS stop windows for card matching. Not miles.
+func (c *Client) DriveStopVisitsFor(ctx context.Context, d model.OneStepDevice, from, to time.Time) ([]model.StopVisit, error) {
+	did := d.DeviceID
+	if did == "" {
+		did = d.FactoryID
+	}
+	if did == "" {
+		return nil, fmt.Errorf("drive-stop needs a device_id")
+	}
+	from = from.UTC()
+	to = to.UTC()
+	if !to.After(from) {
+		to = from.Add(time.Second)
+	}
+	var out []model.StopVisit
+	for start := from; start.Before(to); {
+		end := start.Add(driveStopChunk)
+		if end.After(to) {
+			end = to
+		}
+		b, err := c.fetchDriveStopBytes(ctx, did, start, end)
+		if err != nil && c.PrivateKeyPEM != "" && driveStopAuthFallback(err) {
+			plain := &Client{Base: c.Base, Token: c.Token, HTTP: c.HTTP, now: c.now}
+			b, err = plain.fetchDriveStopBytes(ctx, did, start, end)
+		}
+		if err != nil {
+			return nil, err
+		}
+		chunk, err := parseDriveStopVisits(b)
+		if err != nil {
+			return nil, err
+		}
+		eid := ""
+		if d.LinkedCarEFleetsID != nil {
+			eid = *d.LinkedCarEFleetsID
+		}
+		for _, v := range chunk {
+			v.FactoryID = d.FactoryID
+			v.DeviceID = did
+			v.EFleetsID = eid
+			out = append(out, v)
+		}
+		start = end
+	}
+	return out, nil
+}
+
+const driveStopChunk = 31 * 24 * time.Hour
+
+func (c *Client) fetchDriveStopChunked(ctx context.Context, deviceID string, from, to time.Time) (float64, error) {
+	var sum float64
+	for start := from; start.Before(to); {
+		end := start.Add(driveStopChunk)
+		if end.After(to) {
+			end = to
+		}
+		n, err := c.fetchDriveStopWindow(ctx, deviceID, start, end)
+		if err != nil {
+			return 0, err
+		}
+		sum += n
+		if math.IsNaN(sum) || math.IsInf(sum, 0) {
+			return 0, fmt.Errorf("drive-stop chunk sum is not finite")
+		}
+		start = end
+	}
+	return sum, nil
+}
+
+func driveStopAuthFallback(err error) bool {
+	if err == nil {
+		return false
+	}
+	s := err.Error()
+	return strings.Contains(s, "HTTP 401") || strings.Contains(s, "HTTP 403") || strings.Contains(s, "HTTP 500")
+}
+
+func driveStopRetryChunked(err error) bool {
+	if err == nil {
+		return false
+	}
+	s := err.Error()
+	return strings.Contains(s, "HTTP 500") || strings.Contains(s, "timeout") || strings.Contains(s, "deadline")
 }
 
 // sumDriveStop adds trip miles only. An odometer field on the same JSON is ignored.
@@ -200,6 +322,15 @@ func sumDriveStop(b []byte) (float64, error) {
 			return 0, err
 		}
 		return sumMaps(arr)
+	}
+	// Live payload: root distance is {value, unit}. A bare number at root is not used (could be odo-like).
+	if n, ok := measurementMiles(obj["distance"]); ok {
+		return n, nil
+	}
+	if v, ok := obj["drive_stop_list"]; ok {
+		if sl, ok := v.([]any); ok {
+			return sumDriveStopList(sl)
+		}
 	}
 	for _, k := range []string{"stops", "routes", "data", "trips"} {
 		if v, ok := obj[k]; ok {
@@ -228,6 +359,190 @@ func sumDriveStop(b []byte) (float64, error) {
 		return n, nil
 	}
 	return 0, fmt.Errorf("drive-stop JSON had no miles")
+}
+
+func sumDriveStopList(sl []any) (float64, error) {
+	if len(sl) == 0 {
+		return 0, nil
+	}
+	var sum float64
+	anyDist := false
+	for i, x := range sl {
+		m, ok := x.(map[string]any)
+		if !ok {
+			return 0, fmt.Errorf("drive-stop JSON drive_stop_list row %d is not an object", i)
+		}
+		if n, ok := rowTripMiles(m); ok {
+			sum += n
+			if math.IsNaN(sum) || math.IsInf(sum, 0) {
+				return 0, fmt.Errorf("drive-stop JSON drive_stop_list row %d makes total miles non-finite", i)
+			}
+			anyDist = true
+			continue
+		}
+		typ, _ := m["type"].(string)
+		if strings.EqualFold(strings.TrimSpace(typ), "drive") {
+			return 0, fmt.Errorf("drive-stop JSON drive_stop_list row %d had no miles", i)
+		}
+	}
+	if !anyDist {
+		return 0, nil
+	}
+	return sum, nil
+}
+
+func parseDriveStopVisits(b []byte) ([]model.StopVisit, error) {
+	var obj map[string]any
+	if err := json.Unmarshal(b, &obj); err != nil {
+		return nil, err
+	}
+	raw, ok := obj["drive_stop_list"]
+	if !ok || raw == nil {
+		return nil, nil
+	}
+	sl, ok := raw.([]any)
+	if !ok {
+		return nil, nil
+	}
+	var out []model.StopVisit
+	for i, x := range sl {
+		m, ok := x.(map[string]any)
+		if !ok {
+			return nil, fmt.Errorf("drive-stop JSON drive_stop_list row %d is not an object", i)
+		}
+		typ, _ := m["type"].(string)
+		typ = strings.ToLower(strings.TrimSpace(typ))
+		if typ != "" && typ != "stop" {
+			continue
+		}
+		from, err1 := parseVisitTime(m["time_from"])
+		to, err2 := parseVisitTime(m["time_to"])
+		if err1 != nil || err2 != nil || from.IsZero() || to.IsZero() {
+			continue
+		}
+		if to.Before(from) {
+			from, to = to, from
+		}
+		v := model.StopVisit{From: from, To: to}
+		if lat, lng, ok := latLngOf(m["first_valid_lat_lng"]); ok {
+			v.Lat, v.Lng, v.HasPos = lat, lng, true
+		} else if lat, lng, ok := latLngOf(m["last_valid_lat_lng"]); ok {
+			v.Lat, v.Lng, v.HasPos = lat, lng, true
+		}
+		out = append(out, v)
+	}
+	return out, nil
+}
+
+func parseVisitTime(v any) (time.Time, error) {
+	switch t := v.(type) {
+	case string:
+		s := strings.TrimSpace(t)
+		if s == "" {
+			return time.Time{}, fmt.Errorf("empty time")
+		}
+		for _, layout := range []string{time.RFC3339, time.RFC3339Nano, "2006-01-02 15:04:05", "2006-01-02T15:04:05"} {
+			if parsed, err := time.Parse(layout, s); err == nil {
+				return parsed.UTC(), nil
+			}
+		}
+		return time.Time{}, fmt.Errorf("visit time %q", s)
+	default:
+		return time.Time{}, fmt.Errorf("visit time type %T", v)
+	}
+}
+
+func latLngOf(v any) (lat, lng float64, ok bool) {
+	m, isMap := v.(map[string]any)
+	if !isMap {
+		return 0, 0, false
+	}
+	lat, ok1 := asCoord(m["lat"])
+	lng, ok2 := asCoord(m["lng"])
+	if !ok1 || !ok2 {
+		return 0, 0, false
+	}
+	if lat < -90 || lat > 90 || lng < -180 || lng > 180 {
+		return 0, 0, false
+	}
+	return lat, lng, true
+}
+
+func asCoord(v any) (float64, bool) {
+	var n float64
+	switch t := v.(type) {
+	case float64:
+		n = t
+	case json.Number:
+		f, err := t.Float64()
+		if err != nil {
+			return 0, false
+		}
+		n = f
+	case string:
+		f, err := strconv.ParseFloat(t, 64)
+		if err != nil {
+			return 0, false
+		}
+		n = f
+	default:
+		return 0, false
+	}
+	if math.IsNaN(n) || math.IsInf(n, 0) {
+		return 0, false
+	}
+	return n, true
+}
+
+func rowTripMiles(m map[string]any) (float64, bool) {
+	if n, ok := measurementMiles(m["distance"]); ok {
+		return n, true
+	}
+	if n, ok := measurementMiles(m["miles"]); ok {
+		return n, true
+	}
+	for _, key := range []string{"miles", "distance", "distance_miles"} {
+		v, exists := m[key]
+		if !exists {
+			continue
+		}
+		if n, ok := asFloat(v); ok {
+			return n, true
+		}
+	}
+	return 0, false
+}
+
+func measurementMiles(v any) (float64, bool) {
+	m, ok := v.(map[string]any)
+	if !ok {
+		return 0, false
+	}
+	n, ok := asFloat(m["value"])
+	if !ok {
+		return 0, false
+	}
+	unit, _ := m["unit"].(string)
+	miles, err := toMiles(n, unit)
+	if err != nil {
+		return 0, false
+	}
+	return miles, true
+}
+
+func toMiles(n float64, unit string) (float64, error) {
+	switch strings.ToLower(strings.TrimSpace(unit)) {
+	case "", "mi", "mile", "miles":
+		return n, nil
+	case "km", "kilometer", "kilometers":
+		return n * 0.621371192237, nil
+	case "m", "meter", "meters":
+		return n / 1609.344, nil
+	case "ft", "foot", "feet":
+		return n / 5280, nil
+	default:
+		return 0, fmt.Errorf("unknown distance unit %q", unit)
+	}
 }
 
 // sumMaps is GPS/trip distance, not a device odometer reading. An empty list
@@ -465,6 +780,9 @@ func LoadMapCSV(path string) ([]model.OneStepDevice, error) {
 			continue
 		}
 		d := model.OneStepDevice{FactoryID: fid, DeviceID: did, DisplayName: name}
+		dead := strings.ToLower(pick(row, "dead", "retired"))
+		d.Dead = dead == "1" || dead == "true" || dead == "yes" || dead == "dead"
+		d.Active = !d.Dead
 		if oil.HasLogisticsPersonnel(name) {
 			d.LinkedCarEFleetsID = nil
 			continue

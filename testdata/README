@@ -20,3 +20,4 @@ Each locked rule has a fixture. Live eFleets/OneStep/Supabase are never required
 | Dead factory_id not summed | `internal/oil` TestDeadFactoryIDNotSummed |
 | Header trim (`Cust Name `) not column I/J | `enterprise/details.csv` |
 | Real DETAILS/Maintenance/FleetSummary header sets | `testdata/enterprise/*.csv` |
+| SYNTHETIC wrong-card / station-day trace (not live eFleets) | `enterprise/details_wrongcard.csv` + `fleetsummary_wrongcard.csv` |

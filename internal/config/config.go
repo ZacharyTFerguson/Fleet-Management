@@ -13,6 +13,7 @@ type Config struct {
 	SupabaseURL       string
 	ServiceRole       string
 	SyncSecret        string // SUPABASE_SYNC_SECRET for fleet-sync edge function
+	SupabaseAnonKey   string // SUPABASE_GROK_BUILD_KEY / SUPABASE_ANON_KEY (publishable; SELECT only)
 	OneStepToken      string
 	OneStepPrivateKey string
 	OneStepPublicKey  string
@@ -33,11 +34,12 @@ func Load() Config {
 	}
 	base := getenv("ONESTEP_BASE_URL", "https://track.onestepgps.com")
 	return Config{
-		DatabaseURL:       os.Getenv("DATABASE_URL"),
-		SQLitePath:        getenv("OILCHANGE_DB", ""),
-		SupabaseURL:       os.Getenv("SUPABASE_URL"),
-		ServiceRole:       os.Getenv("SUPABASE_SERVICE_ROLE"),
-		SyncSecret:        os.Getenv("SUPABASE_SYNC_SECRET"),
+		DatabaseURL:     os.Getenv("DATABASE_URL"),
+		SQLitePath:      getenv("OILCHANGE_DB", ""),
+		SupabaseURL:     os.Getenv("SUPABASE_URL"),
+		ServiceRole:     os.Getenv("SUPABASE_SERVICE_ROLE"),
+		SyncSecret:      os.Getenv("SUPABASE_SYNC_SECRET"),
+		SupabaseAnonKey: firstEnv("SUPABASE_GROK_BUILD_KEY", "SUPABASE_ANON_KEY"),
 		// Cloud Agent secret names: OneStepAPIKEYTobeSigned (API key) + OneStepAPIKEY (PEM for JWS).
 		OneStepToken: firstEnv("ONESTEP_API_TOKEN", "ONESTEP_API_KEY", "ONE_STEP_FULL_API_KEY", "OneStepAPIKEYTobeSigned"),
 		OneStepPrivateKey: firstNonEmpty(
@@ -46,14 +48,14 @@ func Load() Config {
 			readEnvFile("ONESTEP_JWT_PEM_PATH"),
 		),
 		OneStepPublicKey: firstEnv("ONESTEP_API_PUBLIC_KEY", "ONESTEP_API_PUBLICKEY"),
-		OneStepBase:       strings.TrimRight(base, "/"),
-		EFleetsUser:       os.Getenv("EFLEETS_USERNAME"),
-		EFleetsPass:       os.Getenv("EFLEETS_PASSWORD"),
-		EFleetsCust:       os.Getenv("EFLEETS_CUST_NUM"),
-		EFleetsBase:       getenv("EFLEETS_BASE_URL", "https://login.efleets.com"),
-		EFleetsDetails:    os.Getenv("EFLEETS_DETAILS_URL"),
-		EFleetsMaint:      os.Getenv("EFLEETS_MAINT_URL"),
-		EFleetsFleet:      os.Getenv("EFLEETS_FLEETSUMMARY_URL"),
+		OneStepBase:      strings.TrimRight(base, "/"),
+		EFleetsUser:      os.Getenv("EFLEETS_USERNAME"),
+		EFleetsPass:      os.Getenv("EFLEETS_PASSWORD"),
+		EFleetsCust:      os.Getenv("EFLEETS_CUST_NUM"),
+		EFleetsBase:      getenv("EFLEETS_BASE_URL", "https://login.efleets.com"),
+		EFleetsDetails:   os.Getenv("EFLEETS_DETAILS_URL"),
+		EFleetsMaint:     os.Getenv("EFLEETS_MAINT_URL"),
+		EFleetsFleet:     os.Getenv("EFLEETS_FLEETSUMMARY_URL"),
 	}
 }
 
@@ -139,8 +141,9 @@ func (c Config) EnvReport() []string {
 	}
 	return []string{
 		line("OILCHANGE_DB", c.SQLitePath, ""),
-		line("DATABASE_URL", c.DatabaseURL, ""),
+		line("DATABASE_URL", c.DatabaseURL, "Neon backup (unpooled pgx); DSN stays sqlite when OILCHANGE_DB is set"),
 		line("SUPABASE_URL", c.SupabaseURL, "ZacharyTFerguson's Project (fleet_*); never XRAY"),
+		line("SUPABASE_GROK_BUILD_KEY", c.SupabaseAnonKey, "publishable/anon SELECT on fleet_cars (alias SUPABASE_ANON_KEY)"),
 		line("SUPABASE_SERVICE_ROLE", c.ServiceRole, "server-side PostgREST sync only"),
 		line("SUPABASE_SYNC_SECRET", c.SyncSecret, "fleet-sync edge token when service role unset"),
 		line("EFLEETS_USERNAME", c.EFleetsUser, ""),

@@ -6,8 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"time"
 
+	"oilchange/internal/cards"
 	"oilchange/internal/config"
 	"oilchange/internal/enterprise"
 	"oilchange/internal/export"
@@ -19,8 +21,10 @@ import (
 
 // App wires CLI commands. Last Reading still happens only in internal/oil.
 type App struct {
-	Cfg   config.Config
-	Store *store.Store
+	Cfg         config.Config
+	Store       *store.Store
+	CardsMirror string           // web/data/cards.json; empty skips the Cards desk write
+	OneStep     *onestep.Client  // optional; GPS stop times for card matching
 }
 
 // OpenStore opens sqlite or postgres from env.
@@ -58,21 +62,45 @@ func (a *App) SyncEnterprise(ctx context.Context, vehicles, fuel, shop, mileage 
 		if err != nil {
 			return err
 		}
-		fills, stations, cards, err := enterprise.ParseFills(bytes.NewReader(b))
+		fills, stations, cardRows, err := enterprise.ParseFills(bytes.NewReader(b))
 		if err != nil {
 			return err
 		}
+		roster, err := a.Store.ListCars(ctx)
+		if err != nil {
+			return err
+		}
+		known := make(map[string]bool, len(roster))
+		for _, c := range roster {
+			known[c.EFleetsID] = true
+		}
+		skipped := 0
 		for _, f := range fills {
+			if !known[f.EFleetsID] {
+				skipped++
+				continue
+			}
 			if err := a.Store.UpsertFill(ctx, f); err != nil {
 				return err
 			}
+			if tx, ok := cards.TxFromFill(f); ok {
+				if err := a.Store.UpsertCardTx(ctx, tx); err != nil {
+					return err
+				}
+			}
+		}
+		if skipped > 0 {
+			fmt.Fprintf(os.Stderr, "DETAILS skipped %d punches for vehicles not on the roster\n", skipped)
 		}
 		for _, g := range stations {
 			if err := a.Store.UpsertStation(ctx, g); err != nil {
 				return err
 			}
 		}
-		for _, c := range cards {
+		for _, c := range cardRows {
+			if c.LinkedCarEFleetsID != nil && !known[*c.LinkedCarEFleetsID] {
+				c.LinkedCarEFleetsID = nil
+			}
 			if err := a.Store.UpsertCard(ctx, c); err != nil {
 				return err
 			}
@@ -191,10 +219,10 @@ func (a *App) SyncDevices(ctx context.Context, mapPath string, client *onestep.C
 		devices = mapped
 	}
 
-	// One transaction: a bad map row aborts the whole import instead of leaving
-	// half the registry on the new snapshot and half on the old one.
-	if err := a.Store.UpsertDevices(ctx, devices); err != nil {
-		return 0, err
+	for _, d := range devices {
+		if err := a.Store.UpsertDevice(ctx, d); err != nil {
+			return 0, err
+		}
 	}
 	return len(devices), nil
 }
@@ -230,14 +258,16 @@ func (a *App) SyncOneStep(ctx context.Context, mapPath string, client *onestep.C
 			continue
 		}
 		for _, d := range devs {
-			if d.Dead {
+			if d.Dead || !d.Active {
 				continue
 			}
 			n, err := client.DriveStopMilesFor(ctx, d, out.FillTime)
 			if err != nil {
 				fetchErrors = append(fetchErrors, fmt.Errorf("%s factory_id %s: %w", c.EFleetsID, d.FactoryID, err))
+				fmt.Fprintf(os.Stderr, "drive-stop %s factory_id %s: %v\n", c.EFleetsID, d.FactoryID, err)
 				continue
 			}
+			fmt.Fprintf(os.Stderr, "drive-stop %s factory_id %s miles=%.2f\n", c.EFleetsID, d.FactoryID, n)
 			if err := a.Store.SaveMilesSince(ctx, model.DriveStopMiles{FactoryID: d.FactoryID, Since: out.FillTime, Miles: n}); err != nil {
 				return err
 			}
@@ -247,92 +277,64 @@ func (a *App) SyncOneStep(ctx context.Context, mapPath string, client *onestep.C
 }
 
 // Compute runs Last Reading + HOLD for every car. Returns exit 2 if any open HOLD remains.
-//
-// Invariant after a Compute that returns nil error: every car has either
-// hold_reason set (with exactly one open hold event) or a full
-// last_reading_{miles,at,source} triple — never both NULL. Each car is decided
-// in its own store transaction, so a failure on one car leaves that car exactly
-// as it was and the loop moves on; the joined error and exit 1 tell the
-// operator which cars were not decided this run. Context cancellation stops
-// the loop immediately (the current car's transaction rolls back as a unit).
 func (a *App) Compute(ctx context.Context, overrideLower bool) (int, error) {
 	cars, err := a.Store.ListCars(ctx)
 	if err != nil {
 		return model.ExitError, err
 	}
 	open := 0
-	var carErrs []error
 	for _, c := range cars {
-		if err := ctx.Err(); err != nil {
+		fills, err := a.Store.ListFills(ctx, c.EFleetsID)
+		if err != nil {
 			return model.ExitError, err
 		}
-		held, err := a.computeCar(ctx, c, overrideLower)
+		ros, err := a.Store.ListShopROs(ctx, c.EFleetsID)
 		if err != nil {
-			if ctx.Err() != nil {
+			return model.ExitError, err
+		}
+		devs, err := a.Store.ListDevicesForCar(ctx, c.EFleetsID)
+		if err != nil {
+			return model.ExitError, err
+		}
+		var ids []string
+		for _, d := range devs {
+			ids = append(ids, d.FactoryID)
+		}
+		miles, err := a.Store.ListMilesSince(ctx, ids)
+		if err != nil {
+			return model.ExitError, err
+		}
+		out := oil.EvaluateHolds(oil.ComputeIn{
+			Nickname:          c.Nickname,
+			Fills:             fills,
+			ShopROs:           ros,
+			Devices:           devs,
+			MilesSince:        miles,
+			StoredLastReading: c.LastReadingMiles,
+			OverrideLower:     overrideLower,
+		})
+		if out.SkipWrite {
+			reason := model.HoldNoTrustedFill
+			detail := ""
+			if len(out.Holds) > 0 {
+				reason = out.Holds[0].Code
+				detail = out.Holds[0].Detail
+			}
+			if err := a.Store.SetHold(ctx, c.EFleetsID, reason, detail); err != nil {
 				return model.ExitError, err
 			}
-			fmt.Fprintf(os.Stderr, "ERROR %s not decided: %v\n", c.EFleetsID, err)
-			carErrs = append(carErrs, fmt.Errorf("%s: %w", c.EFleetsID, err))
+			open++
+			fmt.Fprintf(os.Stderr, "HOLD %s %s %s\n", c.EFleetsID, reason, detail)
 			continue
 		}
-		if held {
-			open++
+		if err := a.Store.WriteLastReading(ctx, c.EFleetsID, out.Reading, out.FillTime, out.Source); err != nil {
+			return model.ExitError, err
 		}
-	}
-	if len(carErrs) > 0 {
-		return model.ExitError, errors.Join(carErrs...)
 	}
 	if open > 0 {
 		return model.ExitHolds, nil
 	}
 	return model.ExitOK, nil
-}
-
-// computeCar decides one car: exactly one of SetHold / WriteLastReading commits.
-func (a *App) computeCar(ctx context.Context, c model.Car, overrideLower bool) (held bool, err error) {
-	fills, err := a.Store.ListFills(ctx, c.EFleetsID)
-	if err != nil {
-		return false, err
-	}
-	ros, err := a.Store.ListShopROs(ctx, c.EFleetsID)
-	if err != nil {
-		return false, err
-	}
-	devs, err := a.Store.ListDevicesForCar(ctx, c.EFleetsID)
-	if err != nil {
-		return false, err
-	}
-	var ids []string
-	for _, d := range devs {
-		ids = append(ids, d.FactoryID)
-	}
-	miles, err := a.Store.ListMilesSince(ctx, ids)
-	if err != nil {
-		return false, err
-	}
-	out := oil.EvaluateHolds(oil.ComputeIn{
-		Nickname:          c.Nickname,
-		Fills:             fills,
-		ShopROs:           ros,
-		Devices:           devs,
-		MilesSince:        miles,
-		StoredLastReading: c.LastReadingMiles,
-		OverrideLower:     overrideLower,
-	})
-	if out.SkipWrite {
-		reason := model.HoldNoTrustedFill
-		detail := ""
-		if len(out.Holds) > 0 {
-			reason = out.Holds[0].Code
-			detail = out.Holds[0].Detail
-		}
-		if err := a.Store.SetHold(ctx, c.EFleetsID, reason, detail); err != nil {
-			return false, err
-		}
-		fmt.Fprintf(os.Stderr, "HOLD %s %s %s\n", c.EFleetsID, reason, detail)
-		return true, nil
-	}
-	return false, a.Store.WriteLastReading(ctx, c.EFleetsID, out.Reading, out.FillTime, out.Source)
 }
 
 // OilDone records an operator oil change without touching Last Reading.
@@ -372,6 +374,178 @@ func (a *App) Holds(ctx context.Context) error {
 	}
 	for _, h := range hs {
 		fmt.Printf("HOLD %s %s %s\n", h.EFleetsID, h.Reason, h.Detail)
+	}
+	return nil
+}
+
+func (a *App) CardsRebuild(ctx context.Context, fuelPath string) (int, error) {
+	if fuelPath != "" {
+		if err := a.SyncEnterprise(ctx, "", fuelPath, "", ""); err != nil {
+			return 0, err
+		}
+	}
+	txs, err := a.Store.ListCardTxs(ctx, "")
+	if err != nil {
+		return 0, err
+	}
+	ps := cards.ScorePairings(txs, time.Now().UTC())
+	if err := a.Store.ReplacePairings(ctx, ps); err != nil {
+		return 0, err
+	}
+	gps, err := a.matchCardsAtGPSStops(ctx, txs)
+	if err != nil {
+		return 0, err
+	}
+	if err := a.writeCardsSnapshot(ctx, txs, ps, gps); err != nil {
+		return 0, err
+	}
+	return len(txs), nil
+}
+
+func gpsStopsCachePath() string {
+	return filepath.Join("data", "runtime", "gps-stops.json")
+}
+
+func (a *App) matchCardsAtGPSStops(ctx context.Context, txs []model.CardTx) ([]model.GPSCardMatch, error) {
+	if a == nil || a.Store == nil || len(txs) == 0 {
+		return nil, nil
+	}
+	cache := gpsStopsCachePath()
+	if a.OneStep == nil {
+		visits, err := cards.LoadStopVisits(cache)
+		if err != nil {
+			return nil, nil
+		}
+		fmt.Fprintf(os.Stderr, "gps-stops cache %d visits\n", len(visits))
+		return cards.MatchByStopTimes(visits, txs, cards.DefaultStopSlack), nil
+	}
+	var from, to time.Time
+	for _, t := range txs {
+		if t.At.IsZero() {
+			continue
+		}
+		if from.IsZero() || t.At.Before(from) {
+			from = t.At
+		}
+		if to.IsZero() || t.At.After(to) {
+			to = t.At
+		}
+	}
+	if from.IsZero() {
+		return nil, nil
+	}
+	devs, err := a.Store.ListDevices(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var visits []model.StopVisit
+	n := 0
+	for _, d := range devs {
+		if d.Dead || !d.Active || d.LinkedCarEFleetsID == nil || *d.LinkedCarEFleetsID == "" {
+			continue
+		}
+		n++
+		v, err := a.OneStep.DriveStopVisitsFor(ctx, d, from, to)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "gps-stops %s factory_id %s: %v\n", *d.LinkedCarEFleetsID, d.FactoryID, err)
+			continue
+		}
+		fmt.Fprintf(os.Stderr, "gps-stops %s factory_id %s stops=%d\n", *d.LinkedCarEFleetsID, d.FactoryID, len(v))
+		visits = append(visits, v...)
+	}
+	if n == 0 {
+		return nil, nil
+	}
+	if err := cards.SaveStopVisits(cache, visits); err != nil {
+		fmt.Fprintf(os.Stderr, "gps-stops cache write: %v\n", err)
+	} else {
+		fmt.Fprintf(os.Stderr, "gps-stops cache wrote %d visits\n", len(visits))
+	}
+	return cards.MatchByStopTimes(visits, txs, cards.DefaultStopSlack), nil
+}
+
+func (a *App) writeCardsSnapshot(ctx context.Context, txs []model.CardTx, ps []model.CardPairing, gps []model.GPSCardMatch) error {
+	if a == nil || a.CardsMirror == "" {
+		return nil
+	}
+	nicks := map[string]string{}
+	if a.Store != nil {
+		cars, err := a.Store.ListCars(ctx)
+		if err != nil {
+			return err
+		}
+		for _, c := range cars {
+			nicks[c.EFleetsID] = c.Nickname
+		}
+	}
+	snap := cards.BuildSnapshot(txs, ps, gps, nicks, time.Now().UTC())
+	return cards.WriteSnapshot(a.CardsMirror, snap)
+}
+
+func (a *App) CardsSuspects(ctx context.Context) error {
+	txs, err := a.Store.ListCardTxs(ctx, "")
+	if err != nil {
+		return err
+	}
+	ps, err := a.Store.ListPairings(ctx, "")
+	if err != nil {
+		return err
+	}
+	if len(ps) == 0 {
+		ps = cards.ScorePairings(txs, time.Now().UTC())
+	}
+	ss := cards.FindSuspects(txs, ps)
+	if len(ss) == 0 {
+		fmt.Println("no suspect cards")
+		return nil
+	}
+	for _, s := range ss {
+		fmt.Printf("SUSPECT card=%s enterprise_car=%s best_car=%s latest=%s station=%s evidence_best=%d evidence_latest=%d\n  %s\n",
+			s.CardID, s.EnterpriseCar, s.BestCar, s.LatestAt.UTC().Format(time.RFC3339), s.LatestStation, s.EvidenceBest, s.EvidenceLatest, s.Reason)
+	}
+	return nil
+}
+
+func (a *App) CardsTrace(ctx context.Context, cardID string, windowDays int) error {
+	txs, err := a.Store.ListCardTxs(ctx, "")
+	if err != nil {
+		return err
+	}
+	hits := cards.TraceStationDays(txs, cardID, windowDays)
+	if len(hits) == 0 {
+		fmt.Printf("TRACE card=%s no station-day neighbors in ±%d days\n", cardID, windowDays)
+		return nil
+	}
+	for _, h := range hits {
+		fmt.Printf("TRACE card=%s station=%s day=%s other_car=%s other_card=%s other_at=%s days_apart=%d\n",
+			h.CardID, h.Station, h.Day.Format("2006-01-02"), h.OtherEFleetsID, h.OtherCardID,
+			h.OtherAt.UTC().Format(time.RFC3339), h.DaysApart)
+	}
+	return nil
+}
+
+func (a *App) CardsPairings(ctx context.Context, cardID string) error {
+	ps, err := a.Store.ListPairings(ctx, cardID)
+	if err != nil {
+		return err
+	}
+	if len(ps) == 0 {
+		txs, err := a.Store.ListCardTxs(ctx, cardID)
+		if err != nil {
+			return err
+		}
+		ps = cards.ScorePairings(txs, time.Now().UTC())
+	}
+	if len(ps) == 0 {
+		fmt.Println("no pairings (run cards rebuild first)")
+		return nil
+	}
+	for _, p := range ps {
+		mark := ""
+		if p.Best {
+			mark = " BEST"
+		}
+		fmt.Printf("PAIR card=%s type=%s key=%s n=%d score=%.2f%s\n", p.CardID, p.EntityType, p.EntityKey, p.EvidenceN, p.Score, mark)
 	}
 	return nil
 }

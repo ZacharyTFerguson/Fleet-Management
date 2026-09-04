@@ -66,7 +66,13 @@ Also used by this fleet for miles-since:
 GET {ONESTEP_BASE_URL}/route/drive-stop?...&api-key=YOUR_API_KEY
 ```
 
-Exact `drive-stop` query parameter names come from OneStep’s live apidoc (signed-in portal / docs OneStep provides with the key). Do not invent params. You will need at least a **`device_id`** and a **time window or since-timestamp** that matches the Enterprise fill second (America/New_York naive times in oil work).
+Live apidoc / working public client names (do not invent others):
+
+- **`device_id`** — History identity (not `factory_id`)
+- **`dt_tracker_from`** / **`dt_tracker_to`** — RFC3339 UTC window from the Enterprise fill second to now
+- **`stop_duration`** — `5m0s`
+
+Do **not** send `factory_id` or `from` on this route (HTTP 500). Do **not** send `return_points` when you only need miles (that payload hung fleet sync). Response miles live on `distance.value` (+ optional `unit`); ignore `odometer_from` / `odometer_to`.
 
 ### About PEM files
 
@@ -99,13 +105,16 @@ Expect HTTP **200** and JSON with a `result_list` of devices. Each device includ
 ### curl — drive-stop (miles since a timestamp)
 
 ```bash
-# Replace QUERY… with the live apidoc params for device + time range.
+# Confirmed live apidoc names: device_id, dt_tracker_from, dt_tracker_to, stop_duration.
+# Do not send factory_id or from — those 500. Do not request return_points for miles-since.
 # Always include api-key. Never print the key in CI logs.
 curl -sS -G \
   "${ONESTEP_BASE_URL:-https://track.onestepgps.com/v3/api/public}/route/drive-stop" \
   --data-urlencode "api-key=${ONESTEP_API_KEY}" \
-  # --data-urlencode "device_id=YOUR_DEVICE_ID" \
-  # --data-urlencode "<from/to or since params from apidoc>"
+  --data-urlencode "device_id=YOUR_DEVICE_ID" \
+  --data-urlencode "dt_tracker_from=FILL_RFC3339" \
+  --data-urlencode "dt_tracker_to=NOW_RFC3339" \
+  --data-urlencode "stop_duration=5m0s"
 ```
 
 Fleet note: this route previously **403**’d for an older key state and later returned **200** for miles-since waves. A 403 is a permissions/key-scope problem, not a reason to fall back to OneStep’s odometer field.
@@ -208,7 +217,7 @@ Sheet columns (Automations Copy, when used): headers **OneStep factory id** and 
 |-------|------------|--------|
 | Base URL `…/v3/api/public` + `api-key` query auth | **High** | Public OneStepGPS Go sample (`LatestPointsGoServer`); third-party `/device` captures; Alvys/Fleetio “request API key” flow |
 | `/device` returns `factory_id`, `device_id`, `display_name` | **High** | Public JSON examples; matches this fleet’s sheet U/V columns |
-| `/route/drive-stop` is the miles-since call | **High** for path; **medium** for exact query param names | Org LEARNED / Liaison notes (200 after prior 403); exact params = live apidoc |
+| `/route/drive-stop` is the miles-since call | **High** | Path + params confirmed live 2026-09-03: `device_id`, `dt_tracker_from`, `dt_tracker_to`, `stop_duration=5m0s`. `factory_id`/`from` HTTP 500. Miles on `distance.value`. |
 | Client PEM required for public API | **Low / false for current practice** | No org script or Slack evidence of mTLS/PEM signing; successful pattern is API key only |
 | “JWT RS256” | **Medium (interpretive)** | Agent Research/Probe briefs; treat as token format metadata, not a client PEM requirement |
 

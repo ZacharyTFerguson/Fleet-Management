@@ -153,3 +153,16 @@ func TestLoadReadsOilchangeEnv(t *testing.T) {
 		t.Fatalf("db %q", cfg.SQLitePath)
 	}
 }
+
+func TestLoadCDPURL(t *testing.T) {
+	t.Setenv("EFLEETS_CDP_URL", "http://127.0.0.1:9222")
+	cfg := Load()
+	if cfg.EFleetsCDP != "http://127.0.0.1:9222" {
+		t.Fatalf("cdp %q", cfg.EFleetsCDP)
+	}
+	for _, line := range cfg.EnvReport() {
+		if strings.Contains(line, "EFLEETS_CDP_URL") && strings.Contains(line, "missing") {
+			t.Fatalf("report %q", line)
+		}
+	}
+}

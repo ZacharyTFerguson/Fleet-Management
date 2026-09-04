@@ -18,7 +18,7 @@ Sit-still / important-location Node app lives in a separate PR (`cursor/importan
 
 | Cmd | What |
 |---|---|
-| `sync-enterprise` | Live eFleets if `EFLEETS_*` is set, or `--vehicles` `--fuel-details` `[--shop-ro]` `[--mileage-history]`. Oil/lube shop ROs seed last oil. Does not compute Last Reading. |
+| `sync-enterprise` | File drop (`--vehicles` `--fuel-details` …) first; else Chrome session via `EFLEETS_CDP_URL` (CDP WebSocket cookie reuse + Network-captured `EFLEETS_*_URL`, no password typing); password HTTP last. Oil/lube shop ROs seed last oil. Does not compute Last Reading. |
 | `sync-onestep` | OneStep API devices + drive-stop miles-since after the trusted fill second. Join `factory_id` only. Optional `--map PATH`. |
 | `compute` | Last Reading + HOLD. `[--override-lower]` is the only way to write a lower reading. |
 | `oil-done` | `--efleets-id ID --miles N --date YYYY-MM-DD [--location NAME]` |

@@ -3,6 +3,7 @@ module oilchange
 go 1.27.1
 
 require (
+	github.com/gorilla/websocket v1.5.3
 	github.com/jackc/pgx/v5 v5.10.0
 	modernc.org/sqlite v1.57.0
 )

@@ -249,6 +249,19 @@ func TestEnvReportEFleetsHintOmitsValues(t *testing.T) {
 	if !foundUser || !foundPass {
 		t.Fatal("eFleets env report lines missing")
 	}
+	missing := Config{}
+	foundHint := false
+	for _, line := range missing.EnvReport() {
+		if strings.HasPrefix(line, "EFLEETS_USERNAME:") {
+			foundHint = true
+			if !strings.Contains(line, "missing") || !strings.Contains(line, "never chat") {
+				t.Fatalf("missing keys should still name the secret slot: %q", line)
+			}
+		}
+	}
+	if !foundHint {
+		t.Fatal("missing username line")
+	}
 }
 
 func unsetEFleetsEnv(t *testing.T) {

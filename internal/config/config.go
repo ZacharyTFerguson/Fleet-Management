@@ -118,10 +118,10 @@ func getenv(k, def string) string {
 // EnvReport describes loaded secrets without printing values. Used by `oilchange env`.
 func (c Config) EnvReport() []string {
 	line := func(name, v string, extra string) string {
-		if strings.TrimSpace(v) == "" {
-			return name + ": missing"
+		s := name + ": missing"
+		if strings.TrimSpace(v) != "" {
+			s = fmt.Sprintf("%s: set (%d bytes)", name, len(v))
 		}
-		s := fmt.Sprintf("%s: set (%d bytes)", name, len(v))
 		if extra != "" {
 			s += " " + extra
 		}

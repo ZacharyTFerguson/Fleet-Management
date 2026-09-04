@@ -253,8 +253,11 @@ func (c *Client) DriveStopVisitsFor(ctx context.Context, d model.OneStepDevice, 
 		}
 		b, err := c.fetchDriveStopBytes(ctx, did, start, end)
 		if err != nil && c.PrivateKeyPEM != "" && driveStopAuthFallback(err) {
+			// Same JWT-off fallback as driveStopMiles: do not copy mu; hold the parent lock.
 			plain := &Client{Base: c.Base, Token: c.Token, HTTP: c.HTTP, now: c.now}
+			c.mu.Lock()
 			b, err = plain.fetchDriveStopBytes(ctx, did, start, end)
+			c.mu.Unlock()
 		}
 		if err != nil {
 			return nil, err

@@ -124,7 +124,7 @@ func (a *App) CardsWatch(ctx context.Context, opt CardsWatchOpts) (cards.NearbyR
 		watched := cards.SeedWatchedFactoryIDs(allFills, prior, devs, fleet)
 		need := watchDevicesByFactory(devs, watched)
 		needIDs := factoryIDsOf(need)
-		rankIDs := cards.SeedPriorityFactoryIDs(allFills, devs, fleet)
+		rankIDs := factoryIDsOf(watchDevicesByFactory(devs, cards.SeedPriorityFactoryIDs(allFills, devs, fleet)))
 		if len(rankIDs) == 0 {
 			rankIDs = needIDs
 		}
@@ -164,30 +164,29 @@ func (a *App) CardsWatch(ctx context.Context, opt CardsWatchOpts) (cards.NearbyR
 	}
 	merged.CoverageComplete = allComplete
 	if opt.LiveStops && a.OneStep != nil {
-		ids := unpairedFactoryIDs(devs, nearbyHuntFactoryIDs(merged))
-		if len(ids) > 0 {
-			pr, perr := a.PairDevicesByVIN(ctx, PairVINOpts{
-				Live: live, FactoryIDs: ids, Pace: pace, AskEmpty: true,
-			})
-			if perr != nil {
-				fmt.Fprintf(os.Stderr, "watch VIN-ask: %v\n", perr)
-			} else {
-				fmt.Fprintf(os.Stderr, "watch %s", pr.Format())
+		// After the GPS watch, ask OneStep what OBD VIN is on each
+		// leftover unpaired box and join exact 17-char VIN to cars.vin.
+		pr, perr := a.PairDevicesByVIN(ctx, PairVINOpts{
+			Live: live, Pace: pace, AskEmpty: true,
+		})
+		if perr != nil {
+			fmt.Fprintf(os.Stderr, "watch VIN-ask: %v\n", perr)
+		} else {
+			fmt.Fprintf(os.Stderr, "watch %s", pr.Format())
+		}
+		if pr.Linked > 0 {
+			if stored, serr := a.Store.ListDevices(ctx); serr == nil {
+				devs = overlayDeviceLinks(devs, stored)
 			}
-			if pr.Linked > 0 {
-				if stored, serr := a.Store.ListDevices(ctx); serr == nil {
-					devs = overlayDeviceLinks(devs, stored)
+			rehunt := cards.HuntNearbyFull(visits, txs, gps.Stations, devs, cards.DefaultStopSlack, allComplete)
+			rehunt = cards.RewriteIncompleteWatchWhy(rehunt, allComplete)
+			if opt.Persist && allComplete {
+				if err := a.persistCertainNearby(ctx, rehunt, txs, eras); err != nil {
+					return rehunt, err
 				}
-				rehunt := cards.HuntNearbyFull(visits, txs, gps.Stations, devs, cards.DefaultStopSlack, allComplete)
-				rehunt = cards.RewriteIncompleteWatchWhy(rehunt, allComplete)
-				if opt.Persist && allComplete {
-					if err := a.persistCertainNearby(ctx, rehunt, txs, eras); err != nil {
-						return rehunt, err
-					}
-				}
-				merged = rehunt
-				merged.CoverageComplete = allComplete
 			}
+			merged = rehunt
+			merged.CoverageComplete = allComplete
 		}
 	}
 	return merged, nil

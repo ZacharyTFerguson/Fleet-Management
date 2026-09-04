@@ -156,11 +156,11 @@ A second full-fleet nearby `--live` is the wrong next step. After the 2026-09-04
 1. GPS-first uses the stop cache only (`OneStep` is niled around that call). Watch `--live` must not fleet-fetch linked boxes through `cards rebuild` GPS-first.
 2. Unknown fills only (same `EligibleUnknownFills` as nearby). PERSON stays watch-only.
 3. Card order: highest exclusive-day count first (the prior likely card), then Virginia recorded vehicles, then newest swipe.
-4. Per card: take the **newest 10** provider swipes. Seed `factory_id`s from cache 1-mile hits, plus the VA car’s linked box, plus one hypothesis roster car if the list is still empty. Never invent an unpaired `factory_id`.
+4. Per card: take the **newest 10** provider swipes. Seed `factory_id`s from cache 1-mile hits, plus **only the newest** VA recorded vehicle’s linked box (mixed DETAILS Vehicle columns are not extra fetches), plus one hypothesis roster car if the list is still empty. Never invent an unpaired `factory_id`. Persist ranks that same newest VA box, so 1-mile spectators do not have to span the window.
 5. `--live` drive-stop those boxes for the **union** of those 10 fill-day ±1 windows, skipping a box already spanning-covered. One `device_id` per GET. Default **35 s** between calls; a `429`/`503` `Retry-After` waits that long and retries once.
 6. Hunt still scores **all** eligible fills for that card (May exclusive days + August fetches). Persist if watched-set coverage is complete, exactly one certain **linked** car, not PERSON, not unpaired.
 7. `cards rebuild --no-gps` keeps nearby-certain car eras the ladder did not replace, so a rematch cannot wipe a watch persist.
-8. After the hunt, **ask OneStep for VIN** on unpaired watched boxes: `GET /device?device_id=&latest_point=true` (OBD `device_state.vin` only). Exact 17-char match to `cars.vin` writes the factory_id→Enterprise link. `display_name` is never a join. CLI: `oilchange devices vin`. Then `cards history --no-gps` rematches GPS-at-the-pump.
+8. After the GPS watch, **ask OneStep for VIN** on leftover unpaired boxes (not only hunt hits): `GET /device?device_id=&latest_point=true` (OBD `device_state.vin` only). Exact 17-char match to `cars.vin` writes the factory_id→Enterprise link. `display_name` is never a join. CLI: `oilchange devices vin`. Then `cards history --no-gps` rematches GPS-at-the-pump and keeps watch-persisted car eras in coverage.
 
 Maintenance VIN remains exact 17-char OBD `device_state.vin` = `cars.vin` from the roster (Fleet Summary / shop-backed VIN). A Fuel DETAILS drop is not a shop RO; do not `--shop-ro` a DETAILS file.
 

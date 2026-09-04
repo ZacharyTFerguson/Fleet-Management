@@ -139,6 +139,30 @@ func TestWatchedCoverageCompleteRequiresEveryBox(t *testing.T) {
 	}
 }
 
+func TestSeedPriorityFactoryIDsNewestVirginiaOnly(t *testing.T) {
+	vaNew, vaOld := "27VA15", "292NCX"
+	devs := []model.OneStepDevice{
+		{FactoryID: "FACT-NEW", DeviceID: "D-NEW", Active: true, LinkedCarEFleetsID: &vaNew},
+		{FactoryID: "FACT-OLD", DeviceID: "D-OLD", Active: true, LinkedCarEFleetsID: &vaOld},
+	}
+	cars := []model.Car{
+		{EFleetsID: vaNew, Nickname: "VA15", Region: "VA"},
+		{EFleetsID: vaOld, Nickname: "292NCX"},
+	}
+	fills := []model.CardTx{
+		{CardID: "C1", At: time.Date(2026, 8, 30, 12, 0, 0, 0, time.UTC), RecordedEFleetsID: vaNew},
+		{CardID: "C1", At: time.Date(2026, 6, 1, 12, 0, 0, 0, time.UTC), RecordedEFleetsID: vaOld},
+	}
+	got := SeedPriorityFactoryIDs(fills, devs, cars)
+	if len(got) != 1 || got[0] != "FACT-NEW" {
+		t.Fatalf("newest VA only: %v", got)
+	}
+	watched := SeedWatchedFactoryIDs(fills, NearbyResult{}, devs, cars)
+	if len(watched) != 1 || watched[0] != "FACT-NEW" {
+		t.Fatalf("watched newest VA only: %v", watched)
+	}
+}
+
 func TestPreserveUnladderedCarErasKeepsNearbyCertain(t *testing.T) {
 	ladder := []model.CardEra{{
 		CardID: "GPS-CARD", EFleetsID: "26LSZW", HolderType: HolderCar,

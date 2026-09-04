@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"oilchange/internal/cards"
 	"oilchange/internal/model"
 	"oilchange/internal/oil"
 	"oilchange/internal/onestep"
@@ -244,29 +243,6 @@ func (a *App) PairDevicesByVIN(ctx context.Context, opt PairVINOpts) (PairVINRes
 	return out, nil
 }
 
-func unpairedFactoryIDs(devs []model.OneStepDevice, factoryIDs []string) []string {
-	linked := map[string]bool{}
-	for _, d := range devs {
-		if d.LinkedCarEFleetsID != nil && strings.TrimSpace(*d.LinkedCarEFleetsID) != "" {
-			linked[strings.TrimSpace(d.FactoryID)] = true
-		}
-	}
-	var out []string
-	seen := map[string]struct{}{}
-	for _, id := range factoryIDs {
-		id = strings.TrimSpace(id)
-		if id == "" || linked[id] {
-			continue
-		}
-		if _, ok := seen[id]; ok {
-			continue
-		}
-		seen[id] = struct{}{}
-		out = append(out, id)
-	}
-	return out
-}
-
 func overlayDeviceLinks(devs, stored []model.OneStepDevice) []model.OneStepDevice {
 	link := map[string]*string{}
 	vin := map[string]string{}
@@ -291,34 +267,6 @@ func overlayDeviceLinks(devs, stored []model.OneStepDevice) []model.OneStepDevic
 		}
 		if x, ok := vin[id]; ok {
 			out[i].VIN = x
-		}
-	}
-	return out
-}
-
-func nearbyHuntFactoryIDs(res cards.NearbyResult) []string {
-	var out []string
-	seen := map[string]struct{}{}
-	add := func(id string) {
-		id = strings.TrimSpace(id)
-		if id == "" {
-			return
-		}
-		if _, ok := seen[id]; ok {
-			return
-		}
-		seen[id] = struct{}{}
-		out = append(out, id)
-	}
-	for _, c := range res.Cards {
-		for _, d := range c.Certain {
-			add(d.FactoryID)
-		}
-		for _, d := range c.Likely {
-			add(d.FactoryID)
-		}
-		for _, d := range c.Watch {
-			add(d.FactoryID)
 		}
 	}
 	return out

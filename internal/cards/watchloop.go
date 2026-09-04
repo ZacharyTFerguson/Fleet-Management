@@ -149,8 +149,8 @@ func nearbyDevicesForCard(prior NearbyResult, cardID string) []NearbyDevice {
 	return out
 }
 
-// SeedWatchedFactoryIDs is the API batch: 1-mile hunt hits, then VA recorded
-// vehicles, then one hypothesis roster car if the list is still empty.
+// SeedWatchedFactoryIDs is the API batch: 1-mile hunt hits, then the newest
+// VA recorded vehicle’s linked box, then one hypothesis roster car if empty.
 func SeedWatchedFactoryIDs(fills []model.CardTx, prior NearbyResult, devices []model.OneStepDevice, cars []model.Car) []string {
 	seen := map[string]struct{}{}
 	var out []string
@@ -172,6 +172,9 @@ func SeedWatchedFactoryIDs(fills []model.CardTx, prior NearbyResult, devices []m
 	for _, d := range nearbyDevicesForCard(prior, cardID) {
 		add(d.FactoryID)
 	}
+	// Newest fill first. Mixed DETAILS Vehicle columns must not expand
+	// the API batch to every historical VA car on the card — only the
+	// newest recorded VA vehicle’s linked box, plus 1-mile hunt hits.
 	for _, t := range fills {
 		rec := strings.TrimSpace(t.RecordedEFleetsID)
 		if isUnknownCar(rec) {
@@ -180,9 +183,14 @@ func SeedWatchedFactoryIDs(fills []model.CardTx, prior NearbyResult, devices []m
 		if !IsVirginiaVehicle(rec, t.RecordedCVN, cars) {
 			continue
 		}
-		for _, id := range FactoryIDsForLinkedCar(devices, rec) {
+		ids := FactoryIDsForLinkedCar(devices, rec)
+		if len(ids) == 0 {
+			continue
+		}
+		for _, id := range ids {
 			add(id)
 		}
+		break
 	}
 	if len(out) > 0 {
 		sort.Strings(out)
@@ -206,7 +214,8 @@ func SeedWatchedFactoryIDs(fills []model.CardTx, prior NearbyResult, devices []m
 	return out
 }
 
-// SeedPriorityFactoryIDs is the VA (or hypothesis) box we asked about.
+// SeedPriorityFactoryIDs is the newest VA (or hypothesis) box we asked about.
+// Mixed DETAILS Vehicle columns must not rank every historical VA car.
 // 1-mile spectators do not have to be spanning-fetched before persist.
 func SeedPriorityFactoryIDs(fills []model.CardTx, devices []model.OneStepDevice, cars []model.Car) []string {
 	seen := map[string]struct{}{}
@@ -230,10 +239,10 @@ func SeedPriorityFactoryIDs(fills []model.CardTx, devices []model.OneStepDevice,
 		for _, id := range FactoryIDsForLinkedCar(devices, rec) {
 			add(id)
 		}
-	}
-	if len(out) > 0 {
-		sort.Strings(out)
-		return out
+		if len(out) > 0 {
+			sort.Strings(out)
+			return out
+		}
 	}
 	for _, t := range fills {
 		rec := strings.TrimSpace(t.RecordedEFleetsID)

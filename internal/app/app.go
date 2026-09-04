@@ -299,12 +299,15 @@ func (a *App) CardsLadder(ctx context.Context, persist bool) (cards.LadderResult
 		return empty, err
 	}
 	res := cards.ClassifyLadder(gps, txs, fleet, devs, cards.DefaultLadderRungs)
+	existing, err := a.Store.ListEras(ctx)
+	if err != nil {
+		return res, err
+	}
+	blocked := res.Coverage.Blocked
+	res.Eras = cards.PreserveUnladderedCarEras(res.Eras, existing)
+	res.Coverage = cards.RosterCoverage(fleet, devs, res.Eras, res.Cars)
+	res.Coverage.Blocked = blocked
 	if persist {
-		existing, err := a.Store.ListEras(ctx)
-		if err != nil {
-			return res, err
-		}
-		res.Eras = cards.PreserveUnladderedCarEras(res.Eras, existing)
 		if err := a.Store.ReplaceEras(ctx, res.Eras); err != nil {
 			return res, err
 		}

@@ -3,14 +3,19 @@ package app
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"oilchange/internal/cards"
 	"oilchange/internal/config"
 	"oilchange/internal/model"
+	"oilchange/internal/onestep"
 	"oilchange/internal/store"
 )
 
@@ -207,6 +212,84 @@ func TestCardsHistoryDoesNotWriteLastReading(t *testing.T) {
 	car, err := st.CarByEFleets(ctx, "27VA15")
 	if err != nil || car.LastReadingMiles == nil || *car.LastReadingMiles != 100010 {
 		t.Fatalf("history must not touch Last Reading: %+v %v", car, err)
+	}
+}
+
+func TestCardsHistoryAsksVINThenRematch(t *testing.T) {
+	prev := watchDriveStopMinInterval
+	watchDriveStopMinInterval = time.Millisecond
+	defer func() { watchDriveStopMinInterval = prev }()
+
+	p := filepath.Join(t.TempDir(), "vinhist.sqlite")
+	st, err := store.Open("sqlite", p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	ctx := context.Background()
+	if err := st.UpsertCar(ctx, model.Car{EFleetsID: "27TESTA", VIN: "1HGCM82633A004352", Nickname: "WrongCar"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.UpsertDevice(ctx, model.OneStepDevice{
+		FactoryID: "FACT-LOOSE", DeviceID: "DEV-LOOSE", DisplayName: "WrongCar", Active: true,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	at := time.Date(2026, 8, 12, 10, 0, 0, 0, time.UTC)
+	cachePath := filepath.Join(t.TempDir(), "gps-stops.json")
+	visits := append(cardsPumpSeeds(37.54, -77.43, at), model.StopVisit{
+		FactoryID: "FACT-LOOSE", DeviceID: "DEV-LOOSE", EFleetsID: "27TESTA",
+		HasPos: true, Lat: 37.54, Lng: -77.43,
+		From: at, To: at.Add(10 * time.Minute),
+	})
+	if err := cards.SaveStopVisits(cachePath, visits); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.UpsertCardTx(ctx, model.CardTx{
+		CardID: "xVIN1", At: at.Add(2 * time.Minute),
+		StationName: "WAWA", StationAddress: "1 MAIN,TOWN,VA",
+		RecordedEFleetsID: "TRACKER",
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	var asked int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !strings.Contains(r.URL.Path, "/device") {
+			http.NotFound(w, r)
+			return
+		}
+		atomic.AddInt32(&asked, 1)
+		_, _ = w.Write([]byte(`[{
+			"factory_id":"FACT-LOOSE","device_id":"DEV-LOOSE","display_name":"WrongCar",
+			"latest_device_point":{"device_state":{"vin":"1HGCM82633A004352"}}
+		}]`))
+	}))
+	defer srv.Close()
+	c := onestep.NewClient(srv.URL, "tok")
+	c.HTTP = srv.Client()
+	a := &App{
+		Cfg:          config.Config{OneStepToken: "tok", SQLitePath: p},
+		Store:        st,
+		GPSStopsPath: cachePath,
+		OneStep:      c,
+	}
+	res, err := a.CardsHistory(ctx, CardsHistoryOpts{
+		DevicesOutPath: filepath.Join(t.TempDir(), "devices.csv"),
+		NoGPS:          true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if atomic.LoadInt32(&asked) < 1 {
+		t.Fatal("history must ask OneStep for unpaired VIN")
+	}
+	devs, err := st.ListDevicesForCar(ctx, "27TESTA")
+	if err != nil || len(devs) != 1 || devs[0].FactoryID != "FACT-LOOSE" {
+		t.Fatalf("VIN pair %+v %v", devs, err)
+	}
+	if res.Ladder.Coverage.KnownN < 1 {
+		t.Fatalf("history rematch must count the VIN-linked car: cov=%+v", res.Ladder.Coverage)
 	}
 }
 

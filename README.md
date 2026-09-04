@@ -35,7 +35,7 @@ Sit-still / important-location Node app lives in a separate PR (`cursor/importan
 | `backup-neon` | Copy sqlite oilchange tables into **Neon** (`Fleet_Management_Neon` / `Fleet_Manage_Oil`). SQLite stays the working store. Alias: `backup`. |
 | `serve` | Host Oil Desk UI + `/api/cars` on `127.0.0.1:4739` from the **embedded** static export (`web/out`). **No npm/Node required.** `[--addr]` `[--mirror]` `[--web-dir]`. |
 | `cards rebuild` | ingest optional `--fuel-details` then score every swipe into `card_pairings` (never writes Last Reading). GPS-first: stop windows from OneStep unless `--no-gps` (rematch from `data/runtime/gps-stops.json`). Station lat/lng from exclusive GPS sits; later swipes match the car at that pump even when another box is sitting elsewhere. |
-| `cards history` | **One operator path** for card/vehicle history: `devices csv` → ingest DETAILS (file or live `EFLEETS_*` in env) → GPS stops + `cards rebuild` → ladder 3/5/10 → persist `card_eras` → print coverage. `[--vehicles PATH]` `[--fuel-details PATH]` `[--devices-live]` `[--map PATH]` `[--devices-out PATH]` `[--no-gps]`. Never Last Reading. |
+| `cards history` | **One operator path** for card/vehicle history: devices CSV → ask OneStep OBD VIN on unpaired boxes (`device_state.vin` = `cars.vin`) → ingest DETAILS (file or live `EFLEETS_*` in env) → GPS stops + `cards rebuild` → ladder 3/5/10 → persist `card_eras` → print coverage. `[--vehicles PATH]` `[--fuel-details PATH]` `[--devices-live]` `[--map PATH]` `[--devices-out PATH]` `[--no-gps]`. Never Last Reading. Never `display_name`. |
 | `cards suspect` | cards whose latest Enterprise Vehicle is not the swipe-majority / GPS-called car |
 | `cards trace` | `--card ID [--window-days 2]` other cars at the same station on nearby days |
 | `cards pairings` | `[--card ID]` scored car/person links; `BEST` is evidence, not Enterprise last-write-wins |
@@ -202,7 +202,7 @@ go build -o bin/oilchange ./cmd/oilchange
 ./bin/oilchange cards history --devices-live --map data/runtime/onestep-map.csv
 ```
 
-Steps inside `cards history`: (1) optional `devices sync` + write `data/runtime/onestep-devices.csv`, (2) ingest DETAILS, (3) refresh `gps-stops.json` + `cards rebuild` (pairings + `card_eras`), (4) station ladder 3 → 5 → 10 with coverage %. Use `cards split --card ID` or `cards coverage` after a run.
+Steps inside `cards history`: (1) optional `devices sync` + write `data/runtime/onestep-devices.csv`, (2) ask OneStep OBD VIN on unpaired boxes and join exact 17-char `device_state.vin` = `cars.vin`, (3) ingest DETAILS, (4) refresh `gps-stops.json` + `cards rebuild` (pairings + `card_eras`, keep watch-persisted car eras), (5) station ladder 3 → 5 → 10 with coverage %. Use `cards split --card ID` or `cards coverage` after a run.
 
 HOLD `LOGISTICS_PERSONNEL` (third-spec name `RICH_TYLER_PAIRING`): logistics-personnel names on a punch or OneStep label never create a device↔car link.
 

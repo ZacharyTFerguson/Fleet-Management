@@ -361,8 +361,8 @@ func TestCardsRebuildPreservesNearbyCertainEra(t *testing.T) {
 	}
 	if err := st.ReplaceEras(ctx, []model.CardEra{{
 		CardID: "NEAR-CARD", EFleetsID: car, HolderType: cards.HolderCar, HolderKey: car,
-		From: time.Date(2026, 8, 4, 14, 0, 0, 0, time.UTC),
-		To:   time.Date(2026, 8, 20, 14, 0, 0, 0, time.UTC),
+		From:      time.Date(2026, 8, 4, 14, 0, 0, 0, time.UTC),
+		To:        time.Date(2026, 8, 20, 14, 0, 0, 0, time.UTC),
 		EvidenceN: 3,
 	}}); err != nil {
 		t.Fatal(err)
@@ -515,5 +515,119 @@ func TestCardsWatchCapsNewestFillsForFetchWindow(t *testing.T) {
 	june := time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)
 	if !fromT.After(june) {
 		t.Fatalf("fetch window must be newest fills, from=%s to=%s", fromQ, toQ)
+	}
+}
+
+func TestCardsWatchPairsUnpairedBoxByVINAfterLive(t *testing.T) {
+	prev := watchDriveStopMinInterval
+	watchDriveStopMinInterval = time.Millisecond
+	defer func() { watchDriveStopMinInterval = prev }()
+
+	p := filepath.Join(t.TempDir(), "oil.sqlite")
+	st, err := store.Open("sqlite", p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	var askedVIN int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.Contains(r.URL.Path, "/device"):
+			did := r.URL.Query().Get("device_id")
+			if did == "DEV-LOOSE" && r.URL.Query().Get("limit") == "" {
+				atomic.AddInt32(&askedVIN, 1)
+				_, _ = w.Write([]byte(`[{
+					"factory_id":"FACT-LOOSE","device_id":"DEV-LOOSE","display_name":"WrongCar",
+					"latest_device_point":{"device_state":{"vin":"1HGCM82633A004352"},"params":{"vin":"IGNORED"}}
+				}]`))
+				return
+			}
+			_, _ = w.Write([]byte(`{"result_list":[
+				{"factory_id":"FACT-VA","device_id":"DEV-VA","active":true},
+				{"factory_id":"FACT-LOOSE","device_id":"DEV-LOOSE","display_name":"WrongCar","active":true}
+			]}`))
+		case strings.Contains(r.URL.Path, "/route/drive-stop"):
+			_, _ = w.Write([]byte(`{"drive_stop_list":[]}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer srv.Close()
+	c := onestep.NewClient(srv.URL, "tok")
+	c.HTTP = srv.Client()
+	a := &App{Cfg: config.Config{OneStepToken: "tok"}, Store: st, GPSStopsPath: filepath.Join(t.TempDir(), "gps.json"), OneStep: c}
+	ctx := context.Background()
+	ny := enterprise.NY()
+	va := "292NCX"
+	if err := st.UpsertCar(ctx, model.Car{EFleetsID: va, Nickname: "292NCX"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.UpsertCar(ctx, model.Car{EFleetsID: "27TESTA", VIN: "1HGCM82633A004352", Nickname: "WrongCar"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.UpsertDevice(ctx, model.OneStepDevice{
+		FactoryID: "FACT-VA", DeviceID: "DEV-VA", LinkedCarEFleetsID: &va, Active: true,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.UpsertDevice(ctx, model.OneStepDevice{
+		FactoryID: "FACT-LOOSE", DeviceID: "DEV-LOOSE", DisplayName: "WrongCar", Active: true,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.UpsertCardTx(ctx, model.CardTx{
+		CardID: "CARD-VA", At: time.Date(2026, 8, 20, 14, 0, 0, 0, ny).UTC(),
+		RecordedEFleetsID: va, StationName: "SHEETZ",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := a.CardsWatch(ctx, CardsWatchOpts{LiveStops: true, Pace: time.Millisecond}); err != nil {
+		t.Fatal(err)
+	}
+	if atomic.LoadInt32(&askedVIN) < 1 {
+		t.Fatal("watch must GET /device?device_id= for unpaired VIN")
+	}
+	got, err := st.ListDevicesForCar(ctx, "27TESTA")
+	if err != nil || len(got) != 1 || got[0].FactoryID != "FACT-LOOSE" {
+		t.Fatalf("VIN must pair unpaired box to Enterprise car: %+v %v", got, err)
+	}
+	keep, err := st.ListDevicesForCar(ctx, va)
+	if err != nil || len(keep) != 1 || keep[0].FactoryID != "FACT-VA" {
+		t.Fatalf("must not steal VA map: %+v %v", keep, err)
+	}
+}
+
+func TestCardsLadderCoverageIncludesPreservedWatchEra(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "oil.sqlite")
+	st, err := store.Open("sqlite", p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	ctx := context.Background()
+	car := "292NCX"
+	if err := st.UpsertCar(ctx, model.Car{EFleetsID: car, Nickname: "292NCX"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.UpsertDevice(ctx, model.OneStepDevice{
+		FactoryID: "FACT-VA", DeviceID: "DEV-VA", LinkedCarEFleetsID: &car, Active: true,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.ReplaceEras(ctx, []model.CardEra{{
+		CardID: "WATCH-CARD", EFleetsID: car, HolderType: cards.HolderCar, HolderKey: car,
+		From:      time.Date(2026, 8, 4, 14, 0, 0, 0, time.UTC),
+		To:        time.Date(2026, 8, 20, 14, 0, 0, 0, time.UTC),
+		EvidenceN: 3,
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	a := &App{Store: st, GPSStopsPath: filepath.Join(t.TempDir(), "gps.json")}
+	res, err := a.CardsLadder(ctx, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Coverage.CardEraN != 1 || res.Coverage.KnownN != 1 {
+		t.Fatalf("preserved watch era must count as known: %+v", res.Coverage)
 	}
 }

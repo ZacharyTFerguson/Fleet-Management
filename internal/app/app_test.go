@@ -268,6 +268,52 @@ func TestLiveFleetHasMoreVehiclesThanTwoCarDemo(t *testing.T) {
 	}
 }
 
+func TestAdapterSelectionOrder(t *testing.T) {
+	a := &App{Cfg: config.Config{
+		EFleetsCDP:     "http://127.0.0.1:9222",
+		EFleetsUser:    "u",
+		EFleetsPass:    "p",
+		EFleetsCust:    "1",
+		EFleetsDetails: "https://example.invalid/DETAILS.csv",
+	}}
+	ad, err := a.adapter("veh.csv", "", "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := ad.(enterprise.FileAdapter); !ok {
+		t.Fatalf("files first, got %T", ad)
+	}
+	ad, err = a.adapter("", "", "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := ad.(*enterprise.ChromeSessionAdapter); !ok {
+		t.Fatalf("CDP over password, got %T", ad)
+	}
+	a.Cfg.EFleetsCDP = ""
+	ad, err = a.adapter("", "", "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := ad.(*enterprise.HTTPAdapter); !ok {
+		t.Fatalf("password HTTP last, got %T", ad)
+	}
+}
+
+func TestHasFileUsesCapturedURLWithoutFetch(t *testing.T) {
+	a := &App{}
+	chrome := &enterprise.ChromeSessionAdapter{DetailsURL: "https://example.invalid/DETAILS.csv"}
+	if !a.hasFile(chrome, enterprise.ReportFuelDetails) {
+		t.Fatal("DETAILS URL must count")
+	}
+	if a.hasFile(chrome, enterprise.ReportShopRO) {
+		t.Fatal("missing MAINT URL must not count")
+	}
+	if a.hasFile(enterprise.FileAdapter{Fuel: "details.csv"}, enterprise.ReportFuelDetails) {
+		t.Fatal("file adapter is driven by CLI paths")
+	}
+}
+
 func TestOilDoneDoesNotChangeLastReading(t *testing.T) {
 	p := filepath.Join(t.TempDir(), "oil.sqlite")
 	st, err := store.Open("sqlite", p)

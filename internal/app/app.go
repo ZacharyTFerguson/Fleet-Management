@@ -122,32 +122,35 @@ func (a *App) SyncEnterprise(ctx context.Context, vehicles, fuel, shop, mileage 
 	return nil
 }
 
-// hasFile is true for a live adapter that can actually fetch that report, so file-drop empty flags do not skip live.
+// hasFile is true when a live adapter already has a Network-captured URL.
+// It must not Fetch: that would dial Chrome or type a password during sync setup.
 func (a *App) hasFile(ad enterprise.Adapter, kind enterprise.ReportKind) bool {
-	_, ok := ad.(enterprise.FileAdapter)
-	if ok {
-		return false
+	type reporter interface {
+		HasReport(enterprise.ReportKind) bool
 	}
-	_, _, err := ad.Fetch(context.Background(), kind)
-	return err == nil
+	if r, ok := ad.(reporter); ok {
+		return r.HasReport(kind)
+	}
+	return false
 }
 
-// adapter prefers explicit files (tests) over live login so CI never needs eFleets secrets.
+// adapter prefers files, then an open Chrome session, then password HTTP last.
 func (a *App) adapter(vehicles, fuel, shop, mileage string) (enterprise.Adapter, error) {
-	if vehicles != "" || fuel != "" || shop != "" {
-		return enterprise.FileAdapter{Vehicles: vehicles, Fuel: fuel, ShopRO: shop, Mileage: mileage}, nil
-	}
-	if a.Cfg.EFleetsUser == "" {
-		return nil, fmt.Errorf("pass --vehicles/--fuel-details or set EFLEETS_USERNAME")
-	}
-	h, err := enterprise.NewHTTPAdapter(a.Cfg.EFleetsBase, a.Cfg.EFleetsUser, a.Cfg.EFleetsPass, a.Cfg.EFleetsCust)
-	if err != nil {
-		return nil, err
-	}
-	h.DetailsURL = a.Cfg.EFleetsDetails
-	h.MaintURL = a.Cfg.EFleetsMaint
-	h.FleetURL = a.Cfg.EFleetsFleet
-	return h, nil
+	return enterprise.Select(enterprise.FileAdapter{
+		Vehicles: vehicles,
+		Fuel:     fuel,
+		ShopRO:   shop,
+		Mileage:  mileage,
+	}, enterprise.SessionConfig{
+		CDPURL:     a.Cfg.EFleetsCDP,
+		Username:   a.Cfg.EFleetsUser,
+		Password:   a.Cfg.EFleetsPass,
+		CustNum:    a.Cfg.EFleetsCust,
+		BaseURL:    a.Cfg.EFleetsBase,
+		DetailsURL: a.Cfg.EFleetsDetails,
+		MaintURL:   a.Cfg.EFleetsMaint,
+		FleetURL:   a.Cfg.EFleetsFleet,
+	})
 }
 
 // SyncDevices upserts the durable OneStep device registry from a map CSV and/or API.

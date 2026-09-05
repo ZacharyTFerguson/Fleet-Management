@@ -755,13 +755,39 @@ html.driver-mode .cta.driver-toggle.is-on {
   border: 1px solid var(--card-edge);
   border-radius: 10px;
   background: var(--card);
-  cursor: grab;
+  cursor: pointer;
   touch-action: manipulation;
   user-select: none;
   -webkit-user-select: none;
   -webkit-touch-callout: none;
   box-shadow: 0 2px 0 color-mix(in srgb, var(--ink) 18%, transparent);
   transition: transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease;
+}
+
+.fill-chip-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.4rem;
+}
+
+.fill-chip-grip {
+  flex: 0 0 auto;
+  margin: -0.15rem -0.1rem 0 0;
+  padding: 0.15rem 0.25rem;
+  color: var(--mist);
+  cursor: grab;
+  letter-spacing: -0.12em;
+  line-height: 1;
+  font-size: 0.95rem;
+}
+
+.fill-chip-grip:active {
+  cursor: grabbing;
+}
+
+.history-place-btn {
+  margin: 0.45rem 0 0.15rem;
 }
 
 .fill-chip:hover {

@@ -290,7 +290,19 @@ function DropLane({
     >
       <header className="history-lane-head">
         <h3>{label}</h3>
-        <p>{ready ? "Tap here to drop the fill" : hint}</p>
+        <p>{ready ? "Tap Place here — or tap this lane — to drop the fill" : hint}</p>
+        {ready ? (
+          <button
+            type="button"
+            className="cta history-place-btn"
+            onClick={(e) => {
+              e.stopPropagation();
+              onPlace();
+            }}
+          >
+            Place here
+          </button>
+        ) : null}
       </header>
       <div className="history-lane-body">{children}</div>
     </section>
@@ -311,21 +323,27 @@ function FillChip({
   return (
     <article
       className={`fill-chip ${block.gps_disagrees ? "is-flag" : ""} ${held ? "is-held" : ""}`}
-      draggable
-      onPointerDown={(e) => {
-        if (e.pointerType === "touch") e.currentTarget.draggable = false;
-      }}
       onClick={(e) => {
         e.stopPropagation();
         onHold();
       }}
-      onDragStart={(e) => {
-        e.dataTransfer.setData("text/tx-key", block.tx_key);
-        e.dataTransfer.setData("text/plain", block.tx_key);
-        e.dataTransfer.effectAllowed = "move";
-      }}
     >
-      <p className="fill-chip-card">{block.card_id}</p>
+      <div className="fill-chip-top">
+        <p className="fill-chip-card">{block.card_id}</p>
+        <span
+          className="fill-chip-grip"
+          title="Drag on a computer"
+          draggable
+          onClick={(e) => e.stopPropagation()}
+          onDragStart={(e) => {
+            e.dataTransfer.setData("text/tx-key", block.tx_key);
+            e.dataTransfer.setData("text/plain", block.tx_key);
+            e.dataTransfer.effectAllowed = "move";
+          }}
+        >
+          ⋮⋮
+        </span>
+      </div>
       <p className="fill-chip-when">
         <span className="field-label">Date</span> {when(block.at)}
       </p>

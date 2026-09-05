@@ -98,7 +98,7 @@ Offline/file-drop path when `EFLEETS_*` / OneStep / Neon / Supabase secrets are 
 # or: cloudflared tunnel --url http://127.0.0.1:4739
 ```
 
-Restart the same way (kill both processes, then A then B). `scripts/cloudflare-tunnel.sh` installs a local `cloudflared` binary if it is not on `PATH`. Open the printed `https://….trycloudflare.com` URL; Oil Desk shows `Source mock-mirror` on the roster.
+Restart the same way (kill both processes, then A then B). `scripts/cloudflare-tunnel.sh` installs a local `cloudflared` binary if it is not on `PATH`. Open the printed `https://….trycloudflare.com` URL. **`/records/`** is shop ROs, Fuel & Charging punches, and OneStep boxes (JWT Bearer drive-stop distance). Oil Desk stays at `/`. When Drive `DETAILS_583424_30-Days.csv` is under gitignored `data/runtime/enterprise/`, `serve-demo.sh` uses it. Live Maintenance needs `EFLEETS_MAINT_URL` (not guessed).
 
 Tiny two-car fixture instead of the ~205-car testdata roster:
 

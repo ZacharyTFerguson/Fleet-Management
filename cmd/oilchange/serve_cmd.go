@@ -5,6 +5,8 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strings"
+	"time"
 
 	"oilchange/internal/app"
 	"oilchange/internal/config"
@@ -19,6 +21,8 @@ func cmdServe(cfg config.Config, args []string) int {
 	webDir := fs.String("web-dir", "", "optional on-disk static export (default: embedded web/out)")
 	mirror := fs.String("mirror", defaultMirrorPath(), "cars.json mirror for /api/cars")
 	infoPath := fs.String("device-information", app.DefaultDeviceInformationPath(), "saved Device Information JSON for the desk apply button (no live /device GET)")
+	appWin := fs.Bool("app", false, "open a Chrome/Edge window without browser chrome (oilchange desk)")
+	start := fs.String("start", "/history/", "path opened by --app / desk")
 	if err := fs.Parse(args); err != nil {
 		return model.ExitError
 	}
@@ -66,6 +70,23 @@ func cmdServe(cfg config.Config, args []string) int {
 			}
 			return out, err
 		}
+	}
+	if *appWin {
+		go func() {
+			path := *start
+			if !strings.HasPrefix(path, "/") {
+				path = "/" + path
+			}
+			url := "http://" + opts.Addr + path
+			if err := desk.WaitHTTP(url, 8*time.Second); err != nil {
+				fmt.Fprintln(os.Stderr, "oilchange desk:", err)
+				return
+			}
+			if err := desk.OpenAppWindow(url); err != nil {
+				fmt.Fprintln(os.Stderr, "oilchange desk:", err)
+				fmt.Fprintln(os.Stderr, "open that URL in Chrome/Edge, or on a phone: Share → Add to Home Screen")
+			}
+		}()
 	}
 	if err := desk.ListenAndServe(opts); err != nil {
 		fmt.Fprintln(os.Stderr, err)

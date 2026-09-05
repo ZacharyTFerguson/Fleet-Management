@@ -1,0 +1,25 @@
+{
+  "name": "FLEET Desk",
+  "short_name": "FLEET",
+  "description": "PDI fleet oil, history, and GPS desk",
+  "start_url": "/history/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0b1218",
+  "theme_color": "#0b1218",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

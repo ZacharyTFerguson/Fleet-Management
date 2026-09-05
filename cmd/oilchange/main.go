@@ -53,6 +53,8 @@ func run(args []string) int {
 		return cmdPullSupabase(ctx, cfg, args[1:])
 	case "serve":
 		return cmdServe(cfg, args[1:])
+	case "desk":
+		return cmdServe(cfg, append([]string{"-app"}, args[1:]...))
 	case "env":
 		return cmdEnv(cfg)
 	default:
@@ -90,7 +92,8 @@ func usage() {
   oilchange sync [--interval 5m] [--mirror web/data/cars.json] [--require-neon] [--no-remote]
   oilchange pull-supabase
   oilchange backup-neon
-  oilchange serve [--addr 127.0.0.1:4739] [--mirror web/data/cars.json] [--web-dir PATH] [--device-information PATH]
+  oilchange serve [--addr 127.0.0.1:4739] [--mirror web/data/cars.json] [--web-dir PATH] [--device-information PATH] [--app] [--start /history/]
+  oilchange desk   same as serve --app: Chrome/Edge window, no browser chrome
   oilchange env
 
 Secrets: gitignored oilchange.env or Cloud Agent secrets — never chat. See oilchange.env.example.

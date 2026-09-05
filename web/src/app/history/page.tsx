@@ -1,5 +1,6 @@
 import { DeskNav } from "@/components/DeskNav";
 import { HistoryBoard } from "@/components/HistoryBoard";
+import { InstallHint } from "@/components/InstallHint";
 
 export default function HistoryPage() {
   return (
@@ -7,6 +8,7 @@ export default function HistoryPage() {
       <div className="atmosphere" aria-hidden="true" />
       <div className="grain" aria-hidden="true" />
       <DeskNav current="history" />
+      <InstallHint />
       <header className="hero">
         <p className="brand">FLEET</p>
         <h1 className="headline">History</h1>

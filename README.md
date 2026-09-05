@@ -3,6 +3,9 @@
 PDI fleet oil-change binary in **Fleet-Management**. Last Reading is computed only in `internal/oil`.
 Do not invent miles. HOLD skips the Last Reading write.
 
+Project purpose, vehicle/card identity model, and completion review:
+[`docs/FLEET-MANAGEMENT-OVERVIEW.md`](docs/FLEET-MANAGEMENT-OVERVIEW.md).
+
 LLM intro (goal, what it does, locks): [`docs/FOR-LLMS.md`](docs/FOR-LLMS.md).
 
 ```

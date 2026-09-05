@@ -85,6 +85,30 @@ export OILCHANGE_DB=./oilchange.sqlite
 ./bin/oilchange serve --addr 127.0.0.1:4739 --mirror web/data/cars.json
 ```
 
+### Public demo (Cloudflare tunnel)
+
+Offline/file-drop path when `EFLEETS_*` / OneStep / Neon / Supabase secrets are missing. Uses committed testdata CSVs → local SQLite → Oil Desk. **Does not invent miles.** Last Reading stays HOLD without OneStep drive-stop miles. Mirror is written under gitignored `data/runtime/` so the committed `web/data/cars.json` is left alone.
+
+```bash
+# Terminal A — Oil Desk on localhost (default 127.0.0.1:4739)
+./scripts/serve-demo.sh
+
+# Terminal B — public https://*.trycloudflare.com in front of that port
+./scripts/cloudflare-tunnel.sh
+# or: cloudflared tunnel --url http://127.0.0.1:4739
+```
+
+Restart the same way (kill both processes, then A then B). `scripts/cloudflare-tunnel.sh` installs a local `cloudflared` binary if it is not on `PATH`. Open the printed `https://….trycloudflare.com` URL; Oil Desk shows `Source mock-mirror` on the roster.
+
+Tiny two-car fixture instead of the ~205-car testdata roster:
+
+```bash
+OILCHANGE_VEHICLES=testdata/enterprise/fleetsummary.csv \
+OILCHANGE_FUEL_DETAILS=testdata/enterprise/details.csv \
+  ./scripts/serve-demo.sh
+```
+
+
 Binary path after build: `bin/oilchange` (Windows: `bin/oilchange.exe`). Alias: `sync-supabase` ≡ `sync`.
 
 For the full ~205-car roster, use `testdata/enterprise/fleetsummary_live.csv` and `details_live.csv` instead of the tiny demo CSVs.

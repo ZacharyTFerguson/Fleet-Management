@@ -754,12 +754,19 @@ html.driver-mode .cta.driver-toggle.is-on {
 }
 
 .fill-chip-when,
+.fill-chip-miles,
 .fill-chip-station,
 .fill-chip-meta,
 .fill-chip-flag {
   margin: 0.25rem 0 0;
   font-size: 0.85rem;
   color: var(--mist);
+}
+
+.fill-chip-miles {
+  color: var(--fog);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }
 
 .fill-chip-flag {

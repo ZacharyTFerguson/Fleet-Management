@@ -13,6 +13,11 @@ function when(iso?: string): string {
   return d.toLocaleString();
 }
 
+function miles(n?: number | null): string {
+  if (n == null || Number.isNaN(n)) return "—";
+  return `${n.toLocaleString("en-US")} mi`;
+}
+
 export function HistoryBoard() {
   const [board, setBoard] = useState<Board>(emptyBoard());
   const [error, setError] = useState<string | null>(null);
@@ -249,7 +254,12 @@ function FillChip({ block, onUndo }: { block: FillBlock; onUndo: () => void }) {
       }}
     >
       <p className="fill-chip-card">{block.card_id}</p>
-      <p className="fill-chip-when">{when(block.at)}</p>
+      <p className="fill-chip-when">
+        <span className="field-label">Date</span> {when(block.at)}
+      </p>
+      <p className="fill-chip-miles">
+        <span className="field-label">Miles</span> {miles(block.odometer)}
+      </p>
       <p className="fill-chip-station">{block.station || "—"}</p>
       <p className="fill-chip-meta">
         Enterprise {block.enterprise_name || block.enterprise_pdi_id || "—"}

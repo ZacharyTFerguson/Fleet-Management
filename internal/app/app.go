@@ -505,6 +505,9 @@ func (a *App) CardsRebuild(ctx context.Context, fuelPath string) (int, error) {
 	if err := a.Store.ReplaceEras(ctx, ladder.Eras); err != nil {
 		return 0, err
 	}
+	if err := a.Store.RefreshGPSCalls(ctx, scored); err != nil {
+		return 0, err
+	}
 	if err := a.writeCardsSnapshot(ctx, scored, ps, gps, &ladder); err != nil {
 		return 0, err
 	}

@@ -646,3 +646,105 @@ html.driver-mode .cta.driver-toggle.is-on {
     font-size: 1rem;
   }
 }
+
+.history-shell {
+  max-width: 1400px;
+}
+
+.turnstile {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  margin: 0 0 1.15rem;
+}
+
+.turnstile-region {
+  margin: 0;
+  min-width: 8rem;
+  text-align: center;
+}
+
+.history-lane {
+  margin: 0 0 1.15rem;
+  padding: 0.85rem;
+  border: 2px dashed var(--line);
+  border-radius: 6px;
+  background: var(--panel);
+  min-height: 8rem;
+}
+
+.history-lane.is-over {
+  border-color: var(--sodium);
+  background: color-mix(in srgb, var(--sodium) 12%, var(--panel));
+}
+
+.history-lane-head h3 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.history-lane-head p {
+  margin: 0.2rem 0 0.65rem;
+  color: var(--mist);
+  font-size: 0.85rem;
+}
+
+.history-lane-body {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  min-height: 3rem;
+}
+
+.history-columns {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.85rem;
+}
+
+@media (min-width: 900px) {
+  .history-columns {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.fill-chip {
+  width: min(16rem, 100%);
+  padding: 0.7rem 0.8rem;
+  border: 2px solid var(--card-edge);
+  border-radius: 4px;
+  background: var(--card);
+  cursor: grab;
+}
+
+.fill-chip.is-flag {
+  border-color: var(--hold);
+}
+
+.fill-chip-card {
+  margin: 0;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.fill-chip-when,
+.fill-chip-station,
+.fill-chip-meta,
+.fill-chip-flag {
+  margin: 0.25rem 0 0;
+  font-size: 0.85rem;
+  color: var(--mist);
+}
+
+.fill-chip-flag {
+  color: var(--hold);
+  font-weight: 700;
+}
+
+.fill-undo {
+  margin-top: 0.5rem;
+}

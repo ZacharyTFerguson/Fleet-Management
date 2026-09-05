@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"oilchange/internal/desk"
+	"oilchange/internal/history"
 	"oilchange/internal/syncsupabase"
 )
 
@@ -244,5 +245,58 @@ func TestVINFromFilePOSTWithoutStore(t *testing.T) {
 	h.ServeHTTP(rec, req)
 	if rec.Code != http.StatusServiceUnavailable {
 		t.Fatalf("status %d body %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestHistoryAssignMovesOneFill(t *testing.T) {
+	dir := t.TempDir()
+	web := filepath.Join(dir, "out")
+	_ = os.MkdirAll(web, 0o755)
+	_ = os.WriteFile(filepath.Join(web, "index.html"), []byte("x"), 0o644)
+	var assigned string
+	h, err := desk.Handler(desk.Options{
+		WebDir:     web,
+		MirrorPath: filepath.Join(dir, "cars.json"),
+		History: &desk.HistoryAPI{
+			Board: func(ctx context.Context, region string) (history.Board, error) {
+				return history.Board{Region: region, Regions: []string{"VA"}, AssignedN: 1}, nil
+			},
+			Assign: func(ctx context.Context, txKey, to, reason, region string) (history.Board, error) {
+				if ctx == nil || txKey != "C1|t|27VA15|0" || to != "27VA19" || reason != "manual_drag" {
+					t.Fatalf("assign %s %s %s", txKey, to, reason)
+				}
+				assigned = to
+				return history.Board{Region: "VA", AssignedN: 1, UnassignedN: 0}, nil
+			},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := httptest.NewRequest(http.MethodPost, "/api/history/assign", strings.NewReader(`{"tx_key":"C1|t|27VA15|0","to_efleets_id":"27VA19","reason":"manual_drag","region":"VA"}`))
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status %d body %s", rec.Code, rec.Body.String())
+	}
+	if assigned != "27VA19" || !strings.Contains(rec.Body.String(), `"assigned_n": 1`) {
+		t.Fatalf("body %s assigned %s", rec.Body.String(), assigned)
+	}
+}
+
+func TestHistoryWithoutStore(t *testing.T) {
+	dir := t.TempDir()
+	web := filepath.Join(dir, "out")
+	_ = os.MkdirAll(web, 0o755)
+	_ = os.WriteFile(filepath.Join(web, "index.html"), []byte("x"), 0o644)
+	h, err := desk.Handler(desk.Options{WebDir: web, MirrorPath: filepath.Join(dir, "cars.json")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := httptest.NewRequest(http.MethodGet, "/api/history", nil)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status %d", rec.Code)
 	}
 }

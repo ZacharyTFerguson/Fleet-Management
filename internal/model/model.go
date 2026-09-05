@@ -1,6 +1,10 @@
 package model
 
-import "time"
+import (
+	"strconv"
+	"strings"
+	"time"
+)
 
 // Car is one PDI unit. EFleetsID is the only join key; display_name is never a join key.
 // PDIID is opaque (PDI-0042) and must not embed region.
@@ -88,6 +92,46 @@ type CardTx struct {
 	// CalledEFleetsID is the GPS-first vehicle for this swipe (in-memory).
 	// Enterprise Vehicle stays on RecordedEFleetsID. Last Reading must not read this.
 	CalledEFleetsID string
+}
+
+// Key is the stable one-fill identity. Matches card_transactions uniqueness
+// (card + time + Enterprise car + odometer). Rebuilds keep the same key.
+func (t CardTx) Key() string {
+	odo := 0
+	if t.Odometer != nil {
+		odo = *t.Odometer
+	}
+	return strings.Join([]string{
+		strings.TrimSpace(t.CardID),
+		t.At.UTC().Format(time.RFC3339Nano),
+		strings.TrimSpace(t.RecordedEFleetsID),
+		strconv.Itoa(odo),
+	}, "|")
+}
+
+// TxAssignment is the current home of one fill. Owner source outranks GPS.
+// GPS rematch may set GPSCalled / GPSDisagrees; it must not change Assigned*.
+type TxAssignment struct {
+	TxKey              string
+	AssignedEFleetsID  string
+	AssignedPDIID      string
+	Source             string // owner
+	GPSCalledEFleetsID string
+	GPSDisagrees       bool
+	UpdatedAt          time.Time
+}
+
+// AssignmentEvent is one move: PDI-0003 → PDI-0020. Never deleted on undo.
+type AssignmentEvent struct {
+	ID            int64
+	TxKey         string
+	FromEFleetsID string
+	ToEFleetsID   string
+	FromPDIID     string
+	ToPDIID       string
+	Actor         string
+	Reason        string
+	At            time.Time
 }
 
 // StopVisit is one GPS stop (car sitting still). Card matching uses the time

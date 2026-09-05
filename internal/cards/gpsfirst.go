@@ -349,6 +349,15 @@ func bucketPumpVisits(visits []model.StopVisit, slack time.Duration) map[int64][
 	return out
 }
 
+// StopsCovering returns unique GPS-linked cars sitting in a short stop at at.
+// Used by the Devices evidence panel. Last Reading does not read this.
+func StopsCovering(visits []model.StopVisit, at time.Time, slack time.Duration) []model.StopVisit {
+	if slack <= 0 {
+		slack = DefaultStopSlack
+	}
+	return uniqueCarsAt(bucketPumpVisits(visits, slack), at, slack)
+}
+
 func uniqueCarsAt(buckets map[int64][]model.StopVisit, at time.Time, slack time.Duration) []model.StopVisit {
 	at = at.UTC()
 	h := at.Unix() / 3600

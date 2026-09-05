@@ -13,12 +13,13 @@ type BackupCounts struct {
 	Cars, Fills, ShopROs, Stations, MaintLocs int
 	Cards, CardTxs, Pairings, Eras            int
 	Devices, Miles, Holds, OilChanges         int
+	Assignments, AssignmentEvents             int
 }
 
 // LogLine is the operator-facing summary. It never includes a DSN or password.
 func (c BackupCounts) LogLine() string {
-	return fmt.Sprintf("neon backup cars=%d fills=%d shop_ros=%d holds=%d oil_changes=%d devices=%d miles=%d cards=%d card_txs=%d pairings=%d eras=%d stations=%d maint_locs=%d",
-		c.Cars, c.Fills, c.ShopROs, c.Holds, c.OilChanges, c.Devices, c.Miles, c.Cards, c.CardTxs, c.Pairings, c.Eras, c.Stations, c.MaintLocs)
+	return fmt.Sprintf("neon backup cars=%d fills=%d shop_ros=%d holds=%d oil_changes=%d devices=%d miles=%d cards=%d card_txs=%d pairings=%d eras=%d assignments=%d assignment_events=%d stations=%d maint_locs=%d",
+		c.Cars, c.Fills, c.ShopROs, c.Holds, c.OilChanges, c.Devices, c.Miles, c.Cards, c.CardTxs, c.Pairings, c.Eras, c.Assignments, c.AssignmentEvents, c.Stations, c.MaintLocs)
 }
 
 // validateNeonBackupURL refuses empty, pooled, XRAY, and Supabase DATABASE_URL values.
@@ -218,5 +219,24 @@ func CopyDurable(ctx context.Context, src, dest *store.Store) (BackupCounts, err
 		return c, fmt.Errorf("replace eras: %w", err)
 	}
 	c.Eras = len(eras)
+
+	asg, err := src.ListAssignments(ctx)
+	if err != nil {
+		return c, fmt.Errorf("list assignments: %w", err)
+	}
+	for _, a := range asg {
+		if err := dest.ReplaceAssignment(ctx, a); err != nil {
+			return c, fmt.Errorf("assignment %s: %w", a.TxKey, err)
+		}
+	}
+	c.Assignments = len(asg)
+	events, err := src.ListAssignmentEvents(ctx, "")
+	if err != nil {
+		return c, fmt.Errorf("list assignment events: %w", err)
+	}
+	if err := dest.ReplaceAssignmentEvents(ctx, events); err != nil {
+		return c, fmt.Errorf("assignment events: %w", err)
+	}
+	c.AssignmentEvents = len(events)
 	return c, nil
 }

@@ -34,6 +34,14 @@ func cmdServe(cfg config.Config, args []string) int {
 		fmt.Fprintf(os.Stderr, "oilchange serve: VIN-from-file API off (%v)\n", err)
 	} else {
 		defer done()
+		opts.History = &desk.HistoryAPI{
+			Board:  a.HistoryBoard,
+			Assign: a.AssignFill,
+			Events: a.Store.ListAssignmentEvents,
+			Evidence: a.FillEvidence,
+			Box:      a.BoxEvidence,
+			Probe:    a.ProbeOneBox,
+		}
 		opts.ApplyDeviceInformation = func(ctx context.Context) (desk.VINFromFileResult, error) {
 			res, err := a.ApplyDeviceInformation(ctx, *infoPath)
 			out := desk.VINFromFileResult{

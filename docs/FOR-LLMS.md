@@ -42,7 +42,7 @@ SQLite (`OILCHANGE_DB`) is the working store for ingest, compute, and serve. Neo
 | `probe-onestep` | One-shot live drive-stop GET. Prints measured miles. Does **not** write Last Reading. |
 | `compute` | Last Reading + HOLD. `[--override-lower]` is the only way to write a lower reading. |
 | `oil-done` | Record an oil change (`--efleets-id` `--miles` `--date`). |
-| `serve` | Oil Desk UI + `/api/cars` from the embedded export. `[--addr]` `[--mirror]`. Button **Apply saved OneStep device information** (`POST /api/devices/vin-from-file`) pairs from `data/runtime/device-information.json` with no live `/device`. |
+| `serve` | Oil Desk UI + `/api/cars` from the embedded export. `[--addr]` `[--mirror]`. **History** (`/history/`): drag one fill onto one car; audit in `assignment_events`. **Devices** is the GPS surface (cached evidence + one-box probe). Button **Apply saved OneStep device information** (`POST /api/devices/vin-from-file`) pairs from `data/runtime/device-information.json` with no live `/device`. Owner assignments survive `cards rebuild`. Never Last Reading. |
 | `cards suspect` / `trace` / `pairings` | Wrong-car intel. Pairings are evidence, not Enterprise last-write-wins. |
 | `report` / `holds` | Due list / open HOLDs. |
 | `sync` | Push sqlite cars/holds to Oil Desk `fleet_cars` + refresh `web/data/cars.json`. Best-effort Neon backup after success. |

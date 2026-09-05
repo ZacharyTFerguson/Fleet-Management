@@ -1,6 +1,7 @@
 "use client";
 
 import { ApplyDeviceInfoButton } from "@/components/ApplyDeviceInfoButton";
+import { DevicesGPS } from "@/components/DevicesGPS";
 import { DeskNav } from "@/components/DeskNav";
 
 /**
@@ -17,13 +18,14 @@ export default function DevicesPage() {
         <p className="brand">FLEET</p>
         <h1 className="headline">Devices</h1>
         <p className="lede">
-          GPS boxes keyed by factory_id. When OneStep is cooling down, save Device Information JSON
-          to data/runtime/device-information.json and click the button — do not spam live /device.
+          Devices are the GPS. Cache first. Live checks are one fill or one box.
+          When OneStep is cooling down, apply saved Device Information JSON — do not spam /device.
         </p>
       </header>
       <section className="roster" aria-label="Saved Device Information">
         <ApplyDeviceInfoButton />
       </section>
+      <DevicesGPS />
     </main>
   );
 }

@@ -13,6 +13,11 @@ function when(iso?: string): string {
   return d.toLocaleString();
 }
 
+function miles(n?: number | null): string {
+  if (n == null || Number.isNaN(n)) return "—";
+  return `${n.toLocaleString("en-US")} mi`;
+}
+
 export function HistoryBoard() {
   const [board, setBoard] = useState<Board>(emptyBoard());
   const [error, setError] = useState<string | null>(null);
@@ -20,6 +25,7 @@ export function HistoryBoard() {
   const [driverMode, setDriverMode] = useState(true);
   const [region, setRegion] = useState("");
   const [query, setQuery] = useState("");
+  const [held, setHeld] = useState<string>("");
 
   useEffect(() => {
     try {
@@ -79,11 +85,33 @@ export function HistoryBoard() {
         const body = await res.json();
         if (!res.ok) throw new Error(body.error || res.statusText);
         setBoard(body as Board);
+        setHeld("");
         setError(null);
       } catch (e) {
         setError(e instanceof Error ? e.message : "Could not move fill");
       }
     });
+  };
+
+  const place = (toEFleets: string, reason?: string) => {
+    if (!held) return;
+    assign(held, toEFleets, reason);
+  };
+
+  const toggleHold = (txKey: string) => {
+    setHeld((cur) => (cur === txKey ? "" : txKey));
+  };
+
+  const onChipTap = (block: FillBlock) => {
+    if (held && held !== block.tx_key) {
+      if (block.assigned_efleets_id) {
+        place(block.assigned_efleets_id, "manual_drag");
+      } else {
+        place("", "undo");
+      }
+      return;
+    }
+    toggleHold(block.tx_key);
   };
 
   const turn = (dir: -1 | 1) => {
@@ -172,14 +200,31 @@ export function HistoryBoard() {
       </label>
 
       {error ? <p className="search-empty">{error}</p> : null}
+      {held ? (
+        <p className="history-move-hint is-holding" role="status">
+          Holding one fill. Tap a car — or Needs a home — to drop it. Tap the same block to cancel.
+        </p>
+      ) : (
+        <p className="history-move-hint">
+          Tap a block to pick it up, then tap where it belongs. Assigned fills can move to another car without Undo. Drag still works on a computer.
+        </p>
+      )}
 
       <DropLane
         label="Needs a home"
-        hint="Drop here to undo. One block is one fill."
+        hint="Tap here to release a picked-up fill. One block is one fill."
+        ready={Boolean(held)}
         onDrop={(key) => assign(key, "", "undo")}
+        onPlace={() => place("", "undo")}
       >
         {(board.unassigned || []).filter(match).map((b) => (
-          <FillChip key={b.tx_key} block={b} onUndo={() => assign(b.tx_key, "", "undo")} />
+          <FillChip
+            key={b.tx_key}
+            block={b}
+            held={held === b.tx_key}
+            onHold={() => onChipTap(b)}
+            onUndo={() => assign(b.tx_key, "", "undo")}
+          />
         ))}
       </DropLane>
 
@@ -189,10 +234,18 @@ export function HistoryBoard() {
             key={car.efleets_id}
             label={`${car.nickname || car.efleets_id} · ${car.pdi_id}`}
             hint={car.plate || car.efleets_id}
+            ready={Boolean(held)}
             onDrop={(key) => assign(key, car.efleets_id, "manual_drag")}
+            onPlace={() => place(car.efleets_id, "manual_drag")}
           >
             {(car.fills || []).filter(match).map((b) => (
-              <FillChip key={b.tx_key} block={b} onUndo={() => assign(b.tx_key, "", "undo")} />
+              <FillChip
+                key={b.tx_key}
+                block={b}
+                held={held === b.tx_key}
+                onHold={() => onChipTap(b)}
+                onUndo={() => assign(b.tx_key, "", "undo")}
+              />
             ))}
           </DropLane>
         ))}
@@ -204,18 +257,25 @@ export function HistoryBoard() {
 function DropLane({
   label,
   hint,
+  ready,
   onDrop,
+  onPlace,
   children,
 }: {
   label: string;
   hint: string;
+  ready?: boolean;
   onDrop: (txKey: string) => void;
+  onPlace: () => void;
   children: ReactNode;
 }) {
   const [over, setOver] = useState(false);
   return (
     <section
-      className={`history-lane ${over ? "is-over" : ""}`}
+      className={`history-lane ${over ? "is-over" : ""} ${ready ? "is-ready" : ""}`}
+      onClick={() => {
+        if (ready) onPlace();
+      }}
       onDragOver={(e) => {
         e.preventDefault();
         setOver(true);
@@ -230,26 +290,66 @@ function DropLane({
     >
       <header className="history-lane-head">
         <h3>{label}</h3>
-        <p>{hint}</p>
+        <p>{ready ? "Tap Place here — or tap this lane — to drop the fill" : hint}</p>
+        {ready ? (
+          <button
+            type="button"
+            className="cta history-place-btn"
+            onClick={(e) => {
+              e.stopPropagation();
+              onPlace();
+            }}
+          >
+            Place here
+          </button>
+        ) : null}
       </header>
       <div className="history-lane-body">{children}</div>
     </section>
   );
 }
 
-function FillChip({ block, onUndo }: { block: FillBlock; onUndo: () => void }) {
+function FillChip({
+  block,
+  held,
+  onHold,
+  onUndo,
+}: {
+  block: FillBlock;
+  held: boolean;
+  onHold: () => void;
+  onUndo: () => void;
+}) {
   return (
     <article
-      className={`fill-chip ${block.gps_disagrees ? "is-flag" : ""}`}
-      draggable
-      onDragStart={(e) => {
-        e.dataTransfer.setData("text/tx-key", block.tx_key);
-        e.dataTransfer.setData("text/plain", block.tx_key);
-        e.dataTransfer.effectAllowed = "move";
+      className={`fill-chip ${block.gps_disagrees ? "is-flag" : ""} ${held ? "is-held" : ""}`}
+      onClick={(e) => {
+        e.stopPropagation();
+        onHold();
       }}
     >
-      <p className="fill-chip-card">{block.card_id}</p>
-      <p className="fill-chip-when">{when(block.at)}</p>
+      <div className="fill-chip-top">
+        <p className="fill-chip-card">{block.card_id}</p>
+        <span
+          className="fill-chip-grip"
+          title="Drag on a computer"
+          draggable
+          onClick={(e) => e.stopPropagation()}
+          onDragStart={(e) => {
+            e.dataTransfer.setData("text/tx-key", block.tx_key);
+            e.dataTransfer.setData("text/plain", block.tx_key);
+            e.dataTransfer.effectAllowed = "move";
+          }}
+        >
+          ⋮⋮
+        </span>
+      </div>
+      <p className="fill-chip-when">
+        <span className="field-label">Date</span> {when(block.at)}
+      </p>
+      <p className="fill-chip-miles">
+        <span className="field-label">Miles</span> {miles(block.odometer)}
+      </p>
       <p className="fill-chip-station">{block.station || "—"}</p>
       <p className="fill-chip-meta">
         Enterprise {block.enterprise_name || block.enterprise_pdi_id || "—"}
@@ -257,7 +357,14 @@ function FillChip({ block, onUndo }: { block: FillBlock; onUndo: () => void }) {
       </p>
       {block.gps_disagrees ? <p className="fill-chip-flag">GPS later disagrees — review</p> : null}
       {block.assigned_efleets_id ? (
-        <button type="button" className="cta ghost fill-undo" onClick={onUndo}>
+        <button
+          type="button"
+          className="cta ghost fill-undo"
+          onClick={(e) => {
+            e.stopPropagation();
+            onUndo();
+          }}
+        >
           Undo
         </button>
       ) : null}

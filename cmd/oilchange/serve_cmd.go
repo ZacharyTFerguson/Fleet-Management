@@ -13,6 +13,7 @@ import (
 	"oilchange/internal/desk"
 	"oilchange/internal/model"
 	"oilchange/internal/onestep"
+	"oilchange/internal/places"
 )
 
 // cmdServe hosts the static Oil Desk UI + /api/cars. No Node/npm required.
@@ -40,9 +41,9 @@ func cmdServe(cfg config.Config, args []string) int {
 	} else {
 		defer done()
 		opts.History = &desk.HistoryAPI{
-			Board:  a.HistoryBoard,
-			Assign: a.AssignFill,
-			Events: a.Store.ListAssignmentEvents,
+			Board:    a.HistoryBoard,
+			Assign:   a.AssignFill,
+			Events:   a.Store.ListAssignmentEvents,
 			Evidence: a.FillEvidence,
 			Box:      a.BoxEvidence,
 			Probe:    a.ProbeOneBox,
@@ -52,6 +53,7 @@ func cmdServe(cfg config.Config, args []string) int {
 			c := onestepAuthMode(cfg)
 			auth = c
 		}
+		placeCat := loadPlacesForServe(a)
 		opts.Records = &desk.RecordsAPI{
 			Fuel:        func(ctx context.Context) ([]model.CardTx, error) { return a.Store.ListCardTxs(ctx, "") },
 			Maintenance: a.Store.ListAllShopROs,
@@ -61,6 +63,7 @@ func cmdServe(cfg config.Config, args []string) int {
 			FuelSource:  getenvDefault("OILCHANGE_FUEL_SOURCE", "sqlite card_transactions (eFleets DETAILS file-drop)"),
 			MaintSource: getenvDefault("OILCHANGE_MAINT_SOURCE", "sqlite shop_ros (file-drop Maintenance Detail)"),
 			OneStepAuth: auth,
+			Places:      placeCat,
 		}
 		opts.ApplyDeviceInformation = func(ctx context.Context) (desk.VINFromFileResult, error) {
 			res, err := a.ApplyDeviceInformation(ctx, *infoPath)
@@ -109,6 +112,23 @@ func cmdServe(cfg config.Config, args []string) int {
 		return model.ExitError
 	}
 	return model.ExitOK
+}
+
+func loadPlacesForServe(a *app.App) *places.Catalog {
+	if a == nil || a.Store == nil {
+		return places.NewCatalog(nil)
+	}
+	ctx := context.Background()
+	got, err := places.Ensure(ctx, a.Store, strings.TrimSpace(os.Getenv("OILCHANGE_PLACES_JSON")), a.Cfg.DatabaseURL)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "oilchange serve: places catalog: %v\n", err)
+		if cached, loadErr := places.Load(ctx, a.Store); loadErr == nil {
+			return cached.Catalog
+		}
+		return places.NewCatalog(nil)
+	}
+	fmt.Fprintf(os.Stderr, "oilchange serve: Canon places catalog %d rows (%s)\n", got.Count, got.Source)
+	return got.Catalog
 }
 
 func getenvDefault(key, fallback string) string {

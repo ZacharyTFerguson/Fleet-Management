@@ -10,6 +10,7 @@ import (
 	"oilchange/internal/history"
 	"oilchange/internal/model"
 	"oilchange/internal/onestep"
+	"oilchange/internal/places"
 )
 
 // HistoryBoard is the turnstile payload for /api/history.
@@ -30,7 +31,11 @@ func (a *App) HistoryBoard(ctx context.Context, region string) (history.Board, e
 	if err != nil {
 		return empty, err
 	}
-	return history.BuildBoard(cars, txs, asg, region, time.Now().UTC()), nil
+	board := history.BuildBoard(cars, txs, asg, region, time.Now().UTC())
+	if cat, err := places.Load(ctx, a.Store); err == nil {
+		board = history.ApplyPlaceNames(board, cat.Catalog)
+	}
+	return board, nil
 }
 
 // AssignFill moves one transaction. Empty toEFleets unassigns (undo).
@@ -81,7 +86,12 @@ func (a *App) FillEvidence(ctx context.Context, txKey string) (history.FillEvide
 		return empty, err
 	}
 	visits, _ := cards.LoadStopVisits(a.gpsStopsCacheFile())
-	return history.BuildFillEvidence(tx, asg, visits, cars), nil
+	ev := history.BuildFillEvidence(tx, asg, visits, cars)
+	if cat, err := places.Load(ctx, a.Store); err == nil && cat.Catalog != nil && cat.Catalog.Len() > 0 {
+		hit := cat.Catalog.Lookup(tx.StationName, tx.StationAddress)
+		ev.Station = hit.Label
+	}
+	return ev, nil
 }
 
 // BoxEvidence is one GPS box from the device registry plus cache stop count.

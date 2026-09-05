@@ -41,6 +41,14 @@ mkdir -p "$(dirname "$MIRROR")"
 
 "$BIN" sync-enterprise --vehicles "$VEHICLES" --fuel-details "$FUEL" --shop-ro "$SHOP"
 
+if [[ -n "${OILCHANGE_PLACES_JSON:-}" && -f "${OILCHANGE_PLACES_JSON}" ]]; then
+  "$BIN" places-cache --json "$OILCHANGE_PLACES_JSON" || echo "places-cache json failed (fuel rows will show unmatched)"
+elif [[ -n "${DATABASE_URL:-}" ]]; then
+  "$BIN" places-cache --from-neon || echo "places-cache neon failed (fuel rows will show unmatched)"
+else
+  echo "places cache: using sqlite places if already copied (no DATABASE_URL / OILCHANGE_PLACES_JSON)"
+fi
+
 if "$BIN" env | grep -q 'onestep auth: jwt-rs256\|onestep auth: api-key'; then
   echo "OneStep: devices sync (live /device, pair factory_id / exact VIN — not display_name)"
   "$BIN" devices sync || echo "devices sync failed (desk still serves file-drop records)"

@@ -9,18 +9,20 @@ import (
 	"time"
 
 	"oilchange/internal/model"
+	"oilchange/internal/places"
 )
 
 // RecordsAPI is sqlite-backed fuel / shop RO / OneStep surfaces for /records/.
 type RecordsAPI struct {
-	Fuel         func(ctx context.Context) ([]model.CardTx, error)
-	Maintenance  func(ctx context.Context) ([]model.ShopRO, error)
-	OilChanges   func(ctx context.Context) ([]model.OilChange, error)
-	Devices      func(ctx context.Context) ([]model.OneStepDevice, error)
-	Miles        func(ctx context.Context) ([]model.DriveStopMiles, error)
-	FuelSource   string
-	MaintSource  string
-	OneStepAuth  string
+	Fuel        func(ctx context.Context) ([]model.CardTx, error)
+	Maintenance func(ctx context.Context) ([]model.ShopRO, error)
+	OilChanges  func(ctx context.Context) ([]model.OilChange, error)
+	Devices     func(ctx context.Context) ([]model.OneStepDevice, error)
+	Miles       func(ctx context.Context) ([]model.DriveStopMiles, error)
+	FuelSource  string
+	MaintSource string
+	OneStepAuth string
+	Places      *places.Catalog
 }
 
 func serveJSON(w http.ResponseWriter, r *http.Request, status int, v any) {
@@ -53,7 +55,11 @@ func serveFuel(w http.ResponseWriter, r *http.Request, api *RecordsAPI) {
 	type row struct {
 		CardID      string   `json:"card_id"`
 		At          string   `json:"at"`
-		Station     string   `json:"merchant"`
+		Place       string   `json:"place"`
+		PlaceMatch  string   `json:"place_match"`
+		GeneralCode string   `json:"general_code,omitempty"`
+		Merchant    string   `json:"merchant"`
+		MerchantRaw string   `json:"merchant_raw"`
 		Address     string   `json:"address"`
 		Gallons     *float64 `json:"gallons"`
 		Amount      *float64 `json:"amount"`
@@ -86,26 +92,45 @@ func serveFuel(w http.ResponseWriter, r *http.Request, api *RecordsAPI) {
 		if !t.At.IsZero() {
 			at = t.At.UTC().Format(time.RFC3339)
 		}
+		hit := api.Places.Lookup(t.StationName, t.StationAddress)
 		out = append(out, row{
-			CardID:    t.CardID,
-			At:        at,
-			Station:   t.StationName,
-			Address:   t.StationAddress,
-			Gallons:   t.Gallons,
-			Amount:    t.Amount,
-			Odometer:  t.Odometer,
-			EFleetsID: t.RecordedEFleetsID,
-			Driver:    driver,
+			CardID:      t.CardID,
+			At:          at,
+			Place:       hit.Label,
+			PlaceMatch:  hit.Match,
+			GeneralCode: hit.GeneralCode,
+			Merchant:    hit.Label,
+			MerchantRaw: t.StationName,
+			Address:     t.StationAddress,
+			Gallons:     t.Gallons,
+			Amount:      t.Amount,
+			Odometer:    t.Odometer,
+			EFleetsID:   t.RecordedEFleetsID,
+			Driver:      driver,
 		})
 	}
 	src := api.FuelSource
 	if src == "" {
 		src = "sqlite card_transactions (eFleets DETAILS)"
 	}
+	catalogN := 0
+	if api.Places != nil {
+		catalogN = api.Places.Len()
+	}
+	matched := 0
+	for _, r := range out {
+		if r.PlaceMatch == places.MatchOK {
+			matched++
+		}
+	}
 	serveJSON(w, r, http.StatusOK, map[string]any{
-		"source": src,
-		"count":  len(out),
-		"fills":  out,
+		"source":           src,
+		"count":            len(out),
+		"places_catalog":   catalogN,
+		"places_matched":   matched,
+		"places_unmatched": len(out) - matched,
+		"place_format":     "GeneralCode_Type_Branding_TopTier_TopTierGrade",
+		"fills":            out,
 	})
 }
 
@@ -179,10 +204,10 @@ func serveMaintenance(w http.ResponseWriter, r *http.Request, api *RecordsAPI) {
 		}
 	}
 	serveJSON(w, r, http.StatusOK, map[string]any{
-		"source":       src,
-		"count":        len(out),
-		"ros":          out,
-		"oil_changes":  oils,
+		"source":      src,
+		"count":       len(out),
+		"ros":         out,
+		"oil_changes": oils,
 	})
 }
 
@@ -254,12 +279,12 @@ func serveOneStepStatus(w http.ResponseWriter, r *http.Request, api *RecordsAPI)
 		auth = "unknown"
 	}
 	serveJSON(w, r, http.StatusOK, map[string]any{
-		"auth_mode":          auth,
-		"auth_note":          "RS256 JWT Bearer when PEM is present; never raw token. drive-stop uses device_id + dt_tracker_from + dt_tracker_to. Miles from distance / drive_stop_list only.",
-		"devices":            len(out),
-		"linked_factory_id":  linked,
-		"with_drive_stop":    withMiles,
-		"boxes":              out,
+		"auth_mode":         auth,
+		"auth_note":         "RS256 JWT Bearer when PEM is present; never raw token. drive-stop uses device_id + dt_tracker_from + dt_tracker_to. Miles from distance / drive_stop_list only.",
+		"devices":           len(out),
+		"linked_factory_id": linked,
+		"with_drive_stop":   withMiles,
+		"boxes":             out,
 	})
 }
 
@@ -356,10 +381,16 @@ async function load(){
     oilRows +
     (maint.ros||[]).map(r=>'<tr><td>'+esc(when(r.at))+'</td><td class="mono">'+esc(r.efleets_id)+'</td><td class="mono">'+esc(r.ro_id)+'</td><td>'+(r.odometer??'—')+'</td><td>'+esc(r.shop)+'</td><td>'+esc(r.service)+'</td></tr>').join('')
     + '</tbody></table>';
-  document.getElementById('fuel-src').textContent = 'Source: ' + (fuel.source||'') + ' — ' + (fuel.count||0) + ' punches. Merchant / time / odo from the export.';
+  document.getElementById('fuel-src').textContent = 'Source: ' + (fuel.source||'') + ' — ' + (fuel.count||0) + ' punches. Canon Place name (7_3_5_1_1) from the places catalog; unmatched punches stay unmatched (HOLD). Raw merchant is not a place.';
   const fills=(fuel.fills||[]).slice(0,400);
-  document.getElementById('fuel').innerHTML = '<table><thead><tr><th>when</th><th>card</th><th>merchant</th><th>odo</th><th>gal</th><th>$</th><th>Enterprise vehicle</th></tr></thead><tbody>'+
-    fills.map(f=>'<tr><td>'+esc(when(f.at))+'</td><td class="mono">'+esc(f.card_id)+'</td><td>'+esc(f.merchant)+'<br><span class="src">'+esc(f.address)+'</span></td><td>'+(f.odometer??'—')+'</td><td>'+(f.gallons??'—')+'</td><td>'+(f.amount??'—')+'</td><td class="mono">'+esc(f.enterprise_efleets_id)+'</td></tr>').join('')
+  document.getElementById('fuel').innerHTML = '<table><thead><tr><th>when</th><th>card</th><th>Canon Place</th><th>odo</th><th>gal</th><th>$</th><th>Enterprise vehicle</th></tr></thead><tbody>'+
+    fills.map(f=>{
+      const ok = f.place_match==='ok';
+      const label = f.place || f.merchant || 'unmatched';
+      const cls = ok ? 'ok mono' : 'hold mono';
+      const raw = f.merchant_raw ? '<br><span class="src">raw merchant: '+esc(f.merchant_raw)+'</span>' : '';
+      return '<tr><td>'+esc(when(f.at))+'</td><td class="mono">'+esc(f.card_id)+'</td><td><span class="'+cls+'">'+esc(label)+'</span>'+raw+'<br><span class="src">'+esc(f.address)+'</span></td><td>'+(f.odometer??'—')+'</td><td>'+(f.gallons??'—')+'</td><td>'+(f.amount??'—')+'</td><td class="mono">'+esc(f.enterprise_efleets_id)+'</td></tr>';
+    }).join('')
     + '</tbody></table>';
 }
 load().catch(e=>{ document.getElementById('banner').textContent = 'Load failed: '+e; });

@@ -51,6 +51,8 @@ func run(args []string) int {
 		return cmdBackupNeon(ctx, cfg, args[1:])
 	case "pull-supabase":
 		return cmdPullSupabase(ctx, cfg, args[1:])
+	case "places-cache":
+		return cmdPlacesCache(ctx, cfg, args[1:])
 	case "serve":
 		return cmdServe(cfg, args[1:])
 	case "desk":
@@ -92,6 +94,7 @@ func usage() {
   oilchange sync [--interval 5m] [--mirror web/data/cars.json] [--require-neon] [--no-remote]
   oilchange pull-supabase
   oilchange backup-neon
+  oilchange places-cache [--json PATH | --from-neon]
   oilchange serve [--addr 127.0.0.1:4739] [--mirror web/data/cars.json] [--web-dir PATH] [--device-information PATH] [--app] [--start /history/]
   oilchange desk   same as serve --app: Chrome/Edge window, no browser chrome
   oilchange env

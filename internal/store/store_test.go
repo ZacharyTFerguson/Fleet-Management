@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"oilchange/internal/model"
+	"oilchange/internal/places"
 )
 
 func TestSQLiteRoundTrip(t *testing.T) {
@@ -347,5 +348,34 @@ func TestCardTxRoundTrip(t *testing.T) {
 	}
 	if len(got) != 1 {
 		t.Fatalf("idempotent upsert, got %d", len(got))
+	}
+}
+
+func TestPlacesCacheRoundTrip(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "t.sqlite")
+	s, err := Open("sqlite", p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	ctx := context.Background()
+	if err := s.ReplacePlaces(ctx, nil); err == nil {
+		t.Fatal("empty replace must fail")
+	}
+	rows := []places.Place{{
+		GeneralCode: "A000016", TypeCode: "001", BrandCode: "WAWAA",
+		TopTier: "A", TopTierGrade: "A", Label: "A000016_001_WAWAA_A_A",
+		Name: "WAWA", Address: "2977 ROUTE 611", City: "TANNERSVILLE", State: "PA",
+		SiteKey: "WAWA|2977 ROUTE 611|TANNERSVILLE|PA", Active: true,
+	}}
+	if err := s.ReplacePlaces(ctx, rows); err != nil {
+		t.Fatal(err)
+	}
+	got, err := s.ListPlaces(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || got[0].Label != "A000016_001_WAWAA_A_A" {
+		t.Fatalf("%+v", got)
 	}
 }

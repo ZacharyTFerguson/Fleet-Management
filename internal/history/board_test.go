@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"oilchange/internal/model"
+	"oilchange/internal/places"
 )
 
 func TestBuildBoardFilesOneFillUnderAssignedCar(t *testing.T) {
@@ -49,5 +50,30 @@ func TestBuildBoardUnassignedStaysInTray(t *testing.T) {
 	}
 	if len(got.Cars) != 1 || len(got.Cars[0].Fills) != 0 {
 		t.Fatalf("unassigned must not sit on a car %+v", got.Cars)
+	}
+}
+
+func TestApplyPlaceNamesCanonOrUnmatched(t *testing.T) {
+	at := time.Date(2026, 6, 3, 10, 0, 0, 0, time.UTC)
+	cars := []model.Car{{PDIID: "PDI-0003", EFleetsID: "27VA15", Nickname: "VA15", Region: "VA"}}
+	tx := model.CardTx{
+		CardID: "C1", At: at, StationName: "WAWA",
+		StationAddress: "423 RT 42, TURNERSVILLE, NJ", RecordedEFleetsID: "27VA15",
+	}
+	board := BuildBoard(cars, []model.CardTx{tx}, nil, "VA", at)
+	cat := places.NewCatalog([]places.Place{{
+		GeneralCode: "A000001", TypeCode: "001", BrandCode: "WAWAA",
+		TopTier: "A", TopTierGrade: "A", Label: "A000001_001_WAWAA_A_A",
+		SiteKey: "WAWA|423 RT 42|TURNERSVILLE|NJ", Active: true,
+	}})
+	got := ApplyPlaceNames(board, cat)
+	if len(got.Unassigned) != 1 || got.Unassigned[0].Station != "A000001_001_WAWAA_A_A" {
+		t.Fatalf("%+v", got.Unassigned)
+	}
+	miss := ApplyPlaceNames(BuildBoard(cars, []model.CardTx{{
+		CardID: "C2", At: at, StationName: "TRACKER", StationAddress: "1 MAIN, TOWN, VA",
+	}}, nil, "VA", at), cat)
+	if miss.Unassigned[0].Station != places.UnmatchedLabel {
+		t.Fatalf("tracker must not invent a Canon name: %+v", miss.Unassigned[0])
 	}
 }

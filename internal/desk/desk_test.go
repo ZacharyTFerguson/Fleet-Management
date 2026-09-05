@@ -15,6 +15,7 @@ import (
 	"oilchange/internal/desk"
 	"oilchange/internal/history"
 	"oilchange/internal/model"
+	"oilchange/internal/places"
 	"oilchange/internal/syncsupabase"
 )
 
@@ -350,8 +351,14 @@ func TestRecordsFuelAndPage(t *testing.T) {
 		if path == "/records/" && !strings.Contains(rec.Body.String(), "Fuel &amp; Charging") {
 			t.Fatalf("records html missing fuel heading: %s", rec.Body.String()[:200])
 		}
-		if path == "/api/fuel" && !strings.Contains(rec.Body.String(), "WAWA") {
-			t.Fatalf("fuel body %s", rec.Body.String())
+		if path == "/api/fuel" {
+			body := rec.Body.String()
+			if !strings.Contains(body, "WAWA") {
+				t.Fatalf("fuel body missing raw merchant %s", body)
+			}
+			if !strings.Contains(body, `"place": "unmatched"`) {
+				t.Fatalf("incomplete address must be unmatched, not a invented Canon name: %s", body)
+			}
 		}
 		if path == "/api/maintenance" && !strings.Contains(rec.Body.String(), "Valvoline") {
 			t.Fatalf("maint body %s", rec.Body.String())
@@ -359,5 +366,57 @@ func TestRecordsFuelAndPage(t *testing.T) {
 		if path == "/api/onestep" && !strings.Contains(rec.Body.String(), "3271116717") {
 			t.Fatalf("onestep body %s", rec.Body.String())
 		}
+	}
+}
+
+func TestRecordsCanonPlaceName(t *testing.T) {
+	dir := t.TempDir()
+	web := filepath.Join(dir, "out")
+	_ = os.MkdirAll(web, 0o755)
+	_ = os.WriteFile(filepath.Join(web, "index.html"), []byte("x"), 0o644)
+	at := time.Date(2026, 6, 19, 14, 0, 0, 0, time.UTC)
+	cat := places.NewCatalog([]places.Place{{
+		GeneralCode:  "A000001",
+		TypeCode:     "001",
+		BrandCode:    "WAWAA",
+		TopTier:      "A",
+		TopTierGrade: "A",
+		Label:        "A000001_001_WAWAA_A_A",
+		Name:         "WAWA",
+		Address:      "423 RT 42",
+		City:         "TURNERSVILLE",
+		State:        "NJ",
+		SiteKey:      "WAWA|423 RT 42|TURNERSVILLE|NJ",
+		Active:       true,
+	}})
+	h, err := desk.Handler(desk.Options{
+		WebDir:     web,
+		MirrorPath: filepath.Join(dir, "cars.json"),
+		Records: &desk.RecordsAPI{
+			Fuel: func(ctx context.Context) ([]model.CardTx, error) {
+				return []model.CardTx{{
+					CardID: "x10000", At: at, StationName: "WAWA",
+					StationAddress: "423 RT 42, TURNERSVILLE, NJ",
+				}}, nil
+			},
+			Places:     cat,
+			FuelSource: "test DETAILS",
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := httptest.NewRequest(http.MethodGet, "/api/fuel", nil)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status %d", rec.Code)
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, "A000001_001_WAWAA_A_A") {
+		t.Fatalf("missing Canon label: %s", body)
+	}
+	if strings.Contains(body, `"place": "unmatched"`) {
+		t.Fatalf("matched punch marked unmatched: %s", body)
 	}
 }

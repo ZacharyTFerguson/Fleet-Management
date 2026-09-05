@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"oilchange/internal/model"
+	"oilchange/internal/places"
 )
 
 const unsetRegion = "UNSET"
@@ -18,6 +19,8 @@ type FillBlock struct {
 	CardID              string    `json:"card_id"`
 	At                  time.Time `json:"at"`
 	Station             string    `json:"station"`
+	MerchantRaw         string    `json:"merchant_raw,omitempty"`
+	PlaceMatch          string    `json:"place_match,omitempty"`
 	Address             string    `json:"address,omitempty"`
 	Gallons             *float64  `json:"gallons,omitempty"`
 	Odometer            *int      `json:"odometer,omitempty"`
@@ -46,15 +49,15 @@ type CarColumn struct {
 
 // Board is the turnstile payload: one region of car columns plus a tray.
 type Board struct {
-	SyncedAt     time.Time   `json:"synced_at"`
-	Region       string      `json:"region"`
-	Regions      []string    `json:"regions"`
-	Cars         []CarColumn `json:"cars"`
-	Unassigned   []FillBlock `json:"unassigned"`
-	AssignedN    int         `json:"assigned_n"`
-	UnassignedN  int         `json:"unassigned_n"`
-	GPSFlagN     int         `json:"gps_flag_n"`
-	Swipes       int         `json:"swipes"`
+	SyncedAt    time.Time   `json:"synced_at"`
+	Region      string      `json:"region"`
+	Regions     []string    `json:"regions"`
+	Cars        []CarColumn `json:"cars"`
+	Unassigned  []FillBlock `json:"unassigned"`
+	AssignedN   int         `json:"assigned_n"`
+	UnassignedN int         `json:"unassigned_n"`
+	GPSFlagN    int         `json:"gps_flag_n"`
+	Swipes      int         `json:"swipes"`
 }
 
 type carMeta struct {
@@ -197,6 +200,40 @@ func fillBelongsInRegion(b FillBlock, byE map[string]carMeta, region string) boo
 	}
 	// No car hint — keep the block on every turnstile stop so it is not lost.
 	return b.EnterpriseEFleetsID == "" && b.GPSCalledEFleetsID == ""
+}
+
+// ApplyPlaceNames rewrites fill chips to Canon Place labels when the catalog is loaded.
+// Unmatched punches become "unmatched" — never a invented general_code. Empty catalog is a no-op.
+func ApplyPlaceNames(board Board, cat *places.Catalog) Board {
+	if cat == nil || cat.Len() == 0 {
+		return board
+	}
+	rewrite := func(f FillBlock) FillBlock {
+		raw := firstNonEmpty(f.MerchantRaw, f.Station)
+		hit := cat.Lookup(raw, f.Address)
+		f.MerchantRaw = raw
+		f.Station = hit.Label
+		f.PlaceMatch = hit.Match
+		return f
+	}
+	for i := range board.Cars {
+		for j := range board.Cars[i].Fills {
+			board.Cars[i].Fills[j] = rewrite(board.Cars[i].Fills[j])
+		}
+	}
+	for i := range board.Unassigned {
+		board.Unassigned[i] = rewrite(board.Unassigned[i])
+	}
+	return board
+}
+
+func firstNonEmpty(ss ...string) string {
+	for _, s := range ss {
+		if strings.TrimSpace(s) != "" {
+			return strings.TrimSpace(s)
+		}
+	}
+	return ""
 }
 
 func label(byE map[string]carMeta, id string) string {

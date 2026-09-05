@@ -299,6 +299,14 @@ func (a *App) CardsLadder(ctx context.Context, persist bool) (cards.LadderResult
 		return empty, err
 	}
 	res := cards.ClassifyLadder(gps, txs, fleet, devs, cards.DefaultLadderRungs)
+	existing, err := a.Store.ListEras(ctx)
+	if err != nil {
+		return res, err
+	}
+	blocked := res.Coverage.Blocked
+	res.Eras = cards.PreserveUnladderedCarEras(res.Eras, existing)
+	res.Coverage = cards.RosterCoverage(fleet, devs, res.Eras, res.Cars)
+	res.Coverage.Blocked = blocked
 	if persist {
 		if err := a.Store.ReplaceEras(ctx, res.Eras); err != nil {
 			return res, err
@@ -483,6 +491,14 @@ func (a *App) CardsRebuild(ctx context.Context, fuelPath string) (int, error) {
 		return 0, err
 	}
 	ladder := cards.ClassifyLadder(gps, txs, fleet, devs, cards.DefaultLadderRungs)
+	existingEras, err := a.Store.ListEras(ctx)
+	if err != nil {
+		return 0, err
+	}
+	blocked := ladder.Coverage.Blocked
+	ladder.Eras = cards.PreserveUnladderedCarEras(ladder.Eras, existingEras)
+	ladder.Coverage = cards.RosterCoverage(fleet, devs, ladder.Eras, ladder.Cars)
+	ladder.Coverage.Blocked = blocked
 	if err := a.Store.ReplacePairings(ctx, ps); err != nil {
 		return 0, err
 	}
@@ -690,7 +706,7 @@ func (a *App) matchCardsAtGPSStops(ctx context.Context, txs []model.CardTx) (car
 					}
 				}
 			}
-			gps := cards.MatchGPSFirst(cached, txs, fleet, cards.DefaultStopSlack)
+			gps := cards.MatchGPSFirst(cached, gpsFirstTxs(txs, cached, devs), fleet, cards.DefaultStopSlack)
 			fmt.Fprintf(os.Stderr, "gps-stops cache %d visits with_pos=%d pumps=%d\n", len(cached), countHasPos(cached), gps.Pumps)
 			return gps, nil
 		}
@@ -713,7 +729,17 @@ func (a *App) matchCardsAtGPSStops(ctx context.Context, txs []model.CardTx) (car
 	} else {
 		fmt.Fprintf(os.Stderr, "gps-stops cache wrote %d visits with_pos=%d\n", len(visits), countHasPos(visits))
 	}
-	return cards.MatchGPSFirst(visits, txs, fleet, cards.DefaultStopSlack), nil
+	return cards.MatchGPSFirst(visits, gpsFirstTxs(txs, visits, devs), fleet, cards.DefaultStopSlack), nil
+}
+
+func gpsFirstTxs(txs []model.CardTx, visits []model.StopVisit, devs []model.OneStepDevice) []model.CardTx {
+	var linked []model.OneStepDevice
+	for _, d := range devs {
+		if linkedActive(d) {
+			linked = append(linked, d)
+		}
+	}
+	return cards.FillsWithFleetSight(txs, visits, linked)
 }
 
 func (a *App) writeCardsSnapshot(ctx context.Context, txs []model.CardTx, ps []model.CardPairing, gps cards.GPSFirstResult, ladder *cards.LadderResult) error {

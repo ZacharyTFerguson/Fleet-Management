@@ -579,6 +579,39 @@ html.driver-mode .cta.driver-toggle.is-on {
   }
 }
 
+.vin-file-apply {
+  margin: 0 0 1.25rem;
+  padding: 1rem 1.1rem;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  max-width: 40rem;
+}
+
+.vin-file-hint,
+.vin-file-ok,
+.vin-file-error {
+  margin: 0.75rem 0 0;
+  line-height: 1.45;
+  font-size: 0.92rem;
+}
+
+.vin-file-hint {
+  color: var(--mist);
+}
+
+.vin-file-ok {
+  color: var(--live);
+}
+
+.vin-file-error {
+  color: var(--hold);
+}
+
+.vin-file-apply code {
+  font-size: 0.85em;
+  color: var(--steel);
+}
+
 @media (max-width: 720px) {
   .hero {
     padding-top: 1rem;

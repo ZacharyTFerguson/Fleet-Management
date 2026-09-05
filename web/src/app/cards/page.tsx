@@ -1,3 +1,4 @@
+import { ApplyDeviceInfoButton } from "@/components/ApplyDeviceInfoButton";
 import { CardsBoard } from "@/components/CardsBoard";
 import { DeskNav } from "@/components/DeskNav";
 
@@ -15,6 +16,7 @@ export default function CardsPage() {
           moved (VA15 then VA19) is split. Enterprise Vehicle is not the join.
         </p>
       </header>
+      <ApplyDeviceInfoButton />
       <CardsBoard />
     </main>
   );

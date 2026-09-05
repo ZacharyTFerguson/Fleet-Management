@@ -71,17 +71,22 @@ type devicePointVIN struct {
 type deviceJSON struct {
 	FactoryID   string `json:"factory_id"`
 	FactoryId   string `json:"factoryId"`
+	IMEI        string `json:"imei"` // Device Information report hardware id (= factory_id)
 	DeviceID    string `json:"device_id"`
 	DeviceId    string `json:"device_id_history"`
 	ID          string `json:"id"`
 	DisplayName string `json:"display_name"`
 	Name        string `json:"name"`
+	DeviceName  string `json:"device_name"` // Device Information report label
 	Active      *bool  `json:"active"`
 	IsActive    *bool  `json:"is_active"`
 	Dead        bool   `json:"dead"`
 	Odometer    any    `json:"odometer"` // present on some payloads; must not be used as Last Reading
-	VIN         string `json:"vin"`      // not present live; keep in case a top-level appears
-	Settings    struct {
+	VIN         string `json:"vin"`      // Device Information report VIN; never params.vin
+	DecodedVIN  struct {
+		VehicleVIN string `json:"vehicle_vin"`
+	} `json:"decoded_vin"`
+	Settings struct {
 		VIN string `json:"vin"`
 	} `json:"settings"`
 	LatestDevicePoint         devicePointVIN `json:"latest_device_point"`
@@ -152,15 +157,17 @@ func parseDevices(b []byte) ([]model.OneStepDevice, error) {
 	for _, d := range raw {
 		// A generic id is an API/history identity, not the hardware factory_id.
 		// Skipping id-only rows lets ListDevices try the actual inventory endpoint.
-		fid := first(d.FactoryID, d.FactoryId)
+		fid := first(d.FactoryID, d.FactoryId, d.IMEI)
 		did := first(d.DeviceID, d.DeviceId, d.ID)
-		name := first(d.DisplayName, d.Name)
+		name := first(d.DisplayName, d.Name, d.DeviceName)
 		// OBD device_state.vin is the car the box is plugged into; settings.vin is portal Vehicle Info.
-		// params.vin is noisier and is not used. display_name is never an identity.
+		// Device Information reports (generate-reports `data`) use imei + top-level vin / decoded_vin.
+		// params.vin is noisier and is not used. display_name / device_name is never an identity.
 		vin := first(
 			d.LatestDevicePoint.DeviceState.VIN,
 			d.LatestAccurateDevicePoint.DeviceState.VIN,
 			d.Settings.VIN,
+			d.DecodedVIN.VehicleVIN,
 			d.VIN,
 		)
 		if fid == "" {
@@ -705,15 +712,7 @@ func (c *Client) post(ctx context.Context, path string, body []byte) ([]byte, er
 		return nil, safeHTTPError(path, "read response", err, c.Token, sentAuth)
 	}
 	if res.StatusCode >= 300 {
-		msg := strings.TrimSpace(string(b))
-		msg = sanitizeAuthError(msg, c.Token, sentAuth)
-		if len(msg) > 400 {
-			msg = msg[:400] + "…"
-		}
-		if msg == "" {
-			return nil, fmt.Errorf("onestep %s: HTTP %s", path, res.Status)
-		}
-		return nil, fmt.Errorf("onestep %s: HTTP %s: %s", path, res.Status, msg)
+		return nil, httpStatusError(path, res, b, 400, c.Token, sentAuth)
 	}
 	return b, nil
 }
@@ -763,16 +762,8 @@ func (c *Client) get(ctx context.Context, path string, q url.Values) ([]byte, er
 		return nil, safeHTTPError(path, "read response", err, c.Token, sentAuth)
 	}
 	if res.StatusCode >= 300 {
-		msg := strings.TrimSpace(string(b))
-		msg = sanitizeAuthError(msg, c.Token, sentAuth)
-		if len(msg) > 240 {
-			msg = msg[:240] + "…"
-		}
 		// Never echo query strings (api-key) or Authorization material.
-		if msg == "" {
-			return nil, fmt.Errorf("onestep %s: HTTP %s", path, res.Status)
-		}
-		return nil, fmt.Errorf("onestep %s: HTTP %s: %s", path, res.Status, msg)
+		return nil, httpStatusError(path, res, b, 240, c.Token, sentAuth)
 	}
 	return b, nil
 }

@@ -52,7 +52,7 @@ func run(args []string) int {
 	case "pull-supabase":
 		return cmdPullSupabase(ctx, cfg, args[1:])
 	case "serve":
-		return cmdServe(args[1:])
+		return cmdServe(cfg, args[1:])
 	case "env":
 		return cmdEnv(cfg)
 	default:
@@ -82,13 +82,15 @@ func usage() {
   oilchange cards ladder [--no-gps]
   oilchange cards coverage [--no-gps]
   oilchange cards nearby [--card ID] [--live] [--report] [--persist] [--report-cap N]
-  oilchange devices sync [--map PATH]
+  oilchange cards watch [--card ID] [--live] [--persist] [--fills 10] [--pace 35s]
+  oilchange devices sync [--map PATH] [--information PATH]
   oilchange devices list [--csv [--out PATH] [--live] [--map PATH]]
   oilchange devices csv [--out PATH] [--live] [--map PATH]
+  oilchange devices vin [--factory-id ID] [--pace 35s] [--from PATH]
   oilchange sync [--interval 5m] [--mirror web/data/cars.json] [--require-neon] [--no-remote]
   oilchange pull-supabase
   oilchange backup-neon
-  oilchange serve [--addr 127.0.0.1:4739] [--mirror web/data/cars.json] [--web-dir PATH]
+  oilchange serve [--addr 127.0.0.1:4739] [--mirror web/data/cars.json] [--web-dir PATH] [--device-information PATH]
   oilchange env
 
 Secrets: gitignored oilchange.env or Cloud Agent secrets — never chat. See oilchange.env.example.
@@ -258,13 +260,13 @@ func cmdHolds(ctx context.Context, cfg config.Config, args []string) int {
 
 func cmdCards(ctx context.Context, cfg config.Config, args []string) int {
 	if len(args) < 1 {
-		fmt.Fprintln(os.Stderr, "usage: oilchange cards rebuild|history|suspect|trace|pairings|split|call|ladder|coverage|nearby")
+		fmt.Fprintln(os.Stderr, "usage: oilchange cards rebuild|history|suspect|trace|pairings|split|call|ladder|coverage|nearby|watch")
 		return model.ExitError
 	}
 	fs := flag.NewFlagSet("cards", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
 	details := fs.String("fuel-details", "", "optional DETAILS CSV to ingest before rebuild")
-	cardID := fs.String("card", "", "card id (trace/pairings/split/call)")
+	cardID := fs.String("card", "", "card id (trace/pairings/split/call/nearby/watch)")
 	window := fs.Int("window-days", 2, "station co-occurrence window in days (trace)")
 	noGPS := fs.Bool("no-gps", false, "skip OneStep stop windows (use gps-stops.json cache)")
 	disagree := fs.Bool("disagree", true, "cards call: only swipes where GPS name ≠ Enterprise Vehicle")
@@ -273,10 +275,12 @@ func cmdCards(ctx context.Context, cfg config.Config, args []string) int {
 	devicesLive := fs.Bool("devices-live", false, "refresh OneStep devices if token present (history)")
 	devicesMap := fs.String("map", "", "factory_id map CSV for devices sync (history)")
 	devicesOut := fs.String("devices-out", "data/runtime/onestep-devices.csv", "devices inventory CSV path (history)")
-	liveStops := fs.Bool("live", false, "cards nearby: pull drive-stop for boxes missing from the GPS cache")
+	liveStops := fs.Bool("live", false, "cards nearby/watch: pull drive-stop for missing boxes (watch: watched boxes only)")
 	liveReport := fs.Bool("report", false, "cards nearby: queue OneStep near_address generate-reports jobs")
-	persistNearby := fs.Bool("persist", false, "cards nearby: persist certain linked-car eras (never unpaired factory_id)")
+	persistNearby := fs.Bool("persist", false, "cards nearby/watch: persist certain linked-car eras (never unpaired factory_id)")
 	reportCap := fs.Int("report-cap", 3, "cards nearby --report max generate jobs")
+	watchFills := fs.Int("fills", 10, "cards watch: newest punches per card to fetch")
+	watchPace := fs.Duration("pace", 35*time.Second, "cards watch: min interval between drive-stop GETs (Retry-After wins)")
 	if err := fs.Parse(args[1:]); err != nil {
 		return model.ExitError
 	}
@@ -376,6 +380,20 @@ func cmdCards(ctx context.Context, cfg config.Config, args []string) int {
 		})
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "cards nearby: %v\n", err)
+			return model.ExitError
+		}
+		fmt.Fprint(os.Stdout, cards.FormatNearby(res))
+		return model.ExitOK
+	case "watch":
+		res, err := a.CardsWatch(ctx, app.CardsWatchOpts{
+			CardID:    *cardID,
+			LiveStops: *liveStops,
+			Persist:   *persistNearby,
+			Fills:     *watchFills,
+			Pace:      *watchPace,
+		})
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "cards watch: %v\n", err)
 			return model.ExitError
 		}
 		fmt.Fprint(os.Stdout, cards.FormatNearby(res))

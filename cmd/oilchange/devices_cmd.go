@@ -7,7 +7,10 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
+	"time"
 
+	"oilchange/internal/app"
 	"oilchange/internal/config"
 	"oilchange/internal/model"
 	"oilchange/internal/onestep"
@@ -15,7 +18,7 @@ import (
 
 func cmdDevices(ctx context.Context, cfg config.Config, args []string) int {
 	if len(args) < 1 {
-		fmt.Fprintln(os.Stderr, "usage: oilchange devices sync|list|csv …")
+		fmt.Fprintln(os.Stderr, "usage: oilchange devices sync|list|csv|vin …")
 		return model.ExitError
 	}
 	switch args[0] {
@@ -25,8 +28,10 @@ func cmdDevices(ctx context.Context, cfg config.Config, args []string) int {
 		return cmdDevicesList(ctx, cfg, args[1:])
 	case "csv":
 		return cmdDevicesCSV(ctx, cfg, args[1:])
+	case "vin":
+		return cmdDevicesVIN(ctx, cfg, args[1:])
 	default:
-		fmt.Fprintln(os.Stderr, "usage: oilchange devices sync|list|csv …")
+		fmt.Fprintln(os.Stderr, "usage: oilchange devices sync|list|csv|vin …")
 		return model.ExitError
 	}
 }
@@ -34,6 +39,7 @@ func cmdDevices(ctx context.Context, cfg config.Config, args []string) int {
 func cmdDevicesSync(ctx context.Context, cfg config.Config, args []string) int {
 	fs := flag.NewFlagSet("devices sync", flag.ContinueOnError)
 	mapPath := fs.String("map", "", "factory_id,device_id,efleets_id[,display_name,dead] CSV")
+	infoPath := fs.String("information", "", "saved Device Information JSON (no live /device GET)")
 	if err := fs.Parse(args); err != nil {
 		return model.ExitError
 	}
@@ -43,6 +49,24 @@ func cmdDevicesSync(ctx context.Context, cfg config.Config, args []string) int {
 		return model.ExitError
 	}
 	defer done()
+	if strings.TrimSpace(*infoPath) != "" {
+		if strings.TrimSpace(*mapPath) != "" {
+			if _, err := a.SyncDevices(ctx, *mapPath, nil); err != nil {
+				fmt.Fprintln(os.Stderr, err)
+				return model.ExitError
+			}
+		}
+		res, err := a.ApplyDeviceInformation(ctx, *infoPath)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "devices sync --information: %v\n", err)
+			return model.ExitError
+		}
+		fmt.Fprint(os.Stdout, res.Format())
+		for _, l := range res.Links {
+			fmt.Printf("LINK factory_id=%s device_id=%s vin=%s car=%s\n", l.FactoryID, l.DeviceID, l.VIN, l.EFleetsID)
+		}
+		return model.ExitOK
+	}
 	var client *onestep.Client
 	if cfg.OneStepToken != "" {
 		client = onestep.NewClient(cfg.OneStepBase, cfg.OneStepToken)
@@ -135,6 +159,59 @@ func writeDevicesCSV(ctx context.Context, cfg config.Config, outPath string, liv
 	}
 	if outPath != "" {
 		fmt.Fprintf(os.Stderr, "devices csv: %d rows -> %s\n", n, outPath)
+	}
+	return model.ExitOK
+}
+
+func cmdDevicesVIN(ctx context.Context, cfg config.Config, args []string) int {
+	fs := flag.NewFlagSet("devices vin", flag.ContinueOnError)
+	factoryID := fs.String("factory-id", "", "limit to one factory_id (default: every unpaired box)")
+	pace := fs.Duration("pace", 35*time.Second, "min interval between per-device VIN GETs (Retry-After wins)")
+	from := fs.String("from", "", "saved Device Information JSON (no live /device GET). Empty --from uses data/runtime/device-information.json")
+	if err := fs.Parse(args); err != nil {
+		return model.ExitError
+	}
+	fromSet := false
+	fs.Visit(func(f *flag.Flag) {
+		if f.Name == "from" {
+			fromSet = true
+		}
+	})
+	a, done, err := openApp(cfg)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return model.ExitError
+	}
+	defer done()
+	if fromSet {
+		res, err := a.ApplyDeviceInformation(ctx, *from)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "devices vin --from: %v\n", err)
+			return model.ExitError
+		}
+		fmt.Fprint(os.Stdout, res.Format())
+		for _, l := range res.Links {
+			fmt.Printf("LINK factory_id=%s device_id=%s vin=%s car=%s\n", l.FactoryID, l.DeviceID, l.VIN, l.EFleetsID)
+		}
+		return model.ExitOK
+	}
+	if cfg.OneStepToken != "" {
+		c := onestep.NewClient(cfg.OneStepBase, cfg.OneStepToken)
+		c.PrivateKeyPEM = cfg.OneStepPrivateKey
+		a.OneStep = c
+	}
+	opt := app.PairVINOpts{AskEmpty: true, Pace: *pace}
+	if strings.TrimSpace(*factoryID) != "" {
+		opt.FactoryIDs = []string{*factoryID}
+	}
+	res, err := a.PairDevicesByVIN(ctx, opt)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "devices vin: %v\n", err)
+		return model.ExitError
+	}
+	fmt.Fprint(os.Stdout, res.Format())
+	for _, l := range res.Links {
+		fmt.Printf("LINK factory_id=%s device_id=%s vin=%s car=%s\n", l.FactoryID, l.DeviceID, l.VIN, l.EFleetsID)
 	}
 	return model.ExitOK
 }

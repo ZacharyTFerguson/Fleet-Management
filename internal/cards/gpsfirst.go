@@ -68,6 +68,75 @@ func (g *geoAcc) add(lat, lng float64) {
 	g.lng += (lng - g.lng) / float64(g.n)
 }
 
+// FillsWithFleetSight drops swipes whose FillDayWindow only has GPS from a
+// handful of linked boxes. A watch-loop fetch of one car into August must not
+// let GPS-first treat that car as exclusive at every pump.
+func FillsWithFleetSight(txs []model.CardTx, visits []model.StopVisit, linked []model.OneStepDevice) []model.CardTx {
+	nLinked := 0
+	isLinked := map[string]struct{}{}
+	for _, d := range linked {
+		id := strings.TrimSpace(d.FactoryID)
+		if id == "" || d.Dead || !d.Active {
+			continue
+		}
+		if d.LinkedCarEFleetsID == nil || strings.TrimSpace(*d.LinkedCarEFleetsID) == "" {
+			continue
+		}
+		if _, ok := isLinked[id]; ok {
+			continue
+		}
+		isLinked[id] = struct{}{}
+		nLinked++
+	}
+	need := 1
+	if nLinked >= 8 {
+		need = 8
+	}
+	if nLinked == 0 || need <= 1 {
+		return txs
+	}
+	var out []model.CardTx
+	for _, t := range txs {
+		if t.At.IsZero() {
+			out = append(out, t)
+			continue
+		}
+		from, to := FillDayWindow(t.At)
+		if from.IsZero() {
+			out = append(out, t)
+			continue
+		}
+		seen := map[string]struct{}{}
+		for _, v := range visits {
+			fid := strings.TrimSpace(v.FactoryID)
+			if _, ok := isLinked[fid]; !ok {
+				continue
+			}
+			start, end := v.From, v.To
+			if start.IsZero() && end.IsZero() {
+				continue
+			}
+			if end.IsZero() {
+				end = start
+			}
+			if start.IsZero() {
+				start = end
+			}
+			if end.Before(from) || start.After(to) {
+				continue
+			}
+			seen[fid] = struct{}{}
+			if len(seen) >= need {
+				break
+			}
+		}
+		if len(seen) >= need {
+			out = append(out, t)
+		}
+	}
+	return out
+}
+
 // MatchByStopTimes is the time-only exclusive matcher. GPS-first matching
 // (region + station coordinates) lives in MatchGPSFirst.
 func MatchByStopTimes(visits []model.StopVisit, txs []model.CardTx, slack time.Duration) []model.GPSCardMatch {
@@ -81,7 +150,9 @@ func MatchByStopTimes(visits []model.StopVisit, txs []model.CardTx, slack time.D
 //  2. Prefer cars sitting at a GPS pump cluster (shared short-stop sites).
 //  3. If the station is geocoded, the sit must be within StationRadiusMeters.
 //  4. Else if the merchant state is known, prefer cars whose unit region is that state.
-//  5. Two candidates still left → skip (do not guess).
+//  5. Two candidates still left → skip (do not guess). Fuel-gauge hour-before/after
+//     may break an exact two-box 350 m collision only when a FuelJumpLook is
+//     provided; production passes nil and stays unnamed (dumps have no fuel history).
 //
 // TRACKER / empty merchant *names* are not pumps, but an exclusive GPS sit at
 // swipe time still names the card (station label is the GPS cluster, not TRACKER).
@@ -90,6 +161,12 @@ func MatchByStopTimes(visits []model.StopVisit, txs []model.CardTx, slack time.D
 // second pass retries swipes that were ambiguous on time alone. Last Reading
 // does not use this.
 func MatchGPSFirst(visits []model.StopVisit, txs []model.CardTx, fleet []model.Car, slack time.Duration) GPSFirstResult {
+	return MatchGPSFirstWithFuel(visits, txs, fleet, slack, nil)
+}
+
+// MatchGPSFirstWithFuel is MatchGPSFirst plus an optional fill±1h gauge series.
+// fuelLook == nil must not invent a level. Last Reading is untouched.
+func MatchGPSFirstWithFuel(visits []model.StopVisit, txs []model.CardTx, fleet []model.Car, slack time.Duration, fuelLook *FuelJumpLook) GPSFirstResult {
 	if slack <= 0 {
 		slack = DefaultStopSlack
 	}
@@ -149,15 +226,18 @@ func MatchGPSFirst(visits []model.StopVisit, txs []model.CardTx, fleet []model.C
 				if placeholderCardsAt(txs, t.At, slack) != 1 {
 					continue
 				}
-				var fuel []model.StopVisit
+				var fuelSits []model.StopVisit
 				for _, v := range cands {
 					if isFuelSit(v) && sitAtPump(v, pumps) {
-						fuel = append(fuel, v)
+						fuelSits = append(fuelSits, v)
 					}
 				}
-				cands = fuel
+				cands = fuelSits
 			} else {
 				cands = filterCandidates(cands, stKey, stState, region, geo, pumps, useGeo)
+			}
+			if len(cands) == 2 {
+				cands = disambiguatePumpCollision(cands, t.At, fuelLook)
 			}
 			if len(cands) != 1 {
 				continue

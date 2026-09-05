@@ -106,7 +106,7 @@ func nearbyCoverageComplete(devs []model.OneStepDevice, visits []model.StopVisit
 	need := 0
 	for _, d := range eligibleNearbyDevices(devs) {
 		need++
-		if !deviceCoveredInWindow(visits, d.FactoryID, from, to) {
+		if !cards.DeviceCoveredInWindow(visits, d.FactoryID, from, to) {
 			return false
 		}
 	}
@@ -127,31 +127,6 @@ func eligibleNearbyDevices(devs []model.OneStepDevice) []model.OneStepDevice {
 	return out
 }
 
-func deviceCoveredInWindow(visits []model.StopVisit, factoryID string, from, to time.Time) bool {
-	factoryID = strings.TrimSpace(factoryID)
-	for _, v := range visits {
-		if strings.TrimSpace(v.FactoryID) != factoryID {
-			continue
-		}
-		start := v.From
-		end := v.To
-		if start.IsZero() && end.IsZero() {
-			continue
-		}
-		if end.IsZero() {
-			end = start
-		}
-		if start.IsZero() {
-			start = end
-		}
-		// A short stop inside a multi-day window is not a fetch of that window.
-		if !start.After(from) && !end.Before(to) {
-			return true
-		}
-	}
-	return false
-}
-
 func (a *App) fillMissingNearbyStops(ctx context.Context, visits []model.StopVisit, txs []model.CardTx, devs []model.OneStepDevice) ([]model.StopVisit, int) {
 	from, to := nearbyUnionWindow(txs)
 	if from.IsZero() {
@@ -159,7 +134,7 @@ func (a *App) fillMissingNearbyStops(ctx context.Context, visits []model.StopVis
 	}
 	var missing []model.OneStepDevice
 	for _, d := range eligibleNearbyDevices(devs) {
-		if deviceCoveredInWindow(visits, d.FactoryID, from, to) {
+		if cards.DeviceCoveredInWindow(visits, d.FactoryID, from, to) {
 			continue
 		}
 		missing = append(missing, d)

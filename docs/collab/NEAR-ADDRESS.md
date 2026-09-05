@@ -88,6 +88,7 @@ How oilchange applies that:
 |---|---|---|
 | `near_address` generate-reports | **Yes** — one job with `all_user_devices: true` covers the fleet | `--report-cap` (default 3) so we never spam generate |
 | `GET /route/drive-stop` | **No** — live contract is a single `device_id` query param (`dt_tracker_from` / `dt_tracker_to` / `stop_duration`). Comma-lists / multi-id params are **not** proven; do not invent them | `Client.mu` serializes HTTP; nearby `--live` also enforces **≥1 s** between boxes and logs progress every **25** devices so a ~260-box fill-day pull stays under the hourly ceiling without looking hung |
+| `cards watch --live` | **Batch by shrinking the set** — one drive-stop per **watched** `factory_id` covering the union of the newest 10 fill-day windows (not 260 boxes, not 10 GETs per fill) | **35 s** between GETs unless `Retry-After` is longer. Do not re-run nearby `--live`. |
 
 A strict 15–30 s gap between each of 260 boxes would take hours; that cadence is for routine realtime polling, not a one-shot coverage backfill. Prefer the batched `near_address` job when JSON download works; until then, paced one-device drive-stop is the honest path.
 
@@ -99,7 +100,7 @@ A strict 15–30 s gap between each of 260 boxes would take hours; that cadence 
 4. Every `factory_id` in that window is a **watch**. One hit is not a join.
 5. Prefer devices whose stop **overlaps the fill second** (±20 min slack). Those are “at the pump when it filled up.”
 6. Repeat fills. Same exclusive `factory_id` at fill time on **2** days = likely; **3** = certain enough to name the card as that box’s **linked car** (if the box already has a `factory_id`→car link). Unpaired boxes stay on the watch list unless exact 17-char OBD VIN matches `cars.vin` (existing `LinkByVIN`, not this hunt).
-7. Two boxes at fill time → not exclusive; keep watching.
+7. Two boxes at fill time → not exclusive; keep watching. Fuel-gauge hour-before/after is the intended extra signal for an exact **two** linked boxes in the **350 m** exclusive-sit circle (not the 1-mile hunt). Current Device Information dump and gps-stops cache do **not** carry fuel history (`fuel_type` is Gasoline, not a gauge; no `latest_device_point`). Fail closed (still unnamed) until a proven history endpoint exists. Do not invent `fuel_level`. Do not loosen 350 m to 1 mile.
 8. Never invent a `factory_id`. Never join on `near_address_entity` / `display_name` / plate.
 
 ## Code
@@ -107,7 +108,8 @@ A strict 15–30 s gap between each of 260 boxes would take hours; that cadence 
 - `internal/onestep/nearaddress.go` — generate + poll + JSON parse; each HTTP call holds `Client.mu` (do not lock inside `get()`).
 - `internal/cards/nearby.go` — fill-day window, 1-mile haversine on stop visits, watch/likely/certain.
 - CLI: `oilchange cards nearby [--card ID] [--live] [--report] [--persist] [--report-cap N]`
-- Tests: parse fixture, httptest generate/poll/mutex, fill-day bounds, exclusive vs collision, same-day watch, incomplete coverage, PERSON persist veto. Never live OneStep in `go test`.
+- CLI: `oilchange cards watch [--card ID] [--live] [--persist] [--fills 10] [--pace 35s]` — newest 10 punches per unknown card, drive-stop **only watched** `factory_id`s, 35s (or `Retry-After`) between GETs. Virginia DETAILS vehicles seed which box to ask about; GPS exclusive days still required to persist.
+- Tests: parse fixture, httptest generate/poll/mutex, fill-day bounds, exclusive vs collision, same-day watch, incomplete coverage, PERSON persist veto. Fuel-gauge collision breaker: `internal/cards/fueljump.go` (fail closed without a series). Never live OneStep in `go test`.
 
 ## Rewrite (review loop 1)
 
@@ -145,10 +147,58 @@ nearby certain=0 likely=1 watch=47 cards=20 radius=1mi window=fill-day±1 covera
 - After the fetch, `cards coverage --no-gps` is **known 62 / 205 (30.2%)** vs the VIN-wave **63 / 205**. Extra stop visits did not raise exclusive GPS-first eras.
 - Artifact: `/opt/cursor/artifacts/nearby_live_summary.txt`.
 
+## Watch loop (newest 10, watched boxes only)
+
+A second full-fleet nearby `--live` is the wrong next step. After the 2026-09-04 260-box pull the leftover work is: **ask only the cars already on the watch list** (plus Virginia recorded vehicles, which this fleet treats as the right seed).
+
+`oilchange cards watch [--live] [--persist] [--fills 10] [--pace 35s]`:
+
+1. GPS-first uses the stop cache only (`OneStep` is niled around that call). Watch `--live` must not fleet-fetch linked boxes through `cards rebuild` GPS-first.
+2. Unknown fills only (same `EligibleUnknownFills` as nearby). PERSON stays watch-only.
+3. Card order: highest exclusive-day count first (the prior likely card), then Virginia recorded vehicles, then newest swipe.
+4. Per card: take the **newest 10** provider swipes. Seed `factory_id`s from cache 1-mile hits, plus **only the newest** VA recorded vehicle’s linked box (mixed DETAILS Vehicle columns are not extra fetches), plus one hypothesis roster car if the list is still empty. Never invent an unpaired `factory_id`. Persist ranks that same newest VA box, so 1-mile spectators do not have to span the window.
+5. `--live` drive-stop those boxes for the **union** of those 10 fill-day ±1 windows, skipping a box already spanning-covered. One `device_id` per GET. Default **35 s** between calls; a `429`/`503` `Retry-After` waits that long and retries once.
+6. Hunt still scores **all** eligible fills for that card (May exclusive days + August fetches). Persist if watched-set coverage is complete, exactly one certain **linked** car, not PERSON, not unpaired. Persist ranks the newest VA seed box (1-mile spectators do not block). No VA seed → rank the hunt hits that were fetched; a DETAILS Vehicle hypothesis is not a join.
+7. `cards rebuild --no-gps` keeps nearby-certain car eras the ladder did not replace, so a rematch cannot wipe a watch persist.
+8. After the GPS watch, **ask OneStep for VIN** on leftover unpaired boxes (not only hunt hits): `GET /device?device_id=&latest_point=true` (OBD `device_state.vin` only). Exact 17-char match to `cars.vin` writes the factory_id→Enterprise link. `display_name` is never a join. CLI: `oilchange devices vin`. Then `cards history --no-gps` rematches GPS-at-the-pump and keeps watch-persisted car eras in coverage.
+
+When OneStep is **cooling down** (429 / Retry-After), do **not** keep hitting live `/device`. Save the portal Device Information export to gitignored `data/runtime/device-information.json` (report rows use `imei` as `factory_id` and report `vin`; `params.vin` is ignored). Apply it later with `oilchange devices vin --from data/runtime/device-information.json` or the Oil Desk button **Apply saved OneStep device information** (`POST /api/devices/vin-from-file`). That path is file-parse + sqlite upsert only.
+
+Maintenance VIN remains exact 17-char OBD `device_state.vin` = `cars.vin` from the roster (Fleet Summary / shop-backed VIN). A Fuel DETAILS drop is not a shop RO; do not `--shop-ro` a DETAILS file.
+
+The Aug–Sep 2026 DETAILS file (`DETAILS_583424_30-Days` (14)/(13) and the identically hashed `.xls`) is a new swipe window, not a duplicate of the May–June ingest.
+
+### Live watch `--live --persist` (2026-09-04T20:53Z–22:54Z, EXIT 0)
+
+One process (`/tmp/oilchange cards watch --live --persist --fills 10 --pace 35s`). Watched boxes only. Artifacts: `/opt/cursor/artifacts/watch_live.err`, `watch_live.out`.
+
+- 118 unknown cards in the loop; **83** cards fetched (**168** drive-stop GETs, `failed=0`); 37 PERSON persist skips; 1 watched-box coverage-incomplete skip.
+- Hunt print: `certain=7 likely=8 watch=198 cards=74 coverage_complete=false`. **3** certain **linked** car eras persisted (unpaired factory_id not joined).
+- After GPS: `watch vin-pair linked=0 asked=40 already=204 no_vin=38 no_roster=19 skipped_existing_map=0`. Empty OBD VIN stayed unpaired. Never `display_name`. Never Last Reading.
+- Then `cards history --no-gps` rematch (no live GPS, no live `/device`): `coverage roster=205 device_link=196 (95.6%) card_era=92 (44.9%) known=92 (44.9%) ladder_locked=90`. Cache **146,771** visits / **2,547** pumps. Artifacts: `/opt/cursor/artifacts/history_no_gps.err`, `history_no_gps.out`.
+- Do not start a second watch. Do not `cards coverage --no-gps` as a metrics shortcut (it ReplaceEras).
+
+## Fuel-gauge collision (intended, not live yet)
+
+When GPS-first sees **exactly two** linked `factory_id`s in the 350 m exclusive-sit circle, the operator wants the car whose fuel **rose** ~1h after vs ~1h before, after accounting for drive-stop miles in that window (a drop is consumption, not a fill). Missing / both rose / both fell → unnamed.
+
+This repo does not have that history:
+
+| Source | What it has | Fuel at fill±1h? |
+|---|---|---|
+| `data/runtime/device-information.json` | 223 rows: `imei`, `vin`, `odometer`, `engine_hours`, **`fuel_type`** (Gasoline). No `latest_device_point` | No |
+| `data/runtime/gps-stops.json` | stop `from`/`to` + lat/lng | No |
+| `GET /route/drive-stop` | stop windows + `distance.value` on drives. Do not send `return_points` | No gauge |
+| `GET /device?latest_point=true` | **now** OBD VIN snapshot | Not history |
+
+Needed: a proven time-series of fuel level keyed by `factory_id` (or `device_id`) plus existing drive-stop miles for those two boxes in [fill−1h, fill+1h], paced (`--pace`). First check: one `GET /v3/api/public/report-type` (not a fleet pull); do not invent report fields. Code: `internal/cards/fueljump.go`. Production matcher passes a nil look.
+
 ## Do not
 
 - Use bank posting time.
 - Auto-join from a single 1-mile hit.
 - Loosen GPS-first exclusive-sit (350 m / short stop) to 1 mile.
+- Invent `fuel_level` / miles / MPG to break a two-box sit.
 - Write Last Reading from this hunt.
 - Commit `oilchange.env`, sqlite, or `data/runtime/`.
+- Re-run a 260-box `cards nearby --live` to chase leftovers — use `cards watch`.

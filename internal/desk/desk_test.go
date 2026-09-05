@@ -1,7 +1,9 @@
 package desk_test
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -125,5 +127,122 @@ func TestCarsAPIMissingMirror(t *testing.T) {
 	}
 	if got.Source != "mock-seed" || len(got.Cars) != 0 {
 		t.Fatalf("got %+v", got)
+	}
+}
+
+func TestVINFromFileGETMissing(t *testing.T) {
+	dir := t.TempDir()
+	web := filepath.Join(dir, "out")
+	_ = os.MkdirAll(web, 0o755)
+	_ = os.WriteFile(filepath.Join(web, "index.html"), []byte("x"), 0o644)
+	missing := filepath.Join(dir, "device-information.json")
+	h, err := desk.Handler(desk.Options{
+		WebDir:                web,
+		MirrorPath:            filepath.Join(dir, "cars.json"),
+		DeviceInformationPath: missing,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := httptest.NewRequest(http.MethodGet, "/api/devices/vin-from-file", nil)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status %d body %s", rec.Code, rec.Body.String())
+	}
+	var got desk.VINFromFileResult
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+		t.Fatal(err)
+	}
+	if got.Exists || got.Path != missing {
+		t.Fatalf("%+v", got)
+	}
+}
+
+func TestVINFromFilePOSTAppliesSavedJSON(t *testing.T) {
+	dir := t.TempDir()
+	web := filepath.Join(dir, "out")
+	_ = os.MkdirAll(web, 0o755)
+	_ = os.WriteFile(filepath.Join(web, "index.html"), []byte("x"), 0o644)
+	info := filepath.Join(dir, "device-information.json")
+	var posted int
+	h, err := desk.Handler(desk.Options{
+		WebDir:                web,
+		MirrorPath:            filepath.Join(dir, "cars.json"),
+		DeviceInformationPath: info,
+		ApplyDeviceInformation: func(ctx context.Context) (desk.VINFromFileResult, error) {
+			posted++
+			if ctx == nil {
+				t.Fatal("nil context")
+			}
+			return desk.VINFromFileResult{
+				Path:     info,
+				Exists:   true,
+				Parsed:   2,
+				Upserted: 2,
+				Linked:   1,
+				Links:    []desk.VINFromFileLink{{FactoryID: "FACTVIN", DeviceID: "DEVVIN", VIN: "1HGCM82633A004352", EFleetsID: "27TESTA"}},
+			}, nil
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := httptest.NewRequest(http.MethodPost, "/api/devices/vin-from-file", nil)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status %d body %s", rec.Code, rec.Body.String())
+	}
+	if posted != 1 {
+		t.Fatalf("posted %d", posted)
+	}
+	if !strings.Contains(rec.Body.String(), "FACTVIN") || !strings.Contains(rec.Body.String(), `"asked": 0`) {
+		t.Fatalf("body %s", rec.Body.String())
+	}
+}
+
+func TestVINFromFilePOSTMissingFile(t *testing.T) {
+	dir := t.TempDir()
+	web := filepath.Join(dir, "out")
+	_ = os.MkdirAll(web, 0o755)
+	_ = os.WriteFile(filepath.Join(web, "index.html"), []byte("x"), 0o644)
+	info := filepath.Join(dir, "missing-device-information.json")
+	h, err := desk.Handler(desk.Options{
+		WebDir:                web,
+		MirrorPath:            filepath.Join(dir, "cars.json"),
+		DeviceInformationPath: info,
+		ApplyDeviceInformation: func(ctx context.Context) (desk.VINFromFileResult, error) {
+			return desk.VINFromFileResult{Path: info}, fmt.Errorf("saved OneStep device information not found at %s — drop the Device Information JSON there (OneStep cooling down; do not GET /device)", info)
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := httptest.NewRequest(http.MethodPost, "/api/devices/vin-from-file", nil)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("status %d body %s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "not found") {
+		t.Fatalf("body %s", rec.Body.String())
+	}
+}
+
+func TestVINFromFilePOSTWithoutStore(t *testing.T) {
+	dir := t.TempDir()
+	web := filepath.Join(dir, "out")
+	_ = os.MkdirAll(web, 0o755)
+	_ = os.WriteFile(filepath.Join(web, "index.html"), []byte("x"), 0o644)
+	h, err := desk.Handler(desk.Options{WebDir: web, MirrorPath: filepath.Join(dir, "cars.json")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := httptest.NewRequest(http.MethodPost, "/api/devices/vin-from-file", nil)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status %d body %s", rec.Code, rec.Body.String())
 	}
 }

@@ -12,6 +12,7 @@ import (
 	"oilchange/internal/config"
 	"oilchange/internal/desk"
 	"oilchange/internal/model"
+	"oilchange/internal/onestep"
 )
 
 // cmdServe hosts the static Oil Desk UI + /api/cars. No Node/npm required.
@@ -45,6 +46,21 @@ func cmdServe(cfg config.Config, args []string) int {
 			Evidence: a.FillEvidence,
 			Box:      a.BoxEvidence,
 			Probe:    a.ProbeOneBox,
+		}
+		auth := "none"
+		if cfg.OneStepToken != "" {
+			c := onestepAuthMode(cfg)
+			auth = c
+		}
+		opts.Records = &desk.RecordsAPI{
+			Fuel:        func(ctx context.Context) ([]model.CardTx, error) { return a.Store.ListCardTxs(ctx, "") },
+			Maintenance: a.Store.ListAllShopROs,
+			OilChanges:  a.Store.ListOilChanges,
+			Devices:     a.Store.ListDevices,
+			Miles:       a.Store.ListAllMilesSince,
+			FuelSource:  getenvDefault("OILCHANGE_FUEL_SOURCE", "sqlite card_transactions (eFleets DETAILS file-drop)"),
+			MaintSource: getenvDefault("OILCHANGE_MAINT_SOURCE", "sqlite shop_ros (file-drop Maintenance Detail)"),
+			OneStepAuth: auth,
 		}
 		opts.ApplyDeviceInformation = func(ctx context.Context) (desk.VINFromFileResult, error) {
 			res, err := a.ApplyDeviceInformation(ctx, *infoPath)
@@ -93,4 +109,17 @@ func cmdServe(cfg config.Config, args []string) int {
 		return model.ExitError
 	}
 	return model.ExitOK
+}
+
+func getenvDefault(key, fallback string) string {
+	if v := strings.TrimSpace(os.Getenv(key)); v != "" {
+		return v
+	}
+	return fallback
+}
+
+func onestepAuthMode(cfg config.Config) string {
+	c := onestep.NewClient(cfg.OneStepBase, cfg.OneStepToken)
+	c.PrivateKeyPEM = cfg.OneStepPrivateKey
+	return c.AuthMode()
 }

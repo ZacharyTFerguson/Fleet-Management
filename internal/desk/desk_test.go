@@ -14,6 +14,7 @@ import (
 
 	"oilchange/internal/desk"
 	"oilchange/internal/history"
+	"oilchange/internal/model"
 	"oilchange/internal/syncsupabase"
 )
 
@@ -298,5 +299,65 @@ func TestHistoryWithoutStore(t *testing.T) {
 	h.ServeHTTP(rec, req)
 	if rec.Code != http.StatusServiceUnavailable {
 		t.Fatalf("status %d", rec.Code)
+	}
+}
+
+func TestRecordsFuelAndPage(t *testing.T) {
+	dir := t.TempDir()
+	web := filepath.Join(dir, "out")
+	_ = os.MkdirAll(web, 0o755)
+	_ = os.WriteFile(filepath.Join(web, "index.html"), []byte("x"), 0o644)
+	at := time.Date(2026, 6, 19, 14, 0, 0, 0, time.UTC)
+	odo := 1000
+	h, err := desk.Handler(desk.Options{
+		WebDir:     web,
+		MirrorPath: filepath.Join(dir, "cars.json"),
+		Records: &desk.RecordsAPI{
+			Fuel: func(ctx context.Context) ([]model.CardTx, error) {
+				return []model.CardTx{{
+					CardID: "x10000", At: at, StationName: "WAWA", StationAddress: "1 MAIN",
+					Odometer: &odo, RecordedEFleetsID: "26LSZW",
+				}}, nil
+			},
+			Maintenance: func(ctx context.Context) ([]model.ShopRO, error) {
+				return []model.ShopRO{{
+					ROID: "92400001", EFleetsID: "27TESTA", Odometer: 100500, At: at,
+					LocationName: "Valvoline Instant Oil Change", ServiceDesc: "Full Synthetic Lube Oil Filter",
+				}}, nil
+			},
+			Devices: func(ctx context.Context) ([]model.OneStepDevice, error) {
+				car := "26LSZW"
+				return []model.OneStepDevice{{FactoryID: "3271116717", DeviceID: "dev1", LinkedCarEFleetsID: &car, Active: true}}, nil
+			},
+			Miles: func(ctx context.Context) ([]model.DriveStopMiles, error) {
+				return []model.DriveStopMiles{{FactoryID: "3271116717", Since: at, Miles: 12.5}}, nil
+			},
+			FuelSource:  "test DETAILS",
+			MaintSource: "test shop RO",
+			OneStepAuth: "jwt-rs256",
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range []string{"/records/", "/api/fuel", "/api/maintenance", "/api/onestep"} {
+		req := httptest.NewRequest(http.MethodGet, path, nil)
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("%s status %d body %s", path, rec.Code, rec.Body.String())
+		}
+		if path == "/records/" && !strings.Contains(rec.Body.String(), "Fuel &amp; Charging") {
+			t.Fatalf("records html missing fuel heading: %s", rec.Body.String()[:200])
+		}
+		if path == "/api/fuel" && !strings.Contains(rec.Body.String(), "WAWA") {
+			t.Fatalf("fuel body %s", rec.Body.String())
+		}
+		if path == "/api/maintenance" && !strings.Contains(rec.Body.String(), "Valvoline") {
+			t.Fatalf("maint body %s", rec.Body.String())
+		}
+		if path == "/api/onestep" && !strings.Contains(rec.Body.String(), "3271116717") {
+			t.Fatalf("onestep body %s", rec.Body.String())
+		}
 	}
 }

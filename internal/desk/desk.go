@@ -29,6 +29,7 @@ type Options struct {
 	DeviceInformationPath  string // gitignored Device Information JSON (file apply; no live HTTP)
 	ApplyDeviceInformation func(ctx context.Context) (VINFromFileResult, error)
 	History                *HistoryAPI
+	Records                *RecordsAPI
 }
 
 // VINFromFileLink is one factory_id → Enterprise car from the saved JSON.
@@ -102,6 +103,17 @@ func Handler(opts Options) (http.Handler, error) {
 	mux.HandleFunc("/api/devices/probe", func(w http.ResponseWriter, r *http.Request) {
 		serveDeviceProbe(w, r, opts.History)
 	})
+	mux.HandleFunc("/api/fuel", func(w http.ResponseWriter, r *http.Request) {
+		serveFuel(w, r, opts.Records)
+	})
+	mux.HandleFunc("/api/maintenance", func(w http.ResponseWriter, r *http.Request) {
+		serveMaintenance(w, r, opts.Records)
+	})
+	mux.HandleFunc("/api/onestep", func(w http.ResponseWriter, r *http.Request) {
+		serveOneStepStatus(w, r, opts.Records)
+	})
+	mux.HandleFunc("/records", serveRecordsPage)
+	mux.HandleFunc("/records/", serveRecordsPage)
 	mux.Handle("/", spaFileServer(static))
 	return mux, nil
 }

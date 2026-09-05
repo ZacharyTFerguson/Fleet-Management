@@ -1,6 +1,6 @@
 # Shared status
 
-Updated: 2026-09-04 (UTC) — watch `--live --persist` finished, then OneStep VIN-ask on leftover unpaired boxes, then `cards history --no-gps` rematch. **Do not** re-run the 260-box nearby `--live`. Do not start a second watch. Known on this sqlite after rematch: **92 / 205 (44.9%)**. VIN-ask linked **0** new boxes (empty OBD VIN stays unpaired). Last Reading untouched. When OneStep is cooling down, use saved Device Information JSON (`devices vin --from`, Oil Desk **Apply saved OneStep device information**) instead of another live `/device`.
+Updated: 2026-09-05 (UTC) — added [`OIL-CHANGES-NOT-REFLECTED.md`](OIL-CHANGES-NOT-REFLECTED.md) (Oil Desk last oil empty + eFleets presort). Prior 2026-09-04: watch `--live --persist` finished, then OneStep VIN-ask on leftover unpaired boxes, then `cards history --no-gps` rematch. **Do not** re-run the 260-box nearby `--live`. Do not start a second watch. Known on this sqlite after rematch: **92 / 205 (44.9%)**. VIN-ask linked **0** new boxes (empty OBD VIN stays unpaired). Last Reading untouched. When OneStep is cooling down, use saved Device Information JSON (`devices vin --from`, Oil Desk **Apply saved OneStep device information**) instead of another live `/device`.
 
 ## True now
 
@@ -36,6 +36,8 @@ Files (copied to `data/runtime/enterprise/`, gitignored): 12-month (2026-08-04),
 **189 / 205** cars have last oil. **16** have none in these exports (mostly new units). Last Reading still **146**. HOLDs unchanged (`NO_DEVICE` 55, `NO_TRUSTED_FILL` 4).
 
 Portal `EFLEETS_MAINT_URL` is still the HTML tab, not a CSV. Next live pull needs a captured export URL or CDP download.
+
+Oil Desk last-oil empty + eFleets presort (why, data path, next steps): [`OIL-CHANGES-NOT-REFLECTED.md`](OIL-CHANGES-NOT-REFLECTED.md). Committed `web/data/cars.json` is still 205 × null last oil (`mock-mirror`). Desk reads that mirror, not live sqlite. Do not seed last oil from Last Reading.
 
 ## GPS card match
 

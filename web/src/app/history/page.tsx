@@ -13,8 +13,9 @@ export default function HistoryPage() {
         <p className="brand">FLEET</p>
         <h1 className="headline">History</h1>
         <p className="lede">
-          One fill is one block. Drag it onto the car that used that card. The
-          database files each fill under one car; the board turns by region.
+          One fill is one block. Tap it, then tap a car — or drag it on a
+          computer. The database files each fill under one car; the board turns
+          by region.
         </p>
       </header>
       <HistoryBoard />

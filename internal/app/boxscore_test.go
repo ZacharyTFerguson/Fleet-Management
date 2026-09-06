@@ -52,6 +52,9 @@ func TestRebuildBoxScoreMaintPlusDriveStop(t *testing.T) {
 	if row.Status != oil.LedgerTrusted || row.Expected == nil || *row.Expected != 10100 || row.Overage != 20 {
 		t.Fatalf("expected maint+drive-stop: %+v", row)
 	}
+	if row.Difference == nil || *row.Difference != 20 {
+		t.Fatalf("difference recorded−expected: %+v", row)
+	}
 	if out.SumOverage != 20 || out.TrustedN != 1 {
 		t.Fatalf("rollup %+v", out)
 	}

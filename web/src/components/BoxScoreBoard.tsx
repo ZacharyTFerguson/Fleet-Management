@@ -12,6 +12,7 @@ type Row = {
   maint_at?: string;
   miles_since?: number;
   expected?: number;
+  difference?: number;
   overage: number;
   shortage: number;
   abs_diff?: number;
@@ -33,6 +34,7 @@ type Vehicle = {
   sum_shortage: number;
   latest_abs_diff?: number;
   latest_trend?: string;
+  abs_diff_series?: number[];
 };
 
 type Fleet = {
@@ -51,6 +53,19 @@ type Fleet = {
 };
 
 type Filter = "all" | "trusted" | "bucket";
+
+function trendLabel(trend?: string, inTrend = true) {
+  if (!inTrend) return "out";
+  if (trend === "up") return "growing";
+  if (trend === "down") return "shrinking";
+  if (trend === "flat") return "flat";
+  return trend || "—";
+}
+
+function seriesText(series?: number[]) {
+  if (!series || series.length === 0) return "";
+  return series.join(" → ");
+}
 
 export function BoxScoreBoard() {
   const [fleet, setFleet] = useState<Fleet | null>(null);
@@ -142,7 +157,7 @@ export function BoxScoreBoard() {
           {fleet?.sum_shortage ?? 0}
         </span>
         <span>
-          <span className="meta-label">Gap ↑ / ↓ / flat</span>
+          <span className="meta-label">|gap| growing / shrinking / flat</span>
           {fleet?.trend_up ?? 0} / {fleet?.trend_down ?? 0} / {fleet?.trend_flat ?? 0}
         </span>
         <div className="roster-actions">
@@ -164,8 +179,8 @@ export function BoxScoreBoard() {
           >
             <div className="car-card-head">
               <h2>{v.nickname || v.efleets_id}</h2>
-              <span className={"trend-badge " + (v.latest_trend || "hold")}>
-                {v.latest_trend || "—"}
+              <span className={"trend-badge " + trendLabel(v.latest_trend)}>
+                {trendLabel(v.latest_trend)}
               </span>
             </div>
             <p className="mono">{v.efleets_id}</p>
@@ -173,8 +188,15 @@ export function BoxScoreBoard() {
               over {v.sum_overage} · short {v.sum_shortage}
               {v.latest_abs_diff != null ? ` · |gap| ${v.latest_abs_diff}` : ""}
             </p>
+            {seriesText(v.abs_diff_series) ? (
+              <p className="matchup-why mono" aria-label="abs_diff series">
+                |gap| {seriesText(v.abs_diff_series)}
+              </p>
+            ) : (
+              <p className="matchup-why">no trusted |gap| series yet</p>
+            )}
             <p className="matchup-why">
-              {v.has_maint ? `maint ${v.maint_odo}` : "no good maintenance"} · {(v.rows || []).length} gas card transactions
+              {v.has_maint ? `maint ${v.maint_odo}` : "no good maintenance — HOLD"} · {(v.rows || []).length} gas card transactions
             </p>
           </button>
         ))}
@@ -207,6 +229,7 @@ export function BoxScoreBoard() {
               <th>Provider Transaction Time</th>
               <th>Gas card transaction</th>
               <th>Expected (maint + OneStep)</th>
+              <th>Diff (rec − exp)</th>
               <th>Over / short</th>
               <th>|gap|</th>
               <th>Trend</th>
@@ -224,13 +247,14 @@ export function BoxScoreBoard() {
                 </td>
                 <td className="mono">{r.recorded}</td>
                 <td className="mono">{r.expected ?? "—"}</td>
+                <td className="mono">{r.difference ?? "—"}</td>
                 <td className="mono">
                   {r.overage}/{r.shortage}
                 </td>
                 <td className="mono">{r.abs_diff ?? "—"}</td>
                 <td>
-                  <span className={"trend-badge " + r.trend}>
-                    {r.in_trend ? r.trend : "out"}
+                  <span className={"trend-badge " + trendLabel(r.trend, r.in_trend)}>
+                    {trendLabel(r.trend, r.in_trend)}
                   </span>
                 </td>
                 <td>

@@ -33,7 +33,7 @@ func (a *App) RebuildBoxScore(ctx context.Context) (FleetBoxScore, error) {
 	}
 	out := FleetBoxScore{
 		At:   time.Now().UTC().Format(time.RFC3339),
-		Note: "Recorded mileage = gas card transaction (fuel punch odo + Provider Transaction Time). Expected = good maintenance odo + OneStep miles since that stamp. Suspect/HOLD bucket is visible and does not move the trend until corrected or dismissed.",
+		Note: "Recorded = gas card / Enterprise fuel punch at Provider Transaction Time. Expected = last good maintenance odo + OneStep drive-stop since that stamp (never last oil + interval, never invented miles). Difference = recorded − expected; also abs_diff. |gap| growing = worse vs maint+GPS; shrinking = improving. HOLD when maint or OneStep pairing is missing.",
 	}
 	for _, car := range cars {
 		sc, err := a.scoreCar(ctx, car, false, time.Time{})
@@ -89,12 +89,17 @@ func (a *App) ListBoxScore(ctx context.Context) (FleetBoxScore, error) {
 	}
 	out := FleetBoxScore{
 		At:   time.Now().UTC().Format(time.RFC3339),
-		Note: "Recorded mileage = gas card transaction. Expected = good maintenance + OneStep since that stamp. Trusted rows feed overage/shortage and |gap| up/down. Suspect/HOLD stay out of trend.",
+		Note: "Recorded = gas card transaction. Expected = last good maintenance + OneStep since that stamp — not last oil + interval. Difference = recorded − expected. Trusted |gap| series shows growing vs shrinking. HOLD when maint or OneStep pairing is missing.",
 	}
 	for _, id := range ids {
 		rs := byCar[id]
-		sc := oil.BoxScoreOut{EFleetsID: id, Nickname: nicks[id], Rows: rs}
-		for _, r := range rs {
+		sc := oil.BoxScoreOut{EFleetsID: id, Nickname: nicks[id], Rows: rs, AbsDiffSeries: []int{}}
+		for i := range rs {
+			r := rs[i]
+			if r.Difference == nil {
+				r.Difference = r.SignedDifference()
+				rs[i] = r
+			}
 			if r.MaintOdo > 0 {
 				sc.MaintOdo = r.MaintOdo
 				sc.MaintAt = r.MaintAt
@@ -111,6 +116,7 @@ func (a *App) ListBoxScore(ctx context.Context) (FleetBoxScore, error) {
 				if r.AbsDiff != nil {
 					sc.LatestAbsDiff = r.AbsDiff
 					sc.LatestTrend = r.Trend
+					sc.AbsDiffSeries = append(sc.AbsDiffSeries, *r.AbsDiff)
 				}
 				switch r.Trend {
 				case oil.TrendUp:
@@ -129,6 +135,7 @@ func (a *App) ListBoxScore(ctx context.Context) (FleetBoxScore, error) {
 				out.HoldN++
 			}
 		}
+		sc.Rows = rs
 		out.Vehicles = append(out.Vehicles, sc)
 	}
 	return out, nil

@@ -1,6 +1,6 @@
 # Mileage measurement and box score
 
-Two related numbers. Do not collapse them. Never invent miles. Never use OneStep odometer.
+Two related numbers. Do not collapse them. Never invent miles. Never use OneStep odometer. Never use last oil + oil interval as box-score expected.
 
 ## Last Reading (sheet / oil due)
 
@@ -10,26 +10,22 @@ Lives only in `internal/oil`. Formula:
 
 HOLD `NO_DEVICE` / dead GPS / ambiguous pairing / `NO_DRIVESTOP`. Missing GPS is not zero. `oilchange compute` writes Last Reading; the box score does **not**.
 
-## Box score / variance ledger (gas card move)
+## Expected vs recorded (gas-card move)
 
-Answers: when a **gas card transaction** posts, how far is that punch odometer from maintenance + measured drive-stop, and is `|gap|` going up or down?
+When a **gas card / fuel punch** is recorded:
 
-| Side | Definition |
-|------|------------|
-| **Recorded mileage** | The **gas card transaction**: WEX/Enterprise fuel punch odometer + Provider Transaction Time. Not a vague “Enterprise reading.” |
-| **Expected** | Last **good maintenance** odometer + OneStep drive-stop miles from that maintenance timestamp to the punch second |
+1. **Expected mileage** = last **good maintenance record** odometer (trusted shop/RO or validated maintenance) **+** OneStep drive-stop miles since that maintenance timestamp (JWT + `device_id` + `dt_from`/`dt_to`). Never invent miles; never OneStep odo as the base.
+2. **Recorded mileage** = what the **gas card / Enterprise fuel punch** reported at that fill (Provider Transaction Time second).
+3. **Difference** = recorded − expected (locked sign). Card ahead → positive **overage**. Card behind → negative difference / **shortage**. Also store `abs_diff` = `|difference|`.
+4. **Box score / ledger**: for each vehicle over time, show whether that `|gap|` is **going up or down** (gap growing = getting worse vs maintenance+GPS truth; gap shrinking = improving). Track overage vs shortage relative to expected, and a running series of `abs_diff` so trends are visible.
 
-Sign (locked):
+The box score specifically answers: “when the gas card moves, how far is the card odo from maintenance+OneStep expectation, and is that error trending up or down?”
 
-- **Overage** = recorded − expected when the card is ahead
-- **Shortage** = expected − recorded when the card is behind
-- **abs_diff** = `|recorded − expected|`
+### HOLD / skip
 
-Suspect / HOLD punches stay visible and are **excluded from trend** until corrected or dismissed.
+HOLD (visible, not scored) when the maintenance base or OneStep pairing is missing. Do not invent expected. Do not treat missing drive-stop as `maint + 0`. Last oil + oil interval (`last_oil_miles + interval_miles`) is the Oil Desk **due** number only.
 
-### What expected is *not*
-
-Last oil + oil interval (`last_oil_miles + interval_miles`) is the Oil Desk **due** number. It is **not** box-score expected. An earlier draft assumed that if “expected” was unclear. Later lock replaced it: expected at a gas card punch is maintenance + drive-stop only.
+Suspect / unusual-Y punches stay visible and are **excluded from trend** until corrected or dismissed.
 
 ## Persist
 
@@ -37,6 +33,6 @@ SQLite (`mileage_ledger`, `drive_stop_windows`) is the working store. `oilchange
 
 ## UI / CLI
 
-- Desk `/boxscore/` — fleet rollup + per-unit cards + punch table
+- Desk `/boxscore/` — fleet rollup + per-unit cards + punch table + `|gap|` series
 - `oilchange boxscore [--rebuild] [--efleets-id]`
 - Measure one punch is opt-in live drive-stop. Rebuild uses stored windows only.

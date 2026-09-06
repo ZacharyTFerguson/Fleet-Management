@@ -133,7 +133,7 @@ cd web && npm ci && npm run dev          # App Router + /api/cars in Node
 
 Without Supabase credentials the CLI writes a **mock mirror** at `web/data/cars.json` and `oilchange serve` (or Next `/api/cars`) serves that. With credentials, sync upserts into `fleet_cars`. Schema/RLS: `supabase/migrations/` + `migrations/005_shared_project_fleet_prefix.sql` (anon SELECT on `fleet_cars` only).
 
-Who owns what: [`docs/DATA-OWNERS.md`](docs/DATA-OWNERS.md). OneStep places (Gas Stations only, portal-first writes): [`docs/ONESTEP-PLACES-API.md`](docs/ONESTEP-PLACES-API.md). Mileage box score: recorded mileage = gas card transaction; expected = good maintenance + drive-stop (never OneStep odometer).
+Who owns what: [`docs/DATA-OWNERS.md`](docs/DATA-OWNERS.md). OneStep places (Gas Stations only, portal-first writes): [`docs/ONESTEP-PLACES-API.md`](docs/ONESTEP-PLACES-API.md). Mileage box score: recorded = gas card punch; expected = last good maintenance + OneStep drive-stop (never last oil + interval, never OneStep odometer).
 
 ## Neon backup
 

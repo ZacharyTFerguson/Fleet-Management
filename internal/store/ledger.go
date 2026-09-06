@@ -16,11 +16,12 @@ func (s *Store) UpsertLedgerRow(ctx context.Context, r oil.LedgerRow) error {
 	}
 	_, err := s.exec(ctx, `INSERT INTO mileage_ledger (
 		efleets_id, card_id, punch_at, merchant, recorded_odo, maint_odo, maint_at, miles_since, expected_odo,
-		overage, shortage, abs_diff, trend, status, hold_reason, hold_detail, in_trend, created_at, updated_at)
-		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+		difference, overage, shortage, abs_diff, trend, status, hold_reason, hold_detail, in_trend, created_at, updated_at)
+		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
 		ON CONFLICT (efleets_id, punch_at, recorded_odo) DO UPDATE SET
 			card_id=excluded.card_id, merchant=excluded.merchant, maint_odo=excluded.maint_odo, maint_at=excluded.maint_at,
-			miles_since=excluded.miles_since, expected_odo=excluded.expected_odo, overage=excluded.overage, shortage=excluded.shortage,
+			miles_since=excluded.miles_since, expected_odo=excluded.expected_odo, difference=excluded.difference,
+			overage=excluded.overage, shortage=excluded.shortage,
 			abs_diff=excluded.abs_diff, trend=excluded.trend,
 			status=CASE WHEN mileage_ledger.status IN ('dismissed','corrected') THEN mileage_ledger.status ELSE excluded.status END,
 			hold_reason=CASE WHEN mileage_ledger.status IN ('dismissed','corrected') THEN mileage_ledger.hold_reason ELSE excluded.hold_reason END,
@@ -29,7 +30,7 @@ func (s *Store) UpsertLedgerRow(ctx context.Context, r oil.LedgerRow) error {
 			updated_at=excluded.updated_at`,
 		r.EFleetsID, r.CardID, r.PunchAt.UTC().Format(time.RFC3339), r.Merchant, r.Recorded,
 		anyIntZeroNil(r.MaintOdo), anyTimeRFC3339(timePtrIfSet(r.MaintAt)), anyFloatPtr(r.MilesSince), anyIntPtr(r.Expected),
-		r.Overage, r.Shortage, anyIntPtr(r.AbsDiff), r.Trend, r.Status, r.HoldReason, r.HoldDetail, inTrend, now, now)
+		anyIntPtr(r.Difference), r.Overage, r.Shortage, anyIntPtr(r.AbsDiff), r.Trend, r.Status, r.HoldReason, r.HoldDetail, inTrend, now, now)
 	return err
 }
 
@@ -57,7 +58,7 @@ func (s *Store) SetLedgerStatus(ctx context.Context, efleetsID, punchAt string, 
 
 func (s *Store) ListLedger(ctx context.Context, efleetsID string) ([]oil.LedgerRow, error) {
 	q := `SELECT efleets_id, COALESCE(card_id,''), punch_at, COALESCE(merchant,''), recorded_odo, maint_odo, maint_at, miles_since, expected_odo,
-		overage, shortage, abs_diff, COALESCE(trend,''), status, COALESCE(hold_reason,''), COALESCE(hold_detail,''), in_trend
+		difference, overage, shortage, abs_diff, COALESCE(trend,''), status, COALESCE(hold_reason,''), COALESCE(hold_detail,''), in_trend
 		FROM mileage_ledger`
 	var args []any
 	if efleetsID != "" {
@@ -74,11 +75,11 @@ func (s *Store) ListLedger(ctx context.Context, efleetsID string) ([]oil.LedgerR
 	for rows.Next() {
 		var r oil.LedgerRow
 		var punch, maint sql.NullString
-		var maintOdo, expected, abs sql.NullInt64
+		var maintOdo, expected, diff, abs sql.NullInt64
 		var miles sql.NullFloat64
 		var inTrend int
 		if err := rows.Scan(&r.EFleetsID, &r.CardID, &punch, &r.Merchant, &r.Recorded, &maintOdo, &maint, &miles, &expected,
-			&r.Overage, &r.Shortage, &abs, &r.Trend, &r.Status, &r.HoldReason, &r.HoldDetail, &inTrend); err != nil {
+			&diff, &r.Overage, &r.Shortage, &abs, &r.Trend, &r.Status, &r.HoldReason, &r.HoldDetail, &inTrend); err != nil {
 			return nil, err
 		}
 		if t := parseStoreTime(punch.String); t != nil {
@@ -98,9 +99,16 @@ func (s *Store) ListLedger(ctx context.Context, efleetsID string) ([]oil.LedgerR
 			v := int(expected.Int64)
 			r.Expected = &v
 		}
+		if diff.Valid {
+			v := int(diff.Int64)
+			r.Difference = &v
+		}
 		if abs.Valid {
 			v := int(abs.Int64)
 			r.AbsDiff = &v
+		}
+		if r.Difference == nil {
+			r.Difference = r.SignedDifference()
 		}
 		r.InTrend = inTrend != 0
 		out = append(out, r)

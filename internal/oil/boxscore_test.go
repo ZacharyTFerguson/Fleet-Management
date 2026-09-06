@@ -39,14 +39,39 @@ func TestScorePunchesExpectedVsGasCard(t *testing.T) {
 	if out.Rows[0].Expected == nil || *out.Rows[0].Expected != 10100 {
 		t.Fatalf("expected %v", out.Rows[0].Expected)
 	}
+	if out.Rows[0].Difference == nil || *out.Rows[0].Difference != 20 {
+		t.Fatalf("signed difference recorded−expected: %v", out.Rows[0].Difference)
+	}
 	if out.Rows[1].Overage != 5 || out.Rows[1].Trend != TrendDown || !out.Rows[1].InTrend {
 		t.Fatalf("p2 trend %+v", out.Rows[1])
+	}
+	if out.Rows[1].Difference == nil || *out.Rows[1].Difference != 5 {
+		t.Fatalf("p2 difference %v", out.Rows[1].Difference)
 	}
 	if out.Rows[2].Status != LedgerSuspect || out.Rows[2].InTrend {
 		t.Fatalf("suspect must stay out of trend: %+v", out.Rows[2])
 	}
 	if out.TrendTrusted != 2 || out.TrendDown != 1 || out.SumOverage != 25 {
 		t.Fatalf("rollup %+v", out)
+	}
+	if len(out.AbsDiffSeries) != 2 || out.AbsDiffSeries[0] != 20 || out.AbsDiffSeries[1] != 5 {
+		t.Fatalf("abs_diff series %+v", out.AbsDiffSeries)
+	}
+}
+
+func TestScorePunchesShortageIsNegativeDifference(t *testing.T) {
+	maint := time.Date(2026, 5, 1, 12, 0, 0, 0, time.UTC)
+	p1 := time.Date(2026, 5, 2, 12, 0, 0, 0, time.UTC)
+	out := ScorePunches(BoxScoreIn{
+		HasMaint: true, MaintOdo: 10000, MaintAt: maint, HasDevice: true,
+		Punches:      []GasCardPunch{{Recorded: 10080, At: p1}},
+		MilesToPunch: map[int64]float64{p1.Unix(): 100}, // expected 10100
+	})
+	if out.Rows[0].Shortage != 20 || out.Rows[0].Overage != 0 {
+		t.Fatalf("%+v", out.Rows[0])
+	}
+	if out.Rows[0].Difference == nil || *out.Rows[0].Difference != -20 {
+		t.Fatalf("shortage must be negative difference: %v", out.Rows[0].Difference)
 	}
 }
 
@@ -64,6 +89,33 @@ func TestScorePunchesHoldWhenMilesMissing(t *testing.T) {
 	}
 	if out.Rows[0].Expected != nil || out.Rows[0].InTrend {
 		t.Fatal("must not invent expected miles")
+	}
+}
+
+func TestScorePunchesHoldWhenMaintMissing(t *testing.T) {
+	at := time.Date(2026, 6, 1, 8, 0, 0, 0, time.UTC)
+	out := ScorePunches(BoxScoreIn{
+		HasDevice: true,
+		Punches:   []GasCardPunch{{Recorded: 5100, At: at}},
+		MilesToPunch: map[int64]float64{at.Unix(): 100},
+	})
+	if out.Rows[0].Status != LedgerHold || out.Rows[0].Expected != nil || out.Rows[0].Difference != nil {
+		t.Fatalf("missing maint must HOLD, not invent: %+v", out.Rows[0])
+	}
+}
+
+func TestScorePunchesHoldWhenNoDevice(t *testing.T) {
+	at := time.Date(2026, 6, 1, 8, 0, 0, 0, time.UTC)
+	out := ScorePunches(BoxScoreIn{
+		HasMaint: true, MaintOdo: 5000, MaintAt: at.Add(-time.Hour),
+		Punches:      []GasCardPunch{{Recorded: 5100, At: at}},
+		MilesToPunch: map[int64]float64{at.Unix(): 100},
+	})
+	if out.Rows[0].Status != LedgerHold || out.Rows[0].HoldReason != model.HoldNoDevice {
+		t.Fatalf("%+v", out.Rows[0])
+	}
+	if out.Rows[0].Expected != nil || out.Rows[0].Difference != nil {
+		t.Fatal("no device pairing must not invent expected")
 	}
 }
 

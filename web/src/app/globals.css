@@ -949,12 +949,14 @@ html.driver-mode .cta.driver-toggle.is-on {
   letter-spacing: 0.04em;
 }
 
-.trend-badge.up {
+.trend-badge.up,
+.trend-badge.growing {
   background: var(--hold-bg);
   color: var(--hold);
 }
 
-.trend-badge.down {
+.trend-badge.down,
+.trend-badge.shrinking {
   background: var(--live-bg);
   color: var(--live);
 }

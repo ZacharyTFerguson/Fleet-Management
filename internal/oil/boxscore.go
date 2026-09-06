@@ -54,16 +54,17 @@ type LedgerRow struct {
 	Recorded   int       `json:"recorded"`
 	MaintOdo   int       `json:"maint_odo"`
 	MaintAt    time.Time `json:"maint_at"`
-	MilesSince *float64  `json:"miles_since,omitempty"`
-	Expected   *int      `json:"expected,omitempty"`
-	Overage    int       `json:"overage"`
-	Shortage   int       `json:"shortage"`
-	AbsDiff    *int      `json:"abs_diff,omitempty"`
-	Trend      string    `json:"trend"`
-	Status     string    `json:"status"`
-	HoldReason string    `json:"hold_reason,omitempty"`
-	HoldDetail string    `json:"hold_detail,omitempty"`
-	InTrend    bool      `json:"in_trend"`
+	MilesSince  *float64  `json:"miles_since,omitempty"`
+	Expected    *int      `json:"expected,omitempty"`
+	Difference  *int      `json:"difference,omitempty"` // recorded − expected; nil when HOLD/skip
+	Overage     int       `json:"overage"`
+	Shortage    int       `json:"shortage"`
+	AbsDiff     *int      `json:"abs_diff,omitempty"`
+	Trend       string    `json:"trend"`
+	Status      string    `json:"status"`
+	HoldReason  string    `json:"hold_reason,omitempty"`
+	HoldDetail  string    `json:"hold_detail,omitempty"`
+	InTrend     bool      `json:"in_trend"`
 }
 
 // BoxScoreOut is per-vehicle ledger + rollup. Suspect/HOLD rows stay visible.
@@ -78,14 +79,17 @@ type BoxScoreOut struct {
 	TrendUp       int         `json:"trend_up"`
 	TrendDown     int         `json:"trend_down"`
 	TrendFlat     int         `json:"trend_flat"`
-	SumOverage    int         `json:"sum_overage"`
-	SumShortage   int         `json:"sum_shortage"`
-	LatestAbsDiff *int        `json:"latest_abs_diff,omitempty"`
-	LatestTrend   string      `json:"latest_trend,omitempty"`
+	SumOverage     int         `json:"sum_overage"`
+	SumShortage    int         `json:"sum_shortage"`
+	LatestAbsDiff  *int        `json:"latest_abs_diff,omitempty"`
+	LatestTrend    string      `json:"latest_trend,omitempty"`
+	AbsDiffSeries  []int       `json:"abs_diff_series"`
 }
 
 // ScorePunches compares each gas card transaction to maintenance + measured drive-stop.
-// Sign: overage = recorded − expected (card ahead); shortage = expected − recorded (card behind).
+// Sign (locked): difference = recorded − expected. Positive = overage (card ahead);
+// negative = shortage (card behind). abs_diff = |difference|. Trend is |gap| growing/shrinking.
+// Last oil + interval is never an input. Missing maint or drive-stop → HOLD, no invented expected.
 func ScorePunches(in BoxScoreIn) BoxScoreOut {
 	out := BoxScoreOut{EFleetsID: in.EFleetsID, Nickname: in.Nickname, MaintOdo: in.MaintOdo, MaintAt: in.MaintAt, HasMaint: in.HasMaint}
 	punches := append([]GasCardPunch(nil), in.Punches...)
@@ -97,6 +101,7 @@ func ScorePunches(in BoxScoreIn) BoxScoreOut {
 	})
 
 	var prevAbs *int
+	out.AbsDiffSeries = []int{}
 	for _, p := range punches {
 		row := scoreOne(in, p)
 		if row.Status == LedgerTrusted && row.AbsDiff != nil {
@@ -115,6 +120,7 @@ func ScorePunches(in BoxScoreIn) BoxScoreOut {
 			out.SumShortage += row.Shortage
 			out.LatestAbsDiff = row.AbsDiff
 			out.LatestTrend = row.Trend
+			out.AbsDiffSeries = append(out.AbsDiffSeries, *row.AbsDiff)
 		}
 		out.Rows = append(out.Rows, row)
 	}
@@ -181,7 +187,9 @@ func scoreOne(in BoxScoreIn, p GasCardPunch) LedgerRow {
 	row.MilesSince = &ms
 	expected := in.MaintOdo + int(math.Round(miles))
 	row.Expected = &expected
+	// Locked sign: difference = recorded − expected. Never last_oil + interval.
 	diff := p.Recorded - expected
+	row.Difference = &diff
 	if diff > 0 {
 		row.Overage = diff
 	} else if diff < 0 {
@@ -227,4 +235,17 @@ func GoodMaintenance(ros []model.ShopRO, fills []model.Fill) (odo int, at time.T
 
 func (r LedgerRow) Key() string {
 	return fmt.Sprintf("%s|%s|%d", r.EFleetsID, r.PunchAt.UTC().Format(time.RFC3339), r.Recorded)
+}
+
+// SignedDifference is recorded − expected. Prefer the stored pointer; else overage − shortage
+// when abs_diff was scored (legacy rows before the difference column).
+func (r LedgerRow) SignedDifference() *int {
+	if r.Difference != nil {
+		return r.Difference
+	}
+	if r.AbsDiff == nil {
+		return nil
+	}
+	d := r.Overage - r.Shortage
+	return &d
 }

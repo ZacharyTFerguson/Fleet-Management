@@ -36,3 +36,5 @@ SQLite (`mileage_ledger`, `drive_stop_windows`) is the working store. `oilchange
 - Desk `/boxscore/` — fleet rollup + per-unit cards + punch table + `|gap|` series
 - `oilchange boxscore [--rebuild] [--efleets-id]`
 - Measure one punch is opt-in live drive-stop. Rebuild uses stored windows only.
+
+How each **game card** is built field-by-field (UI + `mileage_ledger`), trusted vs HOLD, and how to load a fresh DETAILS + Maintenance drop: [`MILEAGE-BOX-SCORE-CARDS.md`](MILEAGE-BOX-SCORE-CARDS.md).

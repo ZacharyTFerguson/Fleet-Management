@@ -174,6 +174,9 @@ func (s *Store) upsertCarTx(ctx context.Context, c model.Car) error {
 		if err != nil {
 			return err
 		}
+		if err := s.reconcileLastOilTx(ctx, tx, c.EFleetsID); err != nil {
+			return err
+		}
 		return tx.Commit()
 	}
 	if err != nil && err != sql.ErrNoRows {
@@ -203,7 +206,32 @@ func (s *Store) upsertCarTx(ctx context.Context, c model.Car) error {
 	if err != nil {
 		return err
 	}
+	if err := s.reconcileLastOilTx(ctx, tx, c.EFleetsID); err != nil {
+		return err
+	}
 	return tx.Commit()
+}
+
+// reconcileLastOilTx makes roster ingest order-independent. Maintenance may be
+// imported before its car; in that case InsertOilChange keeps the audit row but
+// cannot update cars.last_oil_* until the roster arrives.
+func (s *Store) reconcileLastOilTx(ctx context.Context, tx *sql.Tx, efleetsID string) error {
+	var miles int
+	var day string
+	err := tx.QueryRowContext(ctx, s.pg(`SELECT miles, CAST(date AS TEXT) FROM oil_changes
+		WHERE efleets_id=? ORDER BY date DESC, miles DESC LIMIT 1`), efleetsID).Scan(&miles, &day)
+	if err == sql.ErrNoRows {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	_, err = tx.ExecContext(ctx, s.pg(`UPDATE cars SET last_oil_miles=?, last_oil_date=?
+		WHERE efleets_id=? AND (
+			last_oil_date IS NULL OR last_oil_date < ? OR
+			(last_oil_date = ? AND (last_oil_miles IS NULL OR last_oil_miles < ?))
+		)`), miles, day, efleetsID, day, day, miles)
+	return err
 }
 
 func (s *Store) carByEFleetsTx(ctx context.Context, tx *sql.Tx, id string) (*model.Car, error) {

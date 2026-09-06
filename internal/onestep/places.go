@@ -26,14 +26,16 @@ type PlaceProbe struct {
 
 // PlaceItem is a downloaded zone/marker/place. Gas-station pipeline only.
 type PlaceItem struct {
-	ID      string   `json:"id,omitempty"`
-	Name    string   `json:"name,omitempty"`
-	Address string   `json:"address,omitempty"`
-	Lat     *float64 `json:"lat,omitempty"`
-	Lng     *float64 `json:"lng,omitempty"`
-	Kind    string   `json:"kind,omitempty"`
-	Group   string   `json:"group,omitempty"`
-	RawKind string   `json:"-"`
+	ID       string    `json:"id,omitempty"`
+	Name     string    `json:"name,omitempty"`
+	Address  string    `json:"address,omitempty"`
+	Lat      *float64  `json:"lat,omitempty"`
+	Lng      *float64  `json:"lng,omitempty"`
+	Kind     string    `json:"kind,omitempty"` // zone_type (sample: polygon)
+	Group    string    `json:"group,omitempty"`
+	GroupIDs []string  `json:"group_ids,omitempty"`
+	Vertices []float64 `json:"vertices,omitempty"` // shape_data.vertices flat [lat,lng,…]
+	RawKind  string    `json:"-"`
 }
 
 const (
@@ -48,9 +50,11 @@ var placeListPaths = []string{
 	"/v3/api/public/marker",
 }
 
+// Documented writes (not proven on this key). Dry-run lists these; POST only if WriteProven.
 var placeCreatePaths = []string{
 	"/v3/api/public/marker",
 	"/v3/api/public/markers",
+	"/v3/api/public/marker-list",
 	"/v3/api/public/place",
 	"/v3/api/public/places",
 }
@@ -196,10 +200,18 @@ func mapsToPlaces(rows []map[string]any) []PlaceItem {
 				}
 			}
 		}
-		if it.Group == "" {
-			if gl, ok := m["zone_group_id_list"].([]any); ok && len(gl) > 0 {
-				it.Group = strAny(gl[0])
+		if gl, ok := m["zone_group_id_list"].([]any); ok {
+			for _, x := range gl {
+				if s, ok := x.(string); ok && s != "" {
+					it.GroupIDs = append(it.GroupIDs, s)
+				}
 			}
+			if it.Group == "" && len(it.GroupIDs) > 0 {
+				it.Group = it.GroupIDs[0]
+			}
+		}
+		if sd, ok := m["shape_data"].(map[string]any); ok {
+			it.Vertices = floatSlice(sd["vertices"])
 		}
 		out = append(out, it)
 	}
@@ -213,6 +225,20 @@ func strAny(vals ...any) string {
 		}
 	}
 	return ""
+}
+
+func floatSlice(v any) []float64 {
+	sl, ok := v.([]any)
+	if !ok {
+		return nil
+	}
+	var out []float64
+	for _, x := range sl {
+		if f, ok := floatAny(x); ok {
+			out = append(out, f)
+		}
+	}
+	return out
 }
 
 func floatAny(vals ...any) (float64, bool) {
@@ -288,18 +314,35 @@ func (c *Client) ListGasStationZones(ctx context.Context) ([]PlaceItem, string, 
 			break
 		}
 		for _, it := range page {
-			if _, ok := want[it.ID]; ok || (gid != "" && it.Group == gid) {
-				it.Group = GasStationsGroupName
-				if strings.Contains(it.Name, "_001_") || it.Name != "" {
-					out = append(out, it)
-				}
+			if !keepGasStationZone(it, gid, want) {
+				continue
 			}
+			it.Group = GasStationsGroupName
+			out = append(out, it)
 		}
 		if len(page) < 100 {
 			break
 		}
 	}
 	return out, "/v3/api/public/zone", nil
+}
+
+func keepGasStationZone(it PlaceItem, gid string, want map[string]struct{}) bool {
+	if _, ok := want[it.ID]; ok {
+		return true
+	}
+	if gid == "" {
+		return false
+	}
+	if it.Group == gid {
+		return true
+	}
+	for _, g := range it.GroupIDs {
+		if g == gid {
+			return true
+		}
+	}
+	return false
 }
 
 func (c *Client) gasStationsGroup(ctx context.Context) (groupID string, zoneIDs []string, err error) {
@@ -392,9 +435,10 @@ func (c *Client) DryRunMarker(ctx context.Context, p MarkerPayload) (map[string]
 		"list_probes":   probes,
 		"create_try":    placeCreatePaths,
 		"zone_try":      zoneCreatePaths,
+		"documented_writes": []string{"POST/PUT /zone", "POST/PUT /marker", "POST /marker-list"},
 		"write_proven":  WriteProven(),
 		"portal_url":    PortalMapURL,
-		"note":          "No POST was sent. Public create/update is documented but not proven on this key (PUT historically 500). Portal-first until ONESTEP_WRITE_PROVEN=1.",
+		"note":          "No POST was sent. Read is proven. PUT update historically 500; create via API is not proven. Portal-first until ONESTEP_WRITE_PROVEN=1.",
 	}
 	return out, nil
 }

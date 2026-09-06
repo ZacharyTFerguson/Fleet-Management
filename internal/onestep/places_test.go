@@ -34,16 +34,23 @@ func TestParsePlaceList(t *testing.T) {
 }
 
 func TestParsePlaceListNestedDetail(t *testing.T) {
-	raw := `{"result_list":[{"zone_id":"z9","display_name":"A000002_001_WAWAA_A_A","zone_group_id_list":["gid1"],"detail":{"lat_lng":{"lat":38.2,"lng":-77.1},"custom_fields":{"address":{"value":"2 Pike"}}}}]}`
+	raw := `{"result_list":[{"zone_id":"6ldgUl0NN2euKF81f07-1k","display_name":"A000001_001_SHELL_A_A","zone_type":"polygon","zone_group_id_list":["other","6ldgMVSEPkDtz-81f07-1k"],"shape_data":{"vertices":[38.1,-77.2,38.2,-77.1]},"detail":{"lat_lng":{"lat":38.2,"lng":-77.1},"custom_fields":{"address":{"value":"2 Pike"}}}}]}`
 	items, _ := parsePlaceList([]byte(raw))
-	if len(items) != 1 || items[0].ID != "z9" || items[0].Address != "2 Pike" {
+	if len(items) != 1 || items[0].ID != "6ldgUl0NN2euKF81f07-1k" || items[0].Address != "2 Pike" {
 		t.Fatalf("%+v", items)
 	}
 	if items[0].Lat == nil || *items[0].Lat != 38.2 || items[0].Lng == nil || *items[0].Lng != -77.1 {
 		t.Fatalf("latlng %+v", items[0])
 	}
-	if items[0].Group != "gid1" {
-		t.Fatalf("group %s", items[0].Group)
+	if items[0].Kind != "polygon" || len(items[0].Vertices) != 4 {
+		t.Fatalf("polygon %+v", items[0])
+	}
+	want := map[string]struct{}{"nope": {}}
+	if !keepGasStationZone(items[0], "6ldgMVSEPkDtz-81f07-1k", want) {
+		t.Fatal("must keep when zone_group_id_list contains Gas_Stations id")
+	}
+	if keepGasStationZone(items[0], "missing", want) {
+		t.Fatal("must not keep a shop/other group")
 	}
 }
 

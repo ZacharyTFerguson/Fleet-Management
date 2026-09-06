@@ -78,9 +78,11 @@ type Draft struct {
 }
 
 type ZoneDraft struct {
-	Shape   string `json:"shape"`
-	RadiusM int    `json:"radius_m"`
-	Prefer  string `json:"prefer"`
+	Shape    string    `json:"shape"`
+	RadiusM  int       `json:"radius_m"`
+	Prefer   string    `json:"prefer"`
+	ZoneType string    `json:"zone_type,omitempty"`
+	Vertices []float64 `json:"vertices,omitempty"`
 }
 
 func LabelOf(general, typeCode, brand, top, grade string) string {

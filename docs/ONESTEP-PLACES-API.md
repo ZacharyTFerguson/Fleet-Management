@@ -1,8 +1,8 @@
 # OneStep Places / Zones API (Gas Stations only)
 
-Research note for Fleet-Management. **This pipeline is Gas Stations only** (`type_code` `001`, group `Gas_Stations`). Do not create maintenance, shop, or other place types through this code path.
+Liaison live research for Fleet-Management. **This pipeline is Gas Stations only** (`type_code` `001`, group `Gas_Stations`). Do not create maintenance, shop, or other place types through this code path.
 
-No account IDs, API keys, PEMs, passwords, or JWTs belong in this file.
+No API keys, PEMs, passwords, or JWTs belong in this file. Resource ids below are public OneStep objects (not credentials); they can change — still look up `Gas_Stations` by `display_name`.
 
 ## Auth
 
@@ -12,12 +12,13 @@ Public v3 base:
 https://track.onestepgps.com/v3/api/public
 ```
 
-| Mode | When | How |
-|------|------|-----|
-| RS256 JWT Bearer | PEM present in vault / env | `Authorization: Bearer <jwt>` signed from API key + PEM |
-| `api-key` query | No PEM | `?api-key=` |
+This fleet signs a short-lived **RS256 JWT** from the account API key + private PEM. Claims are `{access_token, exp}`. Send it as:
 
-Never log the PEM or the JWT. Same auth as devices / drive-stop — see [`onestep-api-auth.md`](onestep-api-auth.md).
+```text
+Authorization: Bearer <jwt>
+```
+
+Without a PEM, fall back to `?api-key=`. Never log the PEM or the JWT. Implementation: `internal/onestep/jwt.go`. Also see [`onestep-api-auth.md`](onestep-api-auth.md).
 
 Portal map (human draw): `https://track.onestepgps.com/v3/ux/map/`
 
@@ -27,49 +28,63 @@ Use **only** these list calls. Paginate with `limit` + `offset`. Do **not** send
 
 | Step | Path | Query | What we keep |
 |------|------|-------|----------------|
-| 1 | `GET /zone-group` | `limit=50&offset=0` | Group whose `display_name` is `Gas_Stations`. Read `zone_id_list`. Historical live group id is an opaque string — do not hardcode it; look it up. |
-| 2 | `GET /zone` | `limit=100&offset=N` | Keep a zone if `zone_id` is in that list **or** `zone_group_id_list` contains the group id. |
+| 1 | `GET /zone-group` | `limit=50&offset=0` | Group whose `display_name` is `Gas_Stations`. Read `zone_id_list` (~14 on the research day). Observed live group id: `6ldgMVSEPkDtz-81f07-1k` — look it up; do not treat that string as a constant join key. |
+| 2 | `GET /zone` | `limit=100&offset=N` | Keep a zone if `zone_id` is in that list **or** `zone_group_id_list` **contains** the group id. |
 
-`GET /marker?limit=&offset=` also works for markers. It is not a substitute for the Gas_Stations zone list.
+`GET /marker?limit=&offset=` works. Portal **Places** are often the same objects as zones. Markers are not a substitute for the Gas_Stations zone list.
 
-### Fields we parse (sample zone)
+Do **not** `GET /zone/:id` (live **500**). Do **not** `POST /zone-list-by-ids` (docs path, live **404**). List + filter only.
+
+### Sample zone (A000001)
+
+Observed live `zone_id` `6ldgUl0NN2euKF81f07-1k` (`display_name` Canon label, `zone_type` polygon):
 
 | Field | Where |
 |-------|--------|
 | `zone_id` | id |
-| `display_name` | Canon label (`A000001_001_SHELL_A_A`) |
+| `display_name` | Canon label (`A000001_001_…`) |
+| `zone_type` | `polygon` on this sample |
 | `detail.lat_lng.{lat,lng}` | coordinates |
 | `detail.custom_fields.address.value` | street address |
-| `shape_data.vertices` | polygon (display only; we do not invent a circle from it) |
+| `shape_data.vertices` | flat `[lat,lng,lat,lng,…]` (display / re-review only; do not invent a circle from it) |
 | `zone_group_id_list` | group membership |
 
-Wrappers: `result_list` (then `zone_groups` / `data` / `result`). Gas-station matching after download is **exact Canon label** on `display_name` (case-insensitive).
+Wrappers: `result_list` (then `zone_groups` / `data` / `result`). After download, match on **exact Canon label** (`display_name`, case-insensitive). Type segment must be `001`.
 
 ## Failed / do-not-use paths (live)
 
 | Path | Live result | Do not use |
 |------|-------------|------------|
-| `GET /zone/:id` | **500** | Single-zone fetch |
+| `GET /zone/:id` | **500** | Single-zone fetch — use list + filter |
 | `GET /zone` with `belonging_to_groups` | **500** | Group filter query |
 | `GET /zone` with `return_count=true` | **500** | Count wrapper |
 | `POST /zone-list-by-ids` (docs) | **404** | Batch-by-ids |
 
-Older candidate probes (`/places`, `/geofences`, `/poi`, `/user-place`, `/important-location`) are not the proven Gas_Stations download. `DiscoverPlaces` still pings `/zone-group`, `/zone`, and `/marker` for dry-run status only. Bodies are never logged.
+`DiscoverPlaces` still pings `/zone-group`, `/zone`, and `/marker` for dry-run status only. Bodies are never logged (they can echo credentials).
 
 ## Create / update — not proven (portal-first)
 
-Documented `POST` / `PUT` zone and marker exist. **Create via API is not proven** on this fleet key. `PUT` update has historically returned **auth error 500**.
+Documented writes:
 
-Until a live POST/PUT succeeds on this key:
+| Method | Path |
+|--------|------|
+| POST / PUT | `/zone` |
+| POST / PUT | `/marker` |
+| POST | `/marker-list` |
 
-1. Review the station, geocode, dry-run.
-2. **Open the portal** and draw the Gas_Stations marker / canopy zone there.
-3. Re-download (`GET /zone-group` + `/zone`) to attach the live `zone_id`.
-4. Do not set `ONESTEP_WRITE_PROVEN=1` until that write is proven.
+Proven on this key: **read YES**. PUT update previously returned **auth error 500**. **Create via API is not proven** — portal UI only so far.
 
-`oilchange serve` refuses `POST` create unless `ONESTEP_WRITE_PROVEN=1`. Dry-run still lists payload + list probes and includes `portal_url`. Send remains confirm-gated (`SEND_TO_ONESTEP` + one-time token). No bulk.
+Pipeline (no shortcuts):
 
-If a proven write later fails 404/405/403, put the job on HOLD. Do not invent a zone id. Two SAVE failures → HOLD (Canon rules).
+1. Format the Canon label (`7_3_5_1_1`, type `001`, group `Gas_Stations`).
+2. Human review.
+3. Third-party map check (Nominatim / OSM default).
+4. Re-review vs OneStep GPS (`detail.lat_lng` after a list download).
+5. **Portal-first** or gated dry-run until a live POST/PUT is proven. Then one confirm-gated send (`SEND_TO_ONESTEP` + one-time token). No bulk.
+
+`oilchange serve` refuses create/update unless `ONESTEP_WRITE_PROVEN=1`. Dry-run lists the payload, proven GET probes, documented write paths, and `portal_url`. It does **not** POST.
+
+If a later proven write fails 404/405/403, HOLD. Do not invent a zone id. Two SAVE failures → HOLD (Canon rules).
 
 ## Auth for portal vs API
 

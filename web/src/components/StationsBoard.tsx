@@ -12,7 +12,7 @@ type Job = {
     group: string;
     lat?: number;
     lng?: number;
-    zone?: { radius_m: number; prefer: string };
+    zone?: { radius_m: number; prefer: string; zone_type?: string; vertices?: number[]; shape?: string };
   };
   review_notes?: string;
   third_party_lat?: number;
@@ -196,7 +196,11 @@ export function StationsBoard() {
             </span>
           </div>
           <p className="matchup-why">
-            Group {sel.draft?.group} · zone {sel.draft?.zone?.radius_m}m {sel.draft?.zone?.prefer}
+            Group {sel.draft?.group}
+            {sel.draft?.zone?.zone_type ? ` · ${sel.draft.zone.zone_type}` : ""}
+            {sel.draft?.zone?.vertices?.length
+              ? ` · ${sel.draft.zone.vertices.length / 2} vertices`
+              : ` · zone ${sel.draft?.zone?.radius_m}m ${sel.draft?.zone?.prefer}`}
           </p>
           <p>{sel.draft?.address}</p>
           {sel.last_error ? <p className="search-empty">{sel.last_error}</p> : null}

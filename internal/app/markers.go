@@ -102,6 +102,15 @@ func (a *App) upsertOneStepGasPlace(ctx context.Context, it onestep.PlaceItem) e
 	if it.Lng != nil {
 		draft.Lng = it.Lng
 	}
+	if it.Kind != "" {
+		draft.Zone.ZoneType = it.Kind
+		if strings.EqualFold(it.Kind, "polygon") {
+			draft.Zone.Shape = "polygon"
+		}
+	}
+	if len(it.Vertices) > 0 {
+		draft.Zone.Vertices = append([]float64(nil), it.Vertices...)
+	}
 	id := "job-" + p.GeneralCode
 	existing, _, _ := a.Store.GetMarkerJob(ctx, id)
 	stage := "onestep"

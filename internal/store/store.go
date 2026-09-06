@@ -815,7 +815,7 @@ func (s *Store) ListCardTxs(ctx context.Context, cardID string) ([]model.CardTx,
 		q += ` WHERE card_id=?`
 		args = append(args, cardID)
 	}
-	q += ` ORDER BY at`
+	q += ` ORDER BY at DESC, card_id, recorded_efleets_id, odometer, source_row`
 	rows, err := s.query(ctx, q, args...)
 	if err != nil {
 		return nil, err

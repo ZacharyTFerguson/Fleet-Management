@@ -39,6 +39,43 @@ func TestBuildBoardFilesOneFillUnderAssignedCar(t *testing.T) {
 	}
 }
 
+func TestBuildBoardFillsNewestFirst(t *testing.T) {
+	older := time.Date(2026, 6, 1, 10, 0, 0, 0, time.UTC)
+	newer := time.Date(2026, 6, 2, 10, 0, 0, 0, time.UTC)
+	same := time.Date(2026, 6, 3, 10, 0, 0, 0, time.UTC)
+	cars := []model.Car{{PDIID: "PDI-0003", EFleetsID: "27VA15", Nickname: "VA15", Region: "VA"}}
+	txOlder := model.CardTx{CardID: "C-OLD", At: older, StationName: "Shell", RecordedEFleetsID: "27VA15"}
+	txNewer := model.CardTx{CardID: "C-NEW", At: newer, StationName: "Shell", RecordedEFleetsID: "27VA15"}
+	txA := model.CardTx{CardID: "C-A", At: same, StationName: "Shell", RecordedEFleetsID: "27VA15"}
+	txB := model.CardTx{CardID: "C-B", At: same, StationName: "Shell", RecordedEFleetsID: "27VA15"}
+	assigns := []model.TxAssignment{
+		{TxKey: txOlder.Key(), AssignedEFleetsID: "27VA15", AssignedPDIID: "PDI-0003", Source: "owner"},
+		{TxKey: txNewer.Key(), AssignedEFleetsID: "27VA15", AssignedPDIID: "PDI-0003", Source: "owner"},
+		{TxKey: txA.Key(), AssignedEFleetsID: "27VA15", AssignedPDIID: "PDI-0003", Source: "owner"},
+		{TxKey: txB.Key(), AssignedEFleetsID: "27VA15", AssignedPDIID: "PDI-0003", Source: "owner"},
+	}
+	got := BuildBoard(cars, []model.CardTx{txOlder, txNewer, txA, txB}, assigns, "VA", newer)
+	if len(got.Cars) != 1 || len(got.Cars[0].Fills) != 4 {
+		t.Fatalf("fills %+v", got.Cars)
+	}
+	fills := got.Cars[0].Fills
+	if fills[0].CardID != "C-A" || fills[1].CardID != "C-B" || fills[2].CardID != "C-NEW" || fills[3].CardID != "C-OLD" {
+		t.Fatalf("newest-first stable order %+v", fills)
+	}
+}
+
+func TestBuildBoardUnassignedNewestFirst(t *testing.T) {
+	older := time.Date(2026, 6, 1, 10, 0, 0, 0, time.UTC)
+	newer := time.Date(2026, 6, 2, 10, 0, 0, 0, time.UTC)
+	cars := []model.Car{{PDIID: "PDI-0003", EFleetsID: "27VA15", Nickname: "VA15", Region: "VA"}}
+	txOlder := model.CardTx{CardID: "C-OLD", At: older, StationName: "Shell", RecordedEFleetsID: "27VA15"}
+	txNewer := model.CardTx{CardID: "C-NEW", At: newer, StationName: "Shell", RecordedEFleetsID: "27VA15"}
+	got := BuildBoard(cars, []model.CardTx{txOlder, txNewer}, nil, "VA", newer)
+	if len(got.Unassigned) != 2 || got.Unassigned[0].CardID != "C-NEW" || got.Unassigned[1].CardID != "C-OLD" {
+		t.Fatalf("unassigned newest-first %+v", got.Unassigned)
+	}
+}
+
 func TestBuildBoardUnassignedStaysInTray(t *testing.T) {
 	at := time.Date(2026, 6, 3, 10, 0, 0, 0, time.UTC)
 	cars := []model.Car{{PDIID: "PDI-0003", EFleetsID: "27VA15", Nickname: "VA15", Region: "VA"}}

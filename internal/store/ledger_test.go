@@ -51,3 +51,29 @@ func TestLedgerDismissSurvivesUpsert(t *testing.T) {
 		t.Fatalf("window %v %v %v", m, ok, err)
 	}
 }
+
+func TestListLedgerNewestFirst(t *testing.T) {
+	s, err := Open("sqlite", filepath.Join(t.TempDir(), "led-order.sqlite"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	ctx := context.Background()
+	older := time.Date(2026, 5, 1, 12, 0, 0, 0, time.UTC)
+	newer := time.Date(2026, 5, 2, 12, 0, 0, 0, time.UTC)
+	for _, row := range []oil.LedgerRow{
+		{EFleetsID: "27VA15", PunchAt: older, Recorded: 10000, Status: oil.LedgerHold},
+		{EFleetsID: "27VA15", PunchAt: newer, Recorded: 10100, Status: oil.LedgerHold},
+	} {
+		if err := s.UpsertLedgerRow(ctx, row); err != nil {
+			t.Fatal(err)
+		}
+	}
+	rows, err := s.ListLedger(ctx, "27VA15")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) != 2 || !rows[0].PunchAt.Equal(newer) {
+		t.Fatalf("newest-first %+v", rows)
+	}
+}

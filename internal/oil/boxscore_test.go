@@ -144,3 +144,16 @@ func TestGoodMaintenanceSkipsAbandonedShop(t *testing.T) {
 		t.Fatalf("good shop %d %v", odo2, ok)
 	}
 }
+
+func TestSortLedgerRowsDescNewestFirst(t *testing.T) {
+	older := time.Date(2026, 5, 1, 12, 0, 0, 0, time.UTC)
+	newer := time.Date(2026, 5, 2, 12, 0, 0, 0, time.UTC)
+	rows := []LedgerRow{
+		{PunchAt: older, Recorded: 10000},
+		{PunchAt: newer, Recorded: 10100},
+	}
+	SortLedgerRowsDesc(rows)
+	if !rows[0].PunchAt.Equal(newer) {
+		t.Fatalf("newest first %+v", rows)
+	}
+}

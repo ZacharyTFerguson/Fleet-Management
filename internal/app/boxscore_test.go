@@ -109,3 +109,48 @@ func TestListBoxScoreRefreshesStaleLedgerAfterMeasuredWindow(t *testing.T) {
 		t.Fatalf("recorded must be gas card; expected must be maint + drive-stop: %+v", row)
 	}
 }
+
+func TestRebuildBoxScoreRowsNewestFirst(t *testing.T) {
+	a := testApp(t)
+	ctx := context.Background()
+	maint := time.Date(2026, 5, 1, 12, 0, 0, 0, time.UTC)
+	older := time.Date(2026, 5, 2, 12, 0, 0, 0, time.UTC)
+	newer := time.Date(2026, 5, 3, 12, 0, 0, 0, time.UTC)
+	if err := a.Store.UpsertCar(ctx, model.Car{EFleetsID: "27VA15", Nickname: "VA15"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := a.Store.UpsertShopRO(ctx, model.ShopRO{
+		ROID: "RO1", EFleetsID: "27VA15", Odometer: 10000, At: maint,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	odoOld := 10120
+	odoNew := 10205
+	if err := a.Store.UpsertFill(ctx, model.Fill{EFleetsID: "27VA15", Odometer: &odoOld, ProviderTransactionTime: older}); err != nil {
+		t.Fatal(err)
+	}
+	if err := a.Store.UpsertFill(ctx, model.Fill{EFleetsID: "27VA15", Odometer: &odoNew, ProviderTransactionTime: newer}); err != nil {
+		t.Fatal(err)
+	}
+	link := "27VA15"
+	if err := a.Store.UpsertDevice(ctx, model.OneStepDevice{FactoryID: "FACT1", DeviceID: "dev1", LinkedCarEFleetsID: &link, Active: true}); err != nil {
+		t.Fatal(err)
+	}
+	if err := a.Store.SaveDriveStopWindow(ctx, "FACT1", maint, older, 100); err != nil {
+		t.Fatal(err)
+	}
+	if err := a.Store.SaveDriveStopWindow(ctx, "FACT1", maint, newer, 200); err != nil {
+		t.Fatal(err)
+	}
+
+	out, err := a.RebuildBoxScore(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(out.Vehicles) != 1 || len(out.Vehicles[0].Rows) != 2 {
+		t.Fatalf("%+v", out)
+	}
+	if !out.Vehicles[0].Rows[0].PunchAt.Equal(newer) || !out.Vehicles[0].Rows[1].PunchAt.Equal(older) {
+		t.Fatalf("desk rows must be newest-first %+v", out.Vehicles[0].Rows)
+	}
+}

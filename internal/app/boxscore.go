@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"sort"
 	"time"
 
 	"oilchange/internal/model"
@@ -40,6 +41,7 @@ func (a *App) RebuildBoxScore(ctx context.Context) (FleetBoxScore, error) {
 		if err != nil {
 			return FleetBoxScore{}, err
 		}
+		oil.SortLedgerRowsDesc(sc.Rows)
 		out.Vehicles = append(out.Vehicles, sc)
 		out.SumOverage += sc.SumOverage
 		out.SumShortage += sc.SumShortage
@@ -100,6 +102,7 @@ func (a *App) listStoredBoxScore(ctx context.Context) (FleetBoxScore, error) {
 	}
 	for _, id := range ids {
 		rs := byCar[id]
+		oil.SortLedgerRowsDesc(rs)
 		sc := oil.BoxScoreOut{EFleetsID: id, Nickname: nicks[id], Rows: rs, AbsDiffSeries: []int{}}
 		for i := range rs {
 			r := rs[i]
@@ -145,6 +148,9 @@ func (a *App) listStoredBoxScore(ctx context.Context) (FleetBoxScore, error) {
 		sc.Rows = rs
 		out.Vehicles = append(out.Vehicles, sc)
 	}
+	sort.Slice(out.Vehicles, func(i, j int) bool {
+		return out.Vehicles[i].EFleetsID < out.Vehicles[j].EFleetsID
+	})
 	return out, nil
 }
 

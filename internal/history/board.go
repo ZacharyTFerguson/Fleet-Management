@@ -173,10 +173,14 @@ func BuildBoard(cars []model.Car, txs []model.CardTx, assigns []model.TxAssignme
 		if !ok {
 			continue
 		}
-		sort.Slice(col.Fills, func(i, j int) bool { return col.Fills[i].At.Before(col.Fills[j].At) })
+		sort.SliceStable(col.Fills, func(i, j int) bool {
+			return model.FillBlockLessDesc(col.Fills[i].At, col.Fills[j].At, col.Fills[i].CardID, col.Fills[j].CardID, col.Fills[i].TxKey, col.Fills[j].TxKey)
+		})
 		board.Cars = append(board.Cars, *col)
 	}
-	sort.Slice(board.Unassigned, func(i, j int) bool { return board.Unassigned[i].At.After(board.Unassigned[j].At) })
+	sort.SliceStable(board.Unassigned, func(i, j int) bool {
+		return model.FillBlockLessDesc(board.Unassigned[i].At, board.Unassigned[j].At, board.Unassigned[i].CardID, board.Unassigned[j].CardID, board.Unassigned[i].TxKey, board.Unassigned[j].TxKey)
+	})
 	if board.Unassigned == nil {
 		board.Unassigned = []FillBlock{}
 	}

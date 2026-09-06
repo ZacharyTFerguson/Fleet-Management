@@ -15,12 +15,7 @@ const DefaultWatchFills = 10
 // NewestFillsFirst copies txs ordered by provider swipe time, newest first.
 func NewestFillsFirst(txs []model.CardTx) []model.CardTx {
 	out := append([]model.CardTx(nil), txs...)
-	sort.SliceStable(out, func(i, j int) bool {
-		if out[i].At.Equal(out[j].At) {
-			return out[i].CardID < out[j].CardID
-		}
-		return out[i].At.After(out[j].At)
-	})
+	model.SortCardTxsDesc(out)
 	return out
 }
 

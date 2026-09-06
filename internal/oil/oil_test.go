@@ -412,6 +412,15 @@ func TestIsOilChangeService(t *testing.T) {
 	if !IsOilChangeService("Conventional Lube Oil and Filter") {
 		t.Fatal("conventional lube oil and filter")
 	}
+	if !IsOilChangeService("Engine Oil & Filter Change") {
+		t.Fatal("Firestone-style oil & filter change is an oil change line")
+	}
+	if !IsOilChangeService("Oil and Filter Change") {
+		t.Fatal("oil and filter change")
+	}
+	if IsOilChangeService("Oil Filter Surcharge") {
+		t.Fatal("surcharge line is not last oil")
+	}
 	if IsOilChangeService("R/R OIL PAN") {
 		t.Fatal("oil pan is not an oil change")
 	}

@@ -385,16 +385,26 @@ func (s *Store) ListCarsAndOpenHolds(ctx context.Context) ([]model.Car, []model.
 }
 
 // UpsertFill is idempotent on eFleets ID + fill second + odo.
+// Punches without an odometer (EV charging, provider omissions) need the
+// NOT EXISTS guard: NULL never conflicts inside the UNIQUE key, so overlapping
+// 90d/12mo dumps would otherwise duplicate them on every sync-enterprise.
 func (s *Store) UpsertFill(ctx context.Context, f model.Fill) error {
-	var odo any
-	if f.Odometer != nil {
-		odo = *f.Odometer
+	at := f.ProviderTransactionTime.UTC().Format(time.RFC3339)
+	src := nz(f.Source, "fuel_details")
+	if f.Odometer == nil {
+		_, err := s.exec(ctx, `INSERT INTO fills (efleets_id, card_company_vehicle_number, odometer, unusual_y, provider_transaction_time, provider_company_vehicle_number, merchant_name, merchant_address, source)
+			SELECT ?,?,NULL,?,?,?,?,?,?
+			WHERE NOT EXISTS (SELECT 1 FROM fills WHERE efleets_id=? AND provider_transaction_time=? AND odometer IS NULL)`,
+			f.EFleetsID, f.CardCompanyVehicleNumber, f.UnusualY, at,
+			f.ProviderCompanyVehicleNumber, f.MerchantName, f.MerchantAddress, src,
+			f.EFleetsID, at)
+		return err
 	}
 	_, err := s.exec(ctx, `INSERT INTO fills (efleets_id, card_company_vehicle_number, odometer, unusual_y, provider_transaction_time, provider_company_vehicle_number, merchant_name, merchant_address, source)
 		VALUES (?,?,?,?,?,?,?,?,?)
 		ON CONFLICT (efleets_id, provider_transaction_time, odometer) DO NOTHING`,
-		f.EFleetsID, f.CardCompanyVehicleNumber, odo, f.UnusualY, f.ProviderTransactionTime.UTC().Format(time.RFC3339),
-		f.ProviderCompanyVehicleNumber, f.MerchantName, f.MerchantAddress, nz(f.Source, "fuel_details"))
+		f.EFleetsID, f.CardCompanyVehicleNumber, *f.Odometer, f.UnusualY, at,
+		f.ProviderCompanyVehicleNumber, f.MerchantName, f.MerchantAddress, src)
 	return err
 }
 
@@ -407,9 +417,10 @@ func nz(s, d string) string {
 }
 
 // ListFills returns punches for one car, oldest first, so the fill picker can walk the chain.
+// Tie-breakers keep same-second punches in one deterministic order across runs and dialects.
 func (s *Store) ListFills(ctx context.Context, efleetsID string) ([]model.Fill, error) {
 	rows, err := s.query(ctx, `SELECT efleets_id, card_company_vehicle_number, odometer, unusual_y, provider_transaction_time, provider_company_vehicle_number, merchant_name, merchant_address, source
-		FROM fills WHERE efleets_id=? ORDER BY provider_transaction_time`, efleetsID)
+		FROM fills WHERE efleets_id=? ORDER BY provider_transaction_time, COALESCE(odometer,0), id`, efleetsID)
 	if err != nil {
 		return nil, err
 	}
@@ -442,8 +453,9 @@ func (s *Store) UpsertShopRO(ctx context.Context, r model.ShopRO) error {
 }
 
 // ListShopROs is shop history for Last Reading and last-oil seed.
+// Tie-breakers keep same-day ROs in one deterministic order across runs and dialects.
 func (s *Store) ListShopROs(ctx context.Context, efleetsID string) ([]model.ShopRO, error) {
-	rows, err := s.query(ctx, `SELECT efleets_id, odometer, at, location_name, COALESCE(ro_id,''), COALESCE(service_desc,'') FROM shop_ros WHERE efleets_id=? ORDER BY at`, efleetsID)
+	rows, err := s.query(ctx, `SELECT efleets_id, odometer, at, location_name, COALESCE(ro_id,''), COALESCE(service_desc,'') FROM shop_ros WHERE efleets_id=? ORDER BY at, odometer, id`, efleetsID)
 	if err != nil {
 		return nil, err
 	}
@@ -815,7 +827,10 @@ func (s *Store) ListCardTxs(ctx context.Context, cardID string) ([]model.CardTx,
 		q += ` WHERE card_id=?`
 		args = append(args, cardID)
 	}
-	q += ` ORDER BY at DESC, card_id, recorded_efleets_id, odometer, source_row`
+	// Newest-first with the canonical tie order (model.CardTxLessDesc): same-second
+	// swipes must not shuffle between reads — History tx keys, the watch loop, and
+	// GPS matching all replay this list.
+	q += ` ORDER BY at DESC, COALESCE(odometer,-1) DESC, card_id, recorded_efleets_id, source_row`
 	rows, err := s.query(ctx, q, args...)
 	if err != nil {
 		return nil, err

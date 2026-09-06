@@ -96,6 +96,9 @@ func usage() {
   oilchange desk   same as serve --app: Chrome/Edge window, no browser chrome
   oilchange env
 
+Desk routes (after serve): /login /settings /secrets /stations
+  Status + Secrets + Gas Stations require desk login. Vault never echoes secrets.
+
 Secrets: gitignored oilchange.env or Cloud Agent secrets — never chat. See oilchange.env.example.
 oilchange env prints which keys loaded; it never prints secret values.
 Desktop UI: oilchange serve hosts embedded Oil Desk + /api/cars (no npm).

@@ -164,5 +164,8 @@ func (c Config) EnvReport() []string {
 		line("ONESTEP_API_PRIVATEKEY", c.OneStepPrivateKey, pemKind(c.OneStepPrivateKey, "BEGIN PRIVATE KEY")),
 		line("ONESTEP_API_PUBLIC_KEY", c.OneStepPublicKey, pemKind(c.OneStepPublicKey, "BEGIN PUBLIC KEY")),
 		line("ONESTEP_BASE_URL", c.OneStepBase, ""),
+		line("DESK_USERNAME", firstEnv("DESK_USERNAME"), "Oil Desk login (optional; first UI login bootstraps)"),
+		line("DESK_PASSWORD", firstEnv("DESK_PASSWORD"), "never printed"),
+		line("OILCHANGE_VAULT_KEY", firstEnv("OILCHANGE_VAULT_KEY"), "AES-GCM vault; else data/runtime/vault.key"),
 	}
 }

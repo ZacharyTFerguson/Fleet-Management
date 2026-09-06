@@ -359,12 +359,20 @@ html.driver-mode .search-empty {
   box-shadow: inset 4px 0 0 var(--live);
 }
 
-.car-card-top {
+.car-card-top,
+.car-card-head {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 0.75rem;
   margin-bottom: 0.85rem;
+}
+
+.car-card-head h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  color: var(--primary);
 }
 
 .unit-name {
@@ -840,4 +848,85 @@ html.driver-mode .cta.driver-toggle.is-on {
 
 .fill-undo {
   margin-top: 0.5rem;
+}
+
+.status-grid,
+.secret-list {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+}
+
+.secret-panel,
+.secret-card {
+  max-width: 40rem;
+}
+
+.secret-form {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.secret-input,
+.secret-pem {
+  width: 100%;
+  margin-top: 0.35rem;
+  padding: 0.75rem 0.9rem;
+  border: 2px solid var(--steel);
+  border-radius: 0.45rem;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--fog);
+  font-family: var(--font-body);
+  font-size: 1rem;
+}
+
+.secret-pem {
+  min-height: 7rem;
+  font-family: ui-monospace, "IBM Plex Mono", monospace;
+  font-size: 0.85rem;
+}
+
+.marker-table-wrap {
+  overflow-x: auto;
+  margin: 1rem 0 1.5rem;
+  border: 1px solid var(--line);
+}
+
+.marker-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+}
+
+.marker-table th,
+.marker-table td {
+  text-align: left;
+  padding: 0.65rem 0.75rem;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+
+.marker-table tr.is-sel {
+  background: color-mix(in srgb, var(--steel) 12%, transparent);
+}
+
+.map-preview {
+  width: 100%;
+  min-height: 16rem;
+  border: 2px solid var(--line);
+  margin: 0.75rem 0;
+  background: #0b1218;
+}
+
+.dry-run {
+  overflow: auto;
+  max-height: 18rem;
+  padding: 0.75rem;
+  border: 1px dashed var(--line);
+  font-size: 0.8rem;
+  color: var(--mist);
+}
+
+.marker-detail {
+  margin-top: 1rem;
 }

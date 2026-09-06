@@ -19,6 +19,7 @@ import (
 	"oilchange/internal/oil"
 	"oilchange/internal/onestep"
 	"oilchange/internal/store"
+	"oilchange/internal/vault"
 )
 
 // App wires CLI commands. Last Reading still happens only in internal/oil.
@@ -28,6 +29,7 @@ type App struct {
 	CardsMirror  string          // web/data/cards.json; empty skips the Cards desk write
 	OneStep      *onestep.Client // optional; GPS stop times for card matching
 	GPSStopsPath string          // optional override for tests; default data/runtime/gps-stops.json
+	Vault        *vault.Box      // AES-GCM desk secrets; never logged
 }
 
 // OpenStore opens sqlite or postgres from env.

@@ -29,6 +29,7 @@ type Options struct {
 	DeviceInformationPath  string // gitignored Device Information JSON (file apply; no live HTTP)
 	ApplyDeviceInformation func(ctx context.Context) (VINFromFileResult, error)
 	History                *HistoryAPI
+	Desk                   *DeskAPI
 }
 
 // VINFromFileLink is one factory_id → Enterprise car from the saved JSON.
@@ -102,6 +103,7 @@ func Handler(opts Options) (http.Handler, error) {
 	mux.HandleFunc("/api/devices/probe", func(w http.ResponseWriter, r *http.Request) {
 		serveDeviceProbe(w, r, opts.History)
 	})
+	mountDeskAPI(mux, opts.Desk)
 	mux.Handle("/", spaFileServer(static))
 	return mux, nil
 }

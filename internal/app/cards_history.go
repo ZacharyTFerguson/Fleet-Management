@@ -153,10 +153,18 @@ func (a *App) oneStepClient() *onestep.Client {
 	if a.OneStep != nil {
 		return a.OneStep
 	}
-	if strings.TrimSpace(a.Cfg.OneStepToken) == "" {
+	tok := strings.TrimSpace(a.Cfg.OneStepToken)
+	if tok == "" {
+		tok = a.SecretPlain(context.Background(), "onestep_api_key")
+	}
+	if tok == "" {
 		return nil
 	}
-	c := onestep.NewClient(a.Cfg.OneStepBase, a.Cfg.OneStepToken)
-	c.PrivateKeyPEM = a.Cfg.OneStepPrivateKey
+	c := onestep.NewClient(a.Cfg.OneStepBase, tok)
+	pem := a.Cfg.OneStepPrivateKey
+	if pem == "" {
+		pem = a.SecretPlain(context.Background(), "onestep_pem")
+	}
+	c.PrivateKeyPEM = pem
 	return c
 }

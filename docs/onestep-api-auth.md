@@ -11,7 +11,7 @@ Practical guide for calling the One Step GPS (OneStep / OneStepGPS) **public v3 
 | **Client PEM / private key** | No for public API | Working public-API callers authenticate with the API key only. Do not invent a client-cert or “sign your own JWT with a PEM” flow unless OneStep gives you that contract in writing. |
 | **Account / portal login** | Portal only | Browser History / Reports use the signed-in PDI Health session on `track.onestepgps.com`. That is separate from the public API key. |
 
-Org research briefs sometimes say “auth is JWT RS256.” Treat that as a description of **OneStep’s token format / portal crypto**, not as “you must load a PEM and mint JWTs yourself.” Pass the API key **as issued**.
+This fleet’s public API uses **RS256 JWT** when a PEM is present: sign `{access_token, exp}` from the account API key + private PEM and send `Authorization: Bearer <jwt>`. Never log the PEM or the JWT. Without a PEM, fall back to `?api-key=`. Places/zones: [`ONESTEP-PLACES-API.md`](ONESTEP-PLACES-API.md).
 
 ### Where the key lives (this org)
 

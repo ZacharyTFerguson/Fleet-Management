@@ -9,6 +9,14 @@ secrets/oilchange.env
 onestep.env
 onestep*.local
 *secret*
+# Keep the Secrets page / vault source (not credential files)
+!internal/app/secrets.go
+!internal/app/secrets_test.go
+!web/src/components/SecretsBoard.tsx
+!web/src/app/secrets/
+!web/src/app/secrets/**
+!web/out/secrets/
+!web/out/secrets/**
 *.pem
 *.key
 

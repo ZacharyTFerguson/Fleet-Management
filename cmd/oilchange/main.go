@@ -57,6 +57,8 @@ func run(args []string) int {
 		return cmdServe(cfg, append([]string{"-app"}, args[1:]...))
 	case "env":
 		return cmdEnv(cfg)
+	case "boxscore":
+		return cmdBoxScore(ctx, cfg, args[1:])
 	default:
 		usage()
 		return model.ExitError
@@ -94,7 +96,11 @@ func usage() {
   oilchange backup-neon
   oilchange serve [--addr 127.0.0.1:4739] [--mirror web/data/cars.json] [--web-dir PATH] [--device-information PATH] [--app] [--start /history/]
   oilchange desk   same as serve --app: Chrome/Edge window, no browser chrome
+  oilchange boxscore [--rebuild] [--efleets-id ID]
   oilchange env
+
+Desk routes (after serve): /login /settings /secrets /stations /boxscore
+  Status + Secrets + Gas Stations + Box score require desk login. Vault never echoes secrets.
 
 Secrets: gitignored oilchange.env or Cloud Agent secrets — never chat. See oilchange.env.example.
 oilchange env prints which keys loaded; it never prints secret values.

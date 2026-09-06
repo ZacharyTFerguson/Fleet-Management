@@ -251,6 +251,19 @@ func (c *Client) fetchDriveStopWindow(ctx context.Context, deviceID string, from
 	return sumDriveStop(b)
 }
 
+// DriveStopMilesWindow is measured trip miles from from→to. Never device odometer.
+func (c *Client) DriveStopMilesWindow(ctx context.Context, deviceID string, from, to time.Time) (float64, error) {
+	if deviceID == "" {
+		return 0, fmt.Errorf("drive-stop needs a device_id")
+	}
+	from = from.UTC()
+	to = to.UTC()
+	if !to.After(from) {
+		to = from.Add(time.Second)
+	}
+	return c.fetchDriveStopWindow(ctx, deviceID, from, to)
+}
+
 func (c *Client) fetchDriveStopBytes(ctx context.Context, deviceID string, from, to time.Time) ([]byte, error) {
 	if c != nil {
 		c.mu.Lock()

@@ -14,12 +14,13 @@ type BackupCounts struct {
 	Cards, CardTxs, Pairings, Eras            int
 	Devices, Miles, Holds, OilChanges         int
 	Assignments, AssignmentEvents             int
+	Places, Ledger, DriveStops                int
 }
 
 // LogLine is the operator-facing summary. It never includes a DSN or password.
 func (c BackupCounts) LogLine() string {
-	return fmt.Sprintf("neon backup cars=%d fills=%d shop_ros=%d holds=%d oil_changes=%d devices=%d miles=%d cards=%d card_txs=%d pairings=%d eras=%d assignments=%d assignment_events=%d stations=%d maint_locs=%d",
-		c.Cars, c.Fills, c.ShopROs, c.Holds, c.OilChanges, c.Devices, c.Miles, c.Cards, c.CardTxs, c.Pairings, c.Eras, c.Assignments, c.AssignmentEvents, c.Stations, c.MaintLocs)
+	return fmt.Sprintf("neon backup cars=%d fills=%d shop_ros=%d holds=%d oil_changes=%d devices=%d miles=%d cards=%d card_txs=%d pairings=%d eras=%d assignments=%d assignment_events=%d stations=%d maint_locs=%d places=%d ledger=%d drive_stops=%d",
+		c.Cars, c.Fills, c.ShopROs, c.Holds, c.OilChanges, c.Devices, c.Miles, c.Cards, c.CardTxs, c.Pairings, c.Eras, c.Assignments, c.AssignmentEvents, c.Stations, c.MaintLocs, c.Places, c.Ledger, c.DriveStops)
 }
 
 // validateNeonBackupURL refuses empty, pooled, XRAY, and Supabase DATABASE_URL values.
@@ -238,5 +239,38 @@ func CopyDurable(ctx context.Context, src, dest *store.Store) (BackupCounts, err
 		return c, fmt.Errorf("assignment events: %w", err)
 	}
 	c.AssignmentEvents = len(events)
+
+	pls, err := src.ListPlaces(ctx)
+	if err != nil {
+		return c, fmt.Errorf("list places: %w", err)
+	}
+	for _, p := range pls {
+		if err := dest.UpsertPlace(ctx, p); err != nil {
+			return c, fmt.Errorf("upsert place %s: %w", p.GeneralCode, err)
+		}
+	}
+	c.Places = len(pls)
+
+	ledger, err := src.ListLedger(ctx, "")
+	if err != nil {
+		return c, fmt.Errorf("list ledger: %w", err)
+	}
+	for _, r := range ledger {
+		if err := dest.UpsertLedgerRow(ctx, r); err != nil {
+			return c, fmt.Errorf("upsert ledger %s: %w", r.EFleetsID, err)
+		}
+	}
+	c.Ledger = len(ledger)
+
+	wins, err := src.ListDriveStopWindows(ctx)
+	if err != nil {
+		return c, fmt.Errorf("list drive-stop windows: %w", err)
+	}
+	for _, w := range wins {
+		if err := dest.SaveDriveStopWindow(ctx, w.FactoryID, w.From, w.To, w.Miles); err != nil {
+			return c, fmt.Errorf("save drive-stop window %s: %w", w.FactoryID, err)
+		}
+	}
+	c.DriveStops = len(wins)
 	return c, nil
 }

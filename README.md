@@ -36,7 +36,7 @@ Sit-still / important-location Node app lives in a separate PR (`cursor/importan
 | `sync` | Push local SQLite cars/holds to **ZacharyTFerguson's Project** (`hdtwfdjdvdzdxfdriyzn`, table `fleet_cars`) when `SUPABASE_URL` + (`SUPABASE_SERVICE_ROLE` or `SUPABASE_SYNC_SECRET`) are set, and refresh `web/data/cars.json`. `[--interval 5m]` for throughout-the-day refresh. Never targets XRAY. After a successful sync, also runs a **best-effort** Neon backup when `DATABASE_URL` is set (`[--require-neon]` to fail if backup is down). |
 | `pull-supabase` | GET `fleet_cars` from Zachary’s project using `SUPABASE_GROK_BUILD_KEY` (or service role). Merges non-null last_reading/HOLD into sqlite. Does not compute Last Reading. Never XRAY. |
 | `backup-neon` | Copy sqlite oilchange tables into **Neon** (`Fleet_Management_Neon` / `Fleet_Manage_Oil`). SQLite stays the working store. Alias: `backup`. |
-| `serve` | Host Oil Desk UI + `/api/cars` on `127.0.0.1:4739` from the **embedded** static export (`web/out`). **No npm/Node required.** `[--addr]` `[--mirror]` `[--web-dir]` `[--app]` `[--start /history/]`. **History** (`/history/`): one fill is one block; drag onto a car; SQLite `assignment_events` logs PDI-0003 → PDI-0020. Rebuilds do not wipe owner calls. **Devices** is GPS: cached evidence + one-box / one-fill live probe. Button **Apply saved OneStep device information** reads `data/runtime/device-information.json` (no live `/device`). Phone: Share → Add to Home Screen (standalone PWA). |
+| `serve` | Host Oil Desk UI + `/api/cars` on `127.0.0.1:4739` from the **embedded** static export (`web/out`). **No npm/Node required.** `[--addr]` `[--mirror]` `[--web-dir]` `[--app]` `[--start /history/]`. **History** (`/history/`): one fill is one block; drag onto a car; SQLite `assignment_events` logs PDI-0003 → PDI-0020. Rebuilds do not wipe owner calls. **Devices** is GPS: cached evidence + one-box / one-fill live probe. Button **Apply saved OneStep device information** reads `data/runtime/device-information.json` (no live `/device`). **Login** (`/login/`): desk session (first sign-in bootstraps). **Status** (`/settings/`): SQLite / Neon / Supabase / OneStep health — no secret values. **Secrets** (`/secrets/`): server-side AES-GCM vault (mask only after save). **Stations** (`/stations/`): Gas Stations–only marker review → third-party map check → dry-run → confirm-gated OneStep send. Phone: Share → Add to Home Screen (standalone PWA). |
 | `desk` | Same as `serve --app`: opens a Chrome/Edge window with no address bar. Secrets stay in `oilchange.env`, not the UI. |
 | `cards rebuild` | ingest optional `--fuel-details` then score every swipe into `card_pairings` (never writes Last Reading). GPS-first: stop windows from OneStep unless `--no-gps` (rematch from `data/runtime/gps-stops.json`). Station lat/lng from exclusive GPS sits; later swipes match the car at that pump even when another box is sitting elsewhere. |
 | `cards history` | **One operator path** for card/vehicle history: devices CSV → ask OneStep OBD VIN on unpaired boxes (`device_state.vin` = `cars.vin`) → ingest DETAILS (file or live `EFLEETS_*` in env) → GPS stops + `cards rebuild` → ladder 3/5/10 → persist `card_eras` → print coverage. `[--vehicles PATH]` `[--fuel-details PATH]` `[--devices-live]` `[--map PATH]` `[--devices-out PATH]` `[--no-gps]`. Never Last Reading. Never `display_name`. |
@@ -83,6 +83,8 @@ export OILCHANGE_DB=./oilchange.sqlite
 
 # 3) Start Oil Desk (http://127.0.0.1:4739) — static UI + /api/cars, no npm
 ./bin/oilchange serve --addr 127.0.0.1:4739 --mirror web/data/cars.json
+# Shareable preview: --addr 0.0.0.0:4739 then cloudflared / a tunnel.
+# Open /login/ then /settings/ /secrets/ /stations/ (Gas Stations only).
 ```
 
 Binary path after build: `bin/oilchange` (Windows: `bin/oilchange.exe`). Alias: `sync-supabase` ≡ `sync`.
@@ -130,6 +132,8 @@ cd web && npm ci && npm run dev          # App Router + /api/cars in Node
 | Web (`web/.env.local`) | Only needed for `npm run dev`. `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`. Never put service role / sync secret in `NEXT_PUBLIC_*`. Templates: `oilchange.env.example`, `web/.env.local.example`. |
 
 Without Supabase credentials the CLI writes a **mock mirror** at `web/data/cars.json` and `oilchange serve` (or Next `/api/cars`) serves that. With credentials, sync upserts into `fleet_cars`. Schema/RLS: `supabase/migrations/` + `migrations/005_shared_project_fleet_prefix.sql` (anon SELECT on `fleet_cars` only).
+
+Who owns what: [`docs/DATA-OWNERS.md`](docs/DATA-OWNERS.md). OneStep places (Gas Stations only, portal-first writes): [`docs/ONESTEP-PLACES-API.md`](docs/ONESTEP-PLACES-API.md). Mileage box score: recorded = gas card punch; expected = last good maintenance + OneStep drive-stop (never last oil + interval, never OneStep odometer).
 
 ## Neon backup
 

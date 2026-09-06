@@ -165,5 +165,6 @@ func sqliteSchema(s string) string {
 	s = strings.ReplaceAll(s, "DEFAULT now()", "DEFAULT (datetime('now'))")
 	s = strings.ReplaceAll(s, "now()", "datetime('now')")
 	s = strings.ReplaceAll(s, "DATE NOT NULL", "TEXT NOT NULL")
+	s = strings.ReplaceAll(s, "BYTEA", "BLOB")
 	return s
 }

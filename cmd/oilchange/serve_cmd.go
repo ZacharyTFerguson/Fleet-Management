@@ -11,7 +11,9 @@ import (
 	"oilchange/internal/app"
 	"oilchange/internal/config"
 	"oilchange/internal/desk"
+	"oilchange/internal/deskauth"
 	"oilchange/internal/model"
+	"oilchange/internal/vault"
 )
 
 // cmdServe hosts the static Oil Desk UI + /api/cars. No Node/npm required.
@@ -69,6 +71,35 @@ func cmdServe(cfg config.Config, args []string) int {
 				})
 			}
 			return out, err
+		}
+		box, err := vault.Open("")
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "oilchange serve: vault off (%v)\n", err)
+		} else {
+			a.Vault = box
+			_ = a.OverlayVault(context.Background())
+			opts.Desk = &desk.DeskAPI{
+				Auth:      deskauth.NewManager(nil),
+				Login:     a.Login,
+				Session:   a.SessionMeta,
+				Status:    a.Status,
+				Secrets:   a.ListSecrets,
+				PutSecret: a.PutSecret,
+				Markers:   a.ListMarkerJobs,
+				Pull:      a.PullGasCandidates,
+				Geocode:   a.GeocodeMarker,
+				Review:    a.ReviewMarker,
+				DryRun:    a.DryRunMarker,
+				Send:         a.SendMarker,
+				Zone:         a.SendZone,
+				Confirm:      a.ConfirmTokenFor,
+				PullOneStep:  a.PullOneStepGasStations,
+				BoxScore:     a.ListBoxScore,
+				RebuildScore: a.RebuildBoxScore,
+				MeasureScore: a.MeasureBoxScorePunch,
+				DismissScore: a.DismissLedger,
+				CorrectScore: a.CorrectLedger,
+			}
 		}
 	}
 	if *appWin {

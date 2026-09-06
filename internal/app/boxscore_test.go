@@ -153,4 +153,33 @@ func TestRebuildBoxScoreRowsNewestFirst(t *testing.T) {
 	if !out.Vehicles[0].Rows[0].PunchAt.Equal(newer) || !out.Vehicles[0].Rows[1].PunchAt.Equal(older) {
 		t.Fatalf("desk rows must be newest-first %+v", out.Vehicles[0].Rows)
 	}
+
+	// The stored-rows read (the payload the desk actually renders) must keep
+	// Latest* pointing at the newest trusted punch and the |gap| series
+	// chronological, even though Rows display newest-first.
+	// older: recorded 10120 vs expected 10000+100 -> |gap| 20
+	// newer: recorded 10205 vs expected 10000+200 -> |gap| 5 (improving)
+	listed, err := a.ListBoxScore(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(listed.Vehicles) != 1 {
+		t.Fatalf("%+v", listed)
+	}
+	v := listed.Vehicles[0]
+	if !v.Rows[0].PunchAt.Equal(newer) || !v.Rows[1].PunchAt.Equal(older) {
+		t.Fatalf("stored desk rows must be newest-first %+v", v.Rows)
+	}
+	if v.LatestAbsDiff == nil || *v.LatestAbsDiff != 5 {
+		t.Fatalf("latest |gap| must come from the newest trusted punch: %+v", v.LatestAbsDiff)
+	}
+	if v.LatestTrend != oil.TrendDown {
+		t.Fatalf("shrinking gap must trend down (improving): %+v", v.LatestTrend)
+	}
+	if len(v.AbsDiffSeries) != 2 || v.AbsDiffSeries[0] != 20 || v.AbsDiffSeries[1] != 5 {
+		t.Fatalf("|gap| series must stay chronological oldest->newest: %+v", v.AbsDiffSeries)
+	}
+	if listed.TrendDown != 1 {
+		t.Fatalf("fleet rollup should count the improving trend: %+v", listed)
+	}
 }

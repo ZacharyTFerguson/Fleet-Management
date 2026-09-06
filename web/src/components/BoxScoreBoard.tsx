@@ -50,7 +50,7 @@ type Fleet = {
   error?: string;
 };
 
-type Filter = "all" | "trusted" | "suspect" | "hold";
+type Filter = "all" | "trusted" | "bucket";
 
 export function BoxScoreBoard() {
   const [fleet, setFleet] = useState<Fleet | null>(null);
@@ -114,8 +114,8 @@ export function BoxScoreBoard() {
       }
     }
     if (filter === "all") return all;
-    if (filter === "hold") return all.filter((r) => r.status === "hold");
-    return all.filter((r) => r.status === filter);
+    if (filter === "trusted") return all.filter((r) => r.status === "trusted");
+    return all.filter((r) => r.status === "suspect" || r.status === "hold");
   }, [fleet, filter, unit]);
 
   return (
@@ -174,21 +174,27 @@ export function BoxScoreBoard() {
               {v.latest_abs_diff != null ? ` · |gap| ${v.latest_abs_diff}` : ""}
             </p>
             <p className="matchup-why">
-              {v.has_maint ? `maint ${v.maint_odo}` : "no good maintenance"} · {(v.rows || []).length} punches
+              {v.has_maint ? `maint ${v.maint_odo}` : "no good maintenance"} · {(v.rows || []).length} gas card transactions
             </p>
           </button>
         ))}
       </div>
 
       <div className="roster-actions filter-row">
-        {(["all", "trusted", "suspect", "hold"] as Filter[]).map((f) => (
+        {(
+          [
+            ["all", "All gas card transactions"],
+            ["trusted", "Trusted (in trend)"],
+            ["bucket", "Suspect / HOLD"],
+          ] as [Filter, string][]
+        ).map(([f, label]) => (
           <button
             key={f}
             className={"cta ghost" + (filter === f ? " is-current" : "")}
             type="button"
             onClick={() => setFilter(f)}
           >
-            {f}
+            {label}
           </button>
         ))}
       </div>
@@ -198,9 +204,9 @@ export function BoxScoreBoard() {
           <thead>
             <tr>
               <th>Car</th>
-              <th>Punch</th>
-              <th>Recorded (gas card)</th>
-              <th>Expected (maint + GPS)</th>
+              <th>Provider Transaction Time</th>
+              <th>Gas card transaction</th>
+              <th>Expected (maint + OneStep)</th>
               <th>Over / short</th>
               <th>|gap|</th>
               <th>Trend</th>

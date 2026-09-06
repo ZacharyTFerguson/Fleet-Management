@@ -16,7 +16,7 @@ Answers: when a **gas card transaction** posts, how far is that punch odometer f
 
 | Side | Definition |
 |------|------------|
-| **Recorded** | Gas card transaction odometer + Provider Transaction Time (not a vague “Enterprise reading”) |
+| **Recorded mileage** | The **gas card transaction**: WEX/Enterprise fuel punch odometer + Provider Transaction Time. Not a vague “Enterprise reading.” |
 | **Expected** | Last **good maintenance** odometer + OneStep drive-stop miles from that maintenance timestamp to the punch second |
 
 Sign (locked):

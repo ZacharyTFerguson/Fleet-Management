@@ -11,11 +11,11 @@ export default function BoxScorePage() {
         <p className="brand">FLEET</p>
         <h1 className="headline">Mileage box score</h1>
         <p className="lede">
-          Recorded is the gas card transaction odometer at punch time. Expected
-          is the last good maintenance odometer plus OneStep drive-stop miles
-          since that stamp. Never invent miles. Never OneStep odometer. Suspect
-          and HOLD stay visible and out of the trend until corrected or
-          dismissed.
+          Recorded mileage is the <strong>gas card transaction</strong> (WEX /
+          Enterprise fuel punch odometer + Provider Transaction Time)—not a
+          vague Enterprise reading. Expected is good maintenance odometer plus
+          OneStep drive-stop miles since that stamp. Suspect/HOLD stay in their
+          own bucket and do not move the trend until corrected or dismissed.
         </p>
       </header>
       <BoxScoreBoard />

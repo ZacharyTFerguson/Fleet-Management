@@ -33,7 +33,7 @@ func (a *App) RebuildBoxScore(ctx context.Context) (FleetBoxScore, error) {
 	}
 	out := FleetBoxScore{
 		At:   time.Now().UTC().Format(time.RFC3339),
-		Note: "Recorded = gas card transaction odo + punch time. Expected = good maintenance odo + OneStep drive-stop since that stamp (not last oil + interval). Suspect/HOLD visible, excluded from trend. Never invent miles. Never OneStep odometer. Does not write Last Reading.",
+		Note: "Recorded mileage = gas card transaction (fuel punch odo + Provider Transaction Time). Expected = good maintenance odo + OneStep miles since that stamp. Suspect/HOLD bucket is visible and does not move the trend until corrected or dismissed.",
 	}
 	for _, car := range cars {
 		sc, err := a.scoreCar(ctx, car, false, time.Time{})
@@ -89,7 +89,7 @@ func (a *App) ListBoxScore(ctx context.Context) (FleetBoxScore, error) {
 	}
 	out := FleetBoxScore{
 		At:   time.Now().UTC().Format(time.RFC3339),
-		Note: "Recorded = gas card transaction. Expected = maintenance + drive-stop. Trend uses trusted rows only. Last oil + interval is due miles, not this expected.",
+		Note: "Recorded mileage = gas card transaction. Expected = good maintenance + OneStep since that stamp. Trusted rows feed overage/shortage and |gap| up/down. Suspect/HOLD stay out of trend.",
 	}
 	for _, id := range ids {
 		rs := byCar[id]

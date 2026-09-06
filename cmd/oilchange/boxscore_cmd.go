@@ -56,7 +56,7 @@ func cmdBoxScore(ctx context.Context, cfg config.Config, args []string) int {
 			if r.MilesSince != nil {
 				miles = fmt.Sprintf("%.1f", *r.MilesSince)
 			}
-			fmt.Printf("%s %s rec=%d exp=%s over=%d short=%d abs=%s miles=%s trend=%s status=%s %s\n",
+			fmt.Printf("%s %s gas_card_tx=%d exp=%s over=%d short=%d abs=%s miles=%s trend=%s status=%s %s\n",
 				r.EFleetsID, r.PunchAt.UTC().Format("2006-01-02T15:04:05Z"), r.Recorded, exp,
 				r.Overage, r.Shortage, abs, miles, r.Trend, r.Status, r.HoldDetail)
 		}

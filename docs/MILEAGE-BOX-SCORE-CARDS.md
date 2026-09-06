@@ -13,7 +13,7 @@ Mileage box-score cards (`/boxscore/`): each unit is a “game” card for **gas
 - **Diff** = recorded − expected. Positive = **overage** (card ahead). Negative = **shortage** (card behind). `|gap|` = abs(diff).
 - Trend = whether `|gap|` is **growing** (worse) or **shrinking** (improving). **Trusted** punches only. Suspect / HOLD stay **visible** and **out of trend**.
 - Rebuild: `oilchange boxscore --rebuild` (or Desk **Rebuild from stored windows**). Uses stored `drive_stop_windows` only — missing GPS is HOLD, not zero.
-- Fresh Enterprise: file-drop CSV (`--vehicles` + `--fuel-details` + `--shop-ro`) → `sync-enterprise` → pair devices → rebuild → Desk **Measure** for `NO_DRIVESTOP`. Do not invent miles.
+- Cheif live drop (2026-09-06): DETAILS **90d ≈ 6308** gas-card txs → `--fuel-details`; Maintenance **12mo ≈ 8134** rows → `--shop-ro`. Then `boxscore --rebuild`. **Expected still needs OneStep drive-stop windows** (`MeasureBoxScorePunch` / stored `drive_stop_windows`). Without those windows, cards **HOLD on expected** (blank Expected, not `maint+0`). Do not invent miles.
 
 ---
 
@@ -215,46 +215,119 @@ CLI one-liner after rebuild:
 
 ---
 
-## 7. Load fresh Enterprise DETAILS + Maintenance, then rebuild cards
+## 7. Load Cheif’s live DETAILS + Maintenance, then rebuild cards
 
-Implemented path is **file-drop CSV** into `sync-enterprise`. Parsers are **header-by-name CSV** (`encoding/csv`). The CLI help mentions xlsx; `FileAdapter` reads the file as bytes and the parsers expect CSV. Convert Excel to CSV first. Put **headers on row 1** (named columns). Live eFleets Excel often has a title on row 1 and headers on row 2 — strip the title or the ingest fails closed (`eFleets file missing headers`). Do not guess columns by letter.
+Cheif’s 2026-09-06 live exports (operator disk / Downloads — **gitignored**, not in this repo):
 
-Typical drop dir (gitignored): `data/runtime/enterprise/`. Do not commit PII dumps. Do not pair a live 205-car Fleet Summary with `testdata/enterprise/maintenance.csv` (demo ids only).
+| Export | Window | Approx size | Becomes | Flag |
+|---|---|---|---|---|
+| Fuel & Charging **DETAILS** | 90 days | **~6308** gas-card transactions | `fills.odometer` + `ProviderTransactionTime` = **Recorded** | `--fuel-details` |
+| **Maintenance Detail** | 12 months | **~8134** line-item rows | `shop_ros` → `GoodMaintenance` = expected **base** | `--shop-ro` |
+| Fleet Summary / All Cars | current roster | 205 live ids | `cars.efleets_id` join | `--vehicles` |
 
-### Operator steps (as implemented)
+eFleets filenames are usually `DETAILS_583424_90-Days*.xlsx` (or `.csv`) and a Maintenance Detail 12-month Excel/CSV. Copy them into gitignored `data/runtime/enterprise/`. Do not commit PII. Do **not** pair the live roster with `testdata/enterprise/maintenance.csv` (demo `27TESTA` / `27TESTB` only).
+
+Any `--vehicles` / `--fuel-details` / `--shop-ro` flag selects **FileAdapter** and **skips live HTTP** for the reports you did not pass. So DETAILS-only ingest does **not** pull Maintenance, and Maintenance-only ingest does **not** pull DETAILS. Pass both flags (or run the two commands below) or expected/recorded will be incomplete.
+
+### xlsx vs CSV (same parsers, different flags)
+
+`FileAdapter` reads bytes; `ParseFills` / `ParseShopROs` are **header-by-name CSV**. Binary `.xlsx` / `.xls` will not parse. Convert each workbook to CSV with **headers on row 1**. Do not guess columns by letter.
+
+**DETAILS xlsx** (often title on row 1, headers on row 2 — see [`CHROME-SESSION-ENTERPRISE.md`](CHROME-SESSION-ENTERPRISE.md)):
+
+1. Open the 90-day DETAILS workbook.
+2. Delete or skip the title row so the first CSV row is `Vehicle`, `Provider Odometer`, `Provider Transaction Date`, `Provider Transaction Time`, `Provider Unusual Odometer Flag`, `Provider Location`, `Provider Card Number`, …
+3. Save as CSV (UTF-8).
+4. Pass that CSV as **`--fuel-details`** (this file is never `--shop-ro`).
+
+**Maintenance xlsx** (Detail tab, not the HTML `maintenanceSummary?maintenanceTab=detail` page):
+
+1. Open the 12-month Maintenance Detail workbook.
+2. First CSV row must include `Vehicle` and `Odometer`. Date is `RO Completed Date` / `RO Complete Date`, else `RO Created Date`. `RO ID` collapses many line items to one shop odo.
+3. Save as CSV.
+4. Pass that CSV as **`--shop-ro`** (this file is never `--fuel-details`).
+
+If the files are already CSV with those headers, skip conversion and pass the paths as-is.
+
+LibreOffice one-liner (optional; Excel “Save As CSV” is the same idea):
 
 ```bash
-export OILCHANGE_DB=./oilchange.sqlite
+# After stripping the DETAILS title row in the sheet:
+soffice --headless --convert-to csv --outdir data/runtime/enterprise \
+  data/runtime/enterprise/DETAILS_583424_90-Days.xlsx
+soffice --headless --convert-to csv --outdir data/runtime/enterprise \
+  data/runtime/enterprise/Maintenance_12mo.xlsx
+```
 
-# 1) Ingest roster + DETAILS (recorded) + Maintenance Detail (expected base).
-#    Does not compute Last Reading. Does not score the box score.
+### CLI — import, then construct unit cards
+
+```bash
+export OILCHANGE_DB=./oilchange.sqlite   # daily driver; do not overwrite the operator desktop db
+go build -o bin/oilchange ./cmd/oilchange
+
+# Roster first (or punches are skipped: "DETAILS skipped N punches for vehicles not on the roster").
+# Committed live-id roster (205 cars). Prefer a fresh Fleet Summary CSV if you have one.
 ./bin/oilchange sync-enterprise \
-  --vehicles data/runtime/enterprise/FleetSummary.csv \
-  --fuel-details data/runtime/enterprise/DETAILS.csv \
-  --shop-ro data/runtime/enterprise/Maintenance.csv
+  --vehicles testdata/enterprise/fleetsummary_live.csv
 
-# 2) GPS pairing (or punches HOLD NO_DEVICE). factory_id only; never display_name.
-#    Optional if cars already have a live linked box in onestep_devices.
+# DETAILS 90d (~6308 txs) → recorded gas-card punches. Does not write Last Reading or expected.
+./bin/oilchange sync-enterprise \
+  --fuel-details data/runtime/enterprise/DETAILS_583424_90-Days.csv
+
+# Maintenance 12mo (~8134 rows) → shop ROs / good-maint base. Does not write Last Reading.
+./bin/oilchange sync-enterprise \
+  --shop-ro data/runtime/enterprise/Maintenance_12mo.csv
+```
+
+Same ingest in **one** command (required if you want FileAdapter to load all three in one run):
+
+```bash
+./bin/oilchange sync-enterprise \
+  --vehicles testdata/enterprise/fleetsummary_live.csv \
+  --fuel-details data/runtime/enterprise/DETAILS_583424_90-Days.csv \
+  --shop-ro data/runtime/enterprise/Maintenance_12mo.csv
+```
+
+Pair GPS boxes if `onestep_devices` is empty (else punches HOLD `NO_DEVICE`):
+
+```bash
 ./bin/oilchange devices sync --map data/runtime/onestep-map.csv
-# and/or: ./bin/oilchange devices vin --from data/runtime/device-information.json
-
-# 3) Score cards from stored windows. Missing windows → HOLD, expected stays blank.
-./bin/oilchange boxscore --rebuild
-
-# 4) Desk: oilchange desk  →  /boxscore/
-#    Click Measure on NO_DRIVESTOP rows (needs OneStep token in oilchange.env).
-#    That writes drive_stop_windows, then rescores that car.
+# or: ./bin/oilchange devices vin --from data/runtime/device-information.json
 ```
 
-Dry run on committed fixtures (demo cars, not fleet miles):
+**Construct the game cards** from sqlite (stored windows only — no live OneStep, no Last Reading write):
 
 ```bash
-./bin/oilchange sync-enterprise \
-  --vehicles testdata/enterprise/fleetsummary.csv \
-  --fuel-details testdata/enterprise/details.csv \
-  --shop-ro testdata/enterprise/maintenance.csv
 ./bin/oilchange boxscore --rebuild
+# optional: ./bin/oilchange boxscore --rebuild --efleets-id 26LSZW
 ```
+
+Expect a first rebuild that **creates unit cards** (one per roster car that has punches) with Recorded filled, and **HOLD on Expected** wherever `drive_stop_windows` has no maint→punch trip. That is correct. Missing GPS is `NO_DRIVESTOP`, not `maint + 0`.
+
+### Desk — same rebuild + Measure for Expected
+
+```bash
+./bin/oilchange desk          # or: oilchange serve
+# sign in on /login/  →  open /boxscore/
+```
+
+1. Confirm fleet meta shows punch counts (trusted / suspect / HOLD).
+2. Click **Rebuild from stored windows** (`POST /api/boxscore/rebuild`) — same as `oilchange boxscore --rebuild`.
+3. Unit cards appear: nickname, `over` / `short`, `|gap|` series or “no trusted |gap| series yet”, `maint N` or “no good maintenance — HOLD”, `N gas card transactions`.
+4. Open **Suspect / HOLD**. Rows with `NO_DRIVESTOP` have blank Expected — click **Measure** (`POST /api/boxscore/measure` → `MeasureBoxScorePunch`). That live-fetches drive-stop for **that** maint→punch window, writes `drive_stop_windows`, and rescores the car.
+5. Rebuild again after several Measures. Trusted punches then get Expected, Diff, over/short, and enter the `|gap|` series.
+
+OneStep token must already be in gitignored `oilchange.env`. Measure is opt-in per punch. There is no bulk “fetch every window” on `--rebuild`.
+
+### Expected still needs drive-stop windows
+
+| Have | Card shows | `expected` / `difference` |
+|---|---|---|
+| DETAILS punches only | cards + punch count; HOLD | NULL |
+| + good Maintenance RO | `maint N` on the card; still HOLD if no GPS window | NULL |
+| + live `factory_id` + **stored** `drive_stop_windows` (or **Measure**) | trusted row, Expected = maint + round(miles-since) | scored |
+
+`oilchange sync-onestep` writes **`drive_stop_miles`** (Last Reading: trusted fill → now). That is **not** the box-score window. Box-score Expected uses `drive_stop_windows` from **good-maint stamp → gas-card second** only.
 
 ### What is **not** a live rebuild (yet)
 
@@ -267,6 +340,16 @@ Dry run on committed fixtures (demo cars, not fleet miles):
 | `oilchange compute` | Writes Last Reading only. Does **not** build game cards. |
 
 Never ask anyone to type an eFleets password in chat. File-drop CSVs do not need a portal login.
+
+Dry run on committed **demo** fixtures (not Cheif’s 6308 / 8134 live rows):
+
+```bash
+./bin/oilchange sync-enterprise \
+  --vehicles testdata/enterprise/fleetsummary.csv \
+  --fuel-details testdata/enterprise/details.csv \
+  --shop-ro testdata/enterprise/maintenance.csv
+./bin/oilchange boxscore --rebuild
+```
 
 ---
 

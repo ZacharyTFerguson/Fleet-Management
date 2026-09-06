@@ -37,4 +37,4 @@ SQLite (`mileage_ledger`, `drive_stop_windows`) is the working store. `oilchange
 - `oilchange boxscore [--rebuild] [--efleets-id]`
 - Measure one punch is opt-in live drive-stop. Rebuild uses stored windows only.
 
-How each **game card** is built field-by-field (UI + `mileage_ledger`), trusted vs HOLD, and how to load a fresh DETAILS + Maintenance drop: [`MILEAGE-BOX-SCORE-CARDS.md`](MILEAGE-BOX-SCORE-CARDS.md).
+How each **game card** is built field-by-field (UI + `mileage_ledger`), trusted vs HOLD, and how to import Cheif’s live DETAILS 90d (~6308 txs) + Maintenance 12mo (~8134 rows) then `boxscore --rebuild`: [`MILEAGE-BOX-SCORE-CARDS.md`](MILEAGE-BOX-SCORE-CARDS.md). Expected still needs OneStep `drive_stop_windows` (Desk **Measure** / `MeasureBoxScorePunch`) — without that, cards HOLD on expected.

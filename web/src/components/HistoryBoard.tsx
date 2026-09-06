@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState, useTransition, type ReactNode } from "react";
 import type { FillBlock, HistoryBoard as Board } from "@/lib/history";
 import { emptyBoard } from "@/lib/history";
+import { historyChipTap } from "@/lib/historyTap";
 
 const DRIVER_MODE_KEY = "fleet-driver-mode";
 
@@ -103,12 +104,13 @@ export function HistoryBoard() {
   };
 
   const onChipTap = (block: FillBlock) => {
-    if (held && held !== block.tx_key) {
-      if (block.assigned_efleets_id) {
-        place(block.assigned_efleets_id, "manual_drag");
-      } else {
-        place("", "undo");
-      }
+    const act = historyChipTap(held, block);
+    if (act.kind === "place") {
+      place(act.toEFleets, act.reason);
+      return;
+    }
+    if (act.kind === "hold") {
+      setHeld(act.txKey);
       return;
     }
     toggleHold(block.tx_key);

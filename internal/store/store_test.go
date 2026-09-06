@@ -434,6 +434,52 @@ func TestListOrderDeterministicOnSameSecond(t *testing.T) {
 	}
 }
 
+// TestFillsNullOdoSchemaGuard locks the two layers that keep NULL-odometer
+// punches (EV charging) from duplicating: the partial unique index added in
+// migration 010, and the migration's cleanup of duplicates an older binary
+// may already have written.
+func TestFillsNullOdoSchemaGuard(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "nullodo.sqlite")
+	s, err := Open("sqlite", p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	ctx := context.Background()
+	at := time.Date(2026, 9, 4, 9, 0, 0, 0, time.UTC).Format(time.RFC3339)
+
+	if _, err := s.exec(ctx, `INSERT INTO fills (efleets_id, provider_transaction_time, odometer) VALUES (?,?,NULL)`, "27SEPB", at); err != nil {
+		t.Fatal(err)
+	}
+	// A raw duplicate insert (bypassing the UpsertFill guard) must hit the index.
+	if _, err := s.exec(ctx, `INSERT INTO fills (efleets_id, provider_transaction_time, odometer) VALUES (?,?,NULL)`, "27SEPB", at); err == nil {
+		t.Fatal("partial unique index must reject a second NULL-odometer punch in the same second")
+	}
+
+	// Upgrade path: a database written by an older binary can already hold
+	// duplicates. Recreate that state and re-run migrations: the duplicates
+	// collapse to one row and the index comes back.
+	if _, err := s.db.Exec(`DROP INDEX fills_one_null_odo_per_second`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.exec(ctx, `INSERT INTO fills (efleets_id, provider_transaction_time, odometer) VALUES (?,?,NULL)`, "27SEPB", at); err != nil {
+		t.Fatal(err)
+	}
+	if err := applyMigrations(s.db, "sqlite"); err != nil {
+		t.Fatal(err)
+	}
+	var n int
+	if err := s.queryRow(ctx, `SELECT COUNT(*) FROM fills WHERE efleets_id=? AND odometer IS NULL`, "27SEPB").Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+	if n != 1 {
+		t.Fatalf("migration must collapse legacy NULL-odometer duplicates, got %d rows", n)
+	}
+	if _, err := s.exec(ctx, `INSERT INTO fills (efleets_id, provider_transaction_time, odometer) VALUES (?,?,NULL)`, "27SEPB", at); err == nil {
+		t.Fatal("index must be recreated after re-migration")
+	}
+}
+
 func TestCardTxRoundTrip(t *testing.T) {
 	p := filepath.Join(t.TempDir(), "cards.sqlite")
 	s, err := Open("sqlite", p)

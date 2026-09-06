@@ -5,6 +5,15 @@ sqlite → Desk/report path. Baseline: `main` after PR #38
 (`TestNormalOilUpdateOpsContract` green). Everything below shipped as code +
 tests in the same branch as this document.
 
+> **Reconciliation note (post-merge of PR #39):** this branch was rebased onto
+> the merged Composer review (PR #39), which introduced `internal/model/sort.go`.
+> The canonical newest-first order and its tie rule now live there (time DESC,
+> higher odometer first with missing odometer last, then card id, then stable
+> keys); the `history.SortBlocksNewestFirst` helper described in Cycle 2 was
+> folded into that shared comparator, and `store.ListCardTxs`/`ListLedger`
+> return newest-first to match. `docs/APP-REVIEW-COMPOSER-2026-09-06.md` covers
+> the other half of the reconciliation.
+
 ## How the app is actually used (observed path)
 
 1. **Dumps in.** An operator exports three eFleets reports — Fleet Summary,

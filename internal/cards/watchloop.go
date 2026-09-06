@@ -13,13 +13,30 @@ import (
 const DefaultWatchFills = 10
 
 // NewestFillsFirst copies txs ordered by provider swipe time, newest first.
+// Ties follow the canonical display order (History uses the same rule):
+// higher odometer first (missing odometer last), then card id, then tx key,
+// so a same-second pair never flips between the watch list and the board.
 func NewestFillsFirst(txs []model.CardTx) []model.CardTx {
 	out := append([]model.CardTx(nil), txs...)
 	sort.SliceStable(out, func(i, j int) bool {
-		if out[i].At.Equal(out[j].At) {
-			return out[i].CardID < out[j].CardID
+		a, b := out[i], out[j]
+		if !a.At.Equal(b.At) {
+			return a.At.After(b.At)
 		}
-		return out[i].At.After(out[j].At)
+		ao, bo := 0, 0
+		if a.Odometer != nil {
+			ao = *a.Odometer
+		}
+		if b.Odometer != nil {
+			bo = *b.Odometer
+		}
+		if ao != bo {
+			return ao > bo
+		}
+		if a.CardID != b.CardID {
+			return a.CardID < b.CardID
+		}
+		return a.Key() < b.Key()
 	})
 	return out
 }

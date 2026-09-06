@@ -417,9 +417,10 @@ func nz(s, d string) string {
 }
 
 // ListFills returns punches for one car, oldest first, so the fill picker can walk the chain.
+// Tie-breakers keep same-second punches in one deterministic order across runs and dialects.
 func (s *Store) ListFills(ctx context.Context, efleetsID string) ([]model.Fill, error) {
 	rows, err := s.query(ctx, `SELECT efleets_id, card_company_vehicle_number, odometer, unusual_y, provider_transaction_time, provider_company_vehicle_number, merchant_name, merchant_address, source
-		FROM fills WHERE efleets_id=? ORDER BY provider_transaction_time`, efleetsID)
+		FROM fills WHERE efleets_id=? ORDER BY provider_transaction_time, COALESCE(odometer,0), id`, efleetsID)
 	if err != nil {
 		return nil, err
 	}
@@ -452,8 +453,9 @@ func (s *Store) UpsertShopRO(ctx context.Context, r model.ShopRO) error {
 }
 
 // ListShopROs is shop history for Last Reading and last-oil seed.
+// Tie-breakers keep same-day ROs in one deterministic order across runs and dialects.
 func (s *Store) ListShopROs(ctx context.Context, efleetsID string) ([]model.ShopRO, error) {
-	rows, err := s.query(ctx, `SELECT efleets_id, odometer, at, location_name, COALESCE(ro_id,''), COALESCE(service_desc,'') FROM shop_ros WHERE efleets_id=? ORDER BY at`, efleetsID)
+	rows, err := s.query(ctx, `SELECT efleets_id, odometer, at, location_name, COALESCE(ro_id,''), COALESCE(service_desc,'') FROM shop_ros WHERE efleets_id=? ORDER BY at, odometer, id`, efleetsID)
 	if err != nil {
 		return nil, err
 	}
@@ -825,7 +827,9 @@ func (s *Store) ListCardTxs(ctx context.Context, cardID string) ([]model.CardTx,
 		q += ` WHERE card_id=?`
 		args = append(args, cardID)
 	}
-	q += ` ORDER BY at`
+	// Deterministic chronological walk: same-second swipes must not shuffle
+	// between reads (History keys and GPS matching both replay this list).
+	q += ` ORDER BY at, card_id, odometer, id`
 	rows, err := s.query(ctx, q, args...)
 	if err != nil {
 		return nil, err

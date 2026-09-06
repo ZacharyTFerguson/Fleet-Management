@@ -173,14 +173,46 @@ func BuildBoard(cars []model.Car, txs []model.CardTx, assigns []model.TxAssignme
 		if !ok {
 			continue
 		}
-		sort.Slice(col.Fills, func(i, j int) bool { return col.Fills[i].At.Before(col.Fills[j].At) })
+		SortBlocksNewestFirst(col.Fills)
 		board.Cars = append(board.Cars, *col)
 	}
-	sort.Slice(board.Unassigned, func(i, j int) bool { return board.Unassigned[i].At.After(board.Unassigned[j].At) })
+	SortBlocksNewestFirst(board.Unassigned)
 	if board.Unassigned == nil {
 		board.Unassigned = []FillBlock{}
 	}
 	return board
+}
+
+// SortBlocksNewestFirst is the one display order for fuel/DETAILS transactions:
+// Provider Transaction Date+Time descending, ties broken deterministically so
+// same-second punches never shuffle between renders. Car columns and the
+// unassigned tray both use it — the two lanes must not read in opposite
+// directions on one page.
+func SortBlocksNewestFirst(blocks []FillBlock) {
+	sort.SliceStable(blocks, func(i, j int) bool { return blockNewer(blocks[i], blocks[j]) })
+}
+
+// blockNewer ties: later time, then higher odometer (missing odometer last),
+// then card id, then tx key.
+func blockNewer(a, b FillBlock) bool {
+	if !a.At.Equal(b.At) {
+		return a.At.After(b.At)
+	}
+	ao, bo := odoOrZero(a.Odometer), odoOrZero(b.Odometer)
+	if ao != bo {
+		return ao > bo
+	}
+	if a.CardID != b.CardID {
+		return a.CardID < b.CardID
+	}
+	return a.TxKey < b.TxKey
+}
+
+func odoOrZero(p *int) int {
+	if p == nil {
+		return 0
+	}
+	return *p
 }
 
 func fillBelongsInRegion(b FillBlock, byE map[string]carMeta, region string) bool {

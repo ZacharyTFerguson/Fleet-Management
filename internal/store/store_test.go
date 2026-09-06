@@ -108,6 +108,43 @@ func TestInsertOilChangeAdvancesLastOilNotLastReading(t *testing.T) {
 	}
 }
 
+func TestUpsertCarReconcilesOilChangeImportedBeforeRoster(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "oil-before-roster.sqlite")
+	s, err := Open("sqlite", p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	ctx := context.Background()
+	older := time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)
+	newer := time.Date(2026, 8, 20, 0, 0, 0, 0, time.UTC)
+	for _, change := range []model.OilChange{
+		{EFleetsID: "27TESTA", Miles: 100000, Date: older, Location: "Old Shop", Source: "shop_ro"},
+		{EFleetsID: "27TESTA", Miles: 179598, Date: newer, Location: "Valvoline", Source: "shop_ro"},
+	} {
+		if err := s.InsertOilChange(ctx, change); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err := s.UpsertCar(ctx, model.Car{EFleetsID: "27TESTA", Nickname: "VA19"}); err != nil {
+		t.Fatal(err)
+	}
+	car, err := s.CarByEFleets(ctx, "27TESTA")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if car.LastOilMiles == nil || *car.LastOilMiles != 179598 {
+		t.Fatalf("last oil must reconcile from the latest stored maintenance row, got %+v", car.LastOilMiles)
+	}
+	if car.LastOilDate == nil || !car.LastOilDate.Equal(newer) {
+		t.Fatalf("last oil date %+v", car.LastOilDate)
+	}
+	if car.LastReadingMiles != nil {
+		t.Fatalf("roster reconciliation must not invent Last Reading, got %+v", car.LastReadingMiles)
+	}
+}
+
 func TestRemigrateReopenSameSQLite(t *testing.T) {
 	p := filepath.Join(t.TempDir(), "reopen.sqlite")
 	s1, err := Open("sqlite", p)

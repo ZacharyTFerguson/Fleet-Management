@@ -24,6 +24,7 @@ type Row = {
 
 type Vehicle = {
   efleets_id: string;
+  nickname?: string;
   maint_odo?: number;
   maint_at?: string;
   has_maint?: boolean;
@@ -56,6 +57,7 @@ export function BoxScoreBoard() {
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
+  const [unit, setUnit] = useState("");
 
   const load = (path = "/api/boxscore") => {
     fetch(path)
@@ -106,6 +108,7 @@ export function BoxScoreBoard() {
   const rows = useMemo(() => {
     const all: Row[] = [];
     for (const v of fleet?.vehicles || []) {
+      if (unit && v.efleets_id !== unit) continue;
       for (const r of v.rows || []) {
         all.push(r);
       }
@@ -113,7 +116,7 @@ export function BoxScoreBoard() {
     if (filter === "all") return all;
     if (filter === "hold") return all.filter((r) => r.status === "hold");
     return all.filter((r) => r.status === filter);
-  }, [fleet, filter]);
+  }, [fleet, filter, unit]);
 
   return (
     <section className="roster" aria-label="Mileage box score">
@@ -151,6 +154,32 @@ export function BoxScoreBoard() {
       {fleet?.note ? <p className="matchup-why">{fleet.note}</p> : null}
       {err ? <p className="search-empty">{err}</p> : null}
 
+      <div className="status-grid" aria-label="Per-unit box score">
+        {(fleet?.vehicles || []).map((v) => (
+          <button
+            key={v.efleets_id}
+            type="button"
+            className={"car-card unit-card" + (unit === v.efleets_id ? " is-sel" : "")}
+            onClick={() => setUnit(unit === v.efleets_id ? "" : v.efleets_id)}
+          >
+            <div className="car-card-head">
+              <h2>{v.nickname || v.efleets_id}</h2>
+              <span className={"trend-badge " + (v.latest_trend || "hold")}>
+                {v.latest_trend || "—"}
+              </span>
+            </div>
+            <p className="mono">{v.efleets_id}</p>
+            <p className="matchup-why">
+              over {v.sum_overage} · short {v.sum_shortage}
+              {v.latest_abs_diff != null ? ` · |gap| ${v.latest_abs_diff}` : ""}
+            </p>
+            <p className="matchup-why">
+              {v.has_maint ? `maint ${v.maint_odo}` : "no good maintenance"} · {(v.rows || []).length} punches
+            </p>
+          </button>
+        ))}
+      </div>
+
       <div className="roster-actions filter-row">
         {(["all", "trusted", "suspect", "hold"] as Filter[]).map((f) => (
           <button
@@ -170,8 +199,8 @@ export function BoxScoreBoard() {
             <tr>
               <th>Car</th>
               <th>Punch</th>
-              <th>Recorded</th>
-              <th>Expected</th>
+              <th>Recorded (gas card)</th>
+              <th>Expected (maint + GPS)</th>
               <th>Over / short</th>
               <th>|gap|</th>
               <th>Trend</th>

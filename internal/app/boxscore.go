@@ -33,7 +33,7 @@ func (a *App) RebuildBoxScore(ctx context.Context) (FleetBoxScore, error) {
 	}
 	out := FleetBoxScore{
 		At:   time.Now().UTC().Format(time.RFC3339),
-		Note: "Recorded = gas card transaction odo + punch time. Expected = good maintenance odo + OneStep drive-stop since that stamp. Suspect/HOLD visible, excluded from trend. Never invent miles. Never OneStep odometer.",
+		Note: "Recorded = gas card transaction odo + punch time. Expected = good maintenance odo + OneStep drive-stop since that stamp (not last oil + interval). Suspect/HOLD visible, excluded from trend. Never invent miles. Never OneStep odometer. Does not write Last Reading.",
 	}
 	for _, car := range cars {
 		sc, err := a.scoreCar(ctx, car, false, time.Time{})
@@ -73,6 +73,12 @@ func (a *App) ListBoxScore(ctx context.Context) (FleetBoxScore, error) {
 	if len(rows) == 0 {
 		return a.RebuildBoxScore(ctx)
 	}
+	nicks := map[string]string{}
+	if cars, err := a.Store.ListCars(ctx); err == nil {
+		for _, c := range cars {
+			nicks[c.EFleetsID] = c.Nickname
+		}
+	}
 	byCar := map[string][]oil.LedgerRow{}
 	var ids []string
 	for _, r := range rows {
@@ -83,11 +89,11 @@ func (a *App) ListBoxScore(ctx context.Context) (FleetBoxScore, error) {
 	}
 	out := FleetBoxScore{
 		At:   time.Now().UTC().Format(time.RFC3339),
-		Note: "Recorded = gas card transaction. Expected = maintenance + drive-stop. Trend uses trusted rows only.",
+		Note: "Recorded = gas card transaction. Expected = maintenance + drive-stop. Trend uses trusted rows only. Last oil + interval is due miles, not this expected.",
 	}
 	for _, id := range ids {
 		rs := byCar[id]
-		sc := oil.BoxScoreOut{EFleetsID: id, Rows: rs}
+		sc := oil.BoxScoreOut{EFleetsID: id, Nickname: nicks[id], Rows: rs}
 		for _, r := range rs {
 			if r.MaintOdo > 0 {
 				sc.MaintOdo = r.MaintOdo

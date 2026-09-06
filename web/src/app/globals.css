@@ -959,6 +959,17 @@ html.driver-mode .cta.driver-toggle.is-on {
   color: var(--live);
 }
 
+.unit-card {
+  text-align: left;
+  cursor: pointer;
+  width: 100%;
+}
+
+.unit-card.is-sel,
+.marker-table tr.is-sel {
+  outline: 2px solid var(--sodium);
+}
+
 .trend-badge.flat,
 .trend-badge.hold,
 .trend-badge.out {

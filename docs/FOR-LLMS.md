@@ -104,6 +104,7 @@ Do not commit `oilchange.env`, sqlite files, `data/runtime/`, PEMs, or `web/data
 | [`docs/NEON-FOR-LLMS.md`](NEON-FOR-LLMS.md) | Neon is already the sqlite backup — keep using it; do not recreate the project |
 | [`docs/onestep-api-auth.md`](onestep-api-auth.md) | Public v3 auth and drive-stop query names |
 | [`docs/ONESTEP-PLACES-API.md`](ONESTEP-PLACES-API.md) | Proven Gas_Stations list (`/zone-group` + `/zone`); portal-first create |
+| [`docs/MILEAGE-BOX-SCORE.md`](MILEAGE-BOX-SCORE.md) | Last Reading vs gas-card box score; expected is not last oil + interval |
 | [`docs/collab/README.md`](collab/README.md) | Collaborator notes for other sessions |
 | [`docs/ACCIDENTAL-TWIN.md`](ACCIDENTAL-TWIN.md) | Wrong GitHub repo — do not use it |
 

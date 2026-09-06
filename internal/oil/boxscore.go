@@ -69,6 +69,7 @@ type LedgerRow struct {
 // BoxScoreOut is per-vehicle ledger + rollup. Suspect/HOLD rows stay visible.
 type BoxScoreOut struct {
 	EFleetsID     string      `json:"efleets_id"`
+	Nickname      string      `json:"nickname,omitempty"`
 	MaintOdo      int         `json:"maint_odo"`
 	MaintAt       time.Time   `json:"maint_at"`
 	HasMaint      bool        `json:"has_maint"`
@@ -86,7 +87,7 @@ type BoxScoreOut struct {
 // ScorePunches compares each gas card transaction to maintenance + measured drive-stop.
 // Sign: overage = recorded − expected (card ahead); shortage = expected − recorded (card behind).
 func ScorePunches(in BoxScoreIn) BoxScoreOut {
-	out := BoxScoreOut{EFleetsID: in.EFleetsID, MaintOdo: in.MaintOdo, MaintAt: in.MaintAt, HasMaint: in.HasMaint}
+	out := BoxScoreOut{EFleetsID: in.EFleetsID, Nickname: in.Nickname, MaintOdo: in.MaintOdo, MaintAt: in.MaintAt, HasMaint: in.HasMaint}
 	punches := append([]GasCardPunch(nil), in.Punches...)
 	sort.Slice(punches, func(i, j int) bool {
 		if punches[i].At.Equal(punches[j].At) {

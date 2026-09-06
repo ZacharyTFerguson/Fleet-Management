@@ -59,3 +59,53 @@ func TestRebuildBoxScoreMaintPlusDriveStop(t *testing.T) {
 		t.Fatalf("rollup %+v", out)
 	}
 }
+
+func TestListBoxScoreRefreshesStaleLedgerAfterMeasuredWindow(t *testing.T) {
+	a := testApp(t)
+	ctx := context.Background()
+	maint := time.Date(2026, 5, 1, 12, 0, 0, 0, time.UTC)
+	punch := time.Date(2026, 5, 2, 12, 0, 0, 0, time.UTC)
+	if err := a.Store.UpsertCar(ctx, model.Car{EFleetsID: "27VA15", Nickname: "VA15"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := a.Store.UpsertShopRO(ctx, model.ShopRO{
+		ROID: "RO1", EFleetsID: "27VA15", Odometer: 10000, At: maint,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	odo := 10120
+	if err := a.Store.UpsertFill(ctx, model.Fill{
+		EFleetsID: "27VA15", Odometer: &odo, ProviderTransactionTime: punch,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	link := "27VA15"
+	if err := a.Store.UpsertDevice(ctx, model.OneStepDevice{
+		FactoryID: "FACT1", DeviceID: "dev1", LinkedCarEFleetsID: &link, Active: true,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	first, err := a.ListBoxScore(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.HoldN != 1 || first.Vehicles[0].Rows[0].Expected != nil {
+		t.Fatalf("missing drive-stop must cache a HOLD, got %+v", first)
+	}
+
+	if err := a.Store.SaveDriveStopWindow(ctx, "FACT1", maint, punch, 100); err != nil {
+		t.Fatal(err)
+	}
+	refreshed, err := a.ListBoxScore(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	row := refreshed.Vehicles[0].Rows[0]
+	if row.Status != oil.LedgerTrusted || row.Expected == nil || *row.Expected != 10100 {
+		t.Fatalf("desk returned stale cached HOLD after measured miles arrived: %+v", row)
+	}
+	if row.Recorded != 10120 || row.Difference == nil || *row.Difference != 20 {
+		t.Fatalf("recorded must be gas card; expected must be maint + drive-stop: %+v", row)
+	}
+}

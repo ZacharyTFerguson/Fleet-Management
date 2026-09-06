@@ -385,16 +385,26 @@ func (s *Store) ListCarsAndOpenHolds(ctx context.Context) ([]model.Car, []model.
 }
 
 // UpsertFill is idempotent on eFleets ID + fill second + odo.
+// Punches without an odometer (EV charging, provider omissions) need the
+// NOT EXISTS guard: NULL never conflicts inside the UNIQUE key, so overlapping
+// 90d/12mo dumps would otherwise duplicate them on every sync-enterprise.
 func (s *Store) UpsertFill(ctx context.Context, f model.Fill) error {
-	var odo any
-	if f.Odometer != nil {
-		odo = *f.Odometer
+	at := f.ProviderTransactionTime.UTC().Format(time.RFC3339)
+	src := nz(f.Source, "fuel_details")
+	if f.Odometer == nil {
+		_, err := s.exec(ctx, `INSERT INTO fills (efleets_id, card_company_vehicle_number, odometer, unusual_y, provider_transaction_time, provider_company_vehicle_number, merchant_name, merchant_address, source)
+			SELECT ?,?,NULL,?,?,?,?,?,?
+			WHERE NOT EXISTS (SELECT 1 FROM fills WHERE efleets_id=? AND provider_transaction_time=? AND odometer IS NULL)`,
+			f.EFleetsID, f.CardCompanyVehicleNumber, f.UnusualY, at,
+			f.ProviderCompanyVehicleNumber, f.MerchantName, f.MerchantAddress, src,
+			f.EFleetsID, at)
+		return err
 	}
 	_, err := s.exec(ctx, `INSERT INTO fills (efleets_id, card_company_vehicle_number, odometer, unusual_y, provider_transaction_time, provider_company_vehicle_number, merchant_name, merchant_address, source)
 		VALUES (?,?,?,?,?,?,?,?,?)
 		ON CONFLICT (efleets_id, provider_transaction_time, odometer) DO NOTHING`,
-		f.EFleetsID, f.CardCompanyVehicleNumber, odo, f.UnusualY, f.ProviderTransactionTime.UTC().Format(time.RFC3339),
-		f.ProviderCompanyVehicleNumber, f.MerchantName, f.MerchantAddress, nz(f.Source, "fuel_details"))
+		f.EFleetsID, f.CardCompanyVehicleNumber, *f.Odometer, f.UnusualY, at,
+		f.ProviderCompanyVehicleNumber, f.MerchantName, f.MerchantAddress, src)
 	return err
 }
 

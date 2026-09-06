@@ -11,17 +11,17 @@ import (
 
 // FleetBoxScore is the desk rollup. Last Reading is not written here.
 type FleetBoxScore struct {
-	At           string            `json:"at"`
-	Note         string            `json:"note"`
-	Vehicles     []oil.BoxScoreOut `json:"vehicles"`
-	SumOverage   int               `json:"sum_overage"`
-	SumShortage  int               `json:"sum_shortage"`
-	TrendUp      int               `json:"trend_up"`
-	TrendDown    int               `json:"trend_down"`
-	TrendFlat    int               `json:"trend_flat"`
-	SuspectN     int               `json:"suspect_n"`
-	HoldN        int               `json:"hold_n"`
-	TrustedN     int               `json:"trusted_n"`
+	At          string            `json:"at"`
+	Note        string            `json:"note"`
+	Vehicles    []oil.BoxScoreOut `json:"vehicles"`
+	SumOverage  int               `json:"sum_overage"`
+	SumShortage int               `json:"sum_shortage"`
+	TrendUp     int               `json:"trend_up"`
+	TrendDown   int               `json:"trend_down"`
+	TrendFlat   int               `json:"trend_flat"`
+	SuspectN    int               `json:"suspect_n"`
+	HoldN       int               `json:"hold_n"`
+	TrustedN    int               `json:"trusted_n"`
 }
 
 // RebuildBoxScore scores every gas card transaction against good maintenance + stored drive-stop windows.
@@ -66,12 +66,19 @@ func (a *App) RebuildBoxScore(ctx context.Context) (FleetBoxScore, error) {
 }
 
 func (a *App) ListBoxScore(ctx context.Context) (FleetBoxScore, error) {
+	// The desk read must reflect newly ingested DETAILS/Maintenance and newly
+	// measured drive-stop windows. UpsertLedgerRow preserves dismissed/corrected
+	// operator decisions; reading the stored rows afterward surfaces those states.
+	if _, err := a.RebuildBoxScore(ctx); err != nil {
+		return FleetBoxScore{}, err
+	}
+	return a.listStoredBoxScore(ctx)
+}
+
+func (a *App) listStoredBoxScore(ctx context.Context) (FleetBoxScore, error) {
 	rows, err := a.Store.ListLedger(ctx, "")
 	if err != nil {
 		return FleetBoxScore{}, err
-	}
-	if len(rows) == 0 {
-		return a.RebuildBoxScore(ctx)
 	}
 	nicks := map[string]string{}
 	if cars, err := a.Store.ListCars(ctx); err == nil {
@@ -208,7 +215,6 @@ func liveLinked(devs []model.OneStepDevice) []model.OneStepDevice {
 	}
 	return out
 }
-
 
 func (a *App) windowMiles(ctx context.Context, live []model.OneStepDevice, from, to time.Time, fetchLive bool) (float64, bool, error) {
 	for _, d := range live {

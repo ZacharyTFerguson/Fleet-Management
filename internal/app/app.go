@@ -348,7 +348,7 @@ func (a *App) SyncOneStep(ctx context.Context, mapPath string, client *onestep.C
 			continue
 		}
 		for _, d := range devs {
-			if d.Dead || !d.Active {
+			if d.Dead || !d.Active || oil.HasLogisticsPersonnel(d.DisplayName) {
 				continue
 			}
 			n, err := client.DriveStopMilesFor(ctx, d, out.FillTime)

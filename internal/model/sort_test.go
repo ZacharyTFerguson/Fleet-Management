@@ -25,6 +25,21 @@ func TestSortCardTxsDescNewestFirstStableTies(t *testing.T) {
 	}
 }
 
+// TestSortCardTxsDescOdometerBreaksSameSecond locks the canonical same-second
+// tie: higher odometer first, missing odometer last, before any card-id tie.
+func TestSortCardTxsDescOdometerBreaksSameSecond(t *testing.T) {
+	at := time.Date(2026, 9, 3, 16, 0, 0, 0, time.UTC)
+	txs := []CardTx{
+		{CardID: "C-A", At: at},                       // no odometer -> last
+		{CardID: "C-Z", At: at, Odometer: intPtr(90500)}, // highest odometer -> first
+		{CardID: "C-B", At: at, Odometer: intPtr(90400)},
+	}
+	SortCardTxsDesc(txs)
+	if txs[0].CardID != "C-Z" || txs[1].CardID != "C-B" || txs[2].CardID != "C-A" {
+		t.Fatalf("higher odometer first, missing last: %+v", txs)
+	}
+}
+
 func TestSortFillsDescNewestFirst(t *testing.T) {
 	older := time.Date(2026, 6, 1, 10, 0, 0, 0, time.UTC)
 	newer := time.Date(2026, 6, 2, 10, 0, 0, 0, time.UTC)

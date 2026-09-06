@@ -238,13 +238,14 @@ func (r LedgerRow) Key() string {
 }
 
 // LedgerRowLessDesc reports whether a should appear before b when listing punches
-// newest-first (provider transaction time desc). Tie-breaker: recorded odometer.
+// newest-first (provider transaction time desc). Tie-breaker: higher recorded
+// odometer first — the same canonical rule as model.CardTxLessDesc.
 func LedgerRowLessDesc(a, b LedgerRow) bool {
 	atA, atB := a.PunchAt.UTC(), b.PunchAt.UTC()
 	if !atA.Equal(atB) {
 		return atA.After(atB)
 	}
-	return a.Recorded < b.Recorded
+	return a.Recorded > b.Recorded
 }
 
 // SortLedgerRowsDesc sorts ledger rows newest-first with stable ties.

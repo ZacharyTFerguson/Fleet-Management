@@ -173,18 +173,24 @@ func BuildBoard(cars []model.Car, txs []model.CardTx, assigns []model.TxAssignme
 		if !ok {
 			continue
 		}
-		sort.SliceStable(col.Fills, func(i, j int) bool {
-			return model.FillBlockLessDesc(col.Fills[i].At, col.Fills[j].At, col.Fills[i].CardID, col.Fills[j].CardID, col.Fills[i].TxKey, col.Fills[j].TxKey)
-		})
+		sortBlocksNewestFirst(col.Fills)
 		board.Cars = append(board.Cars, *col)
 	}
-	sort.SliceStable(board.Unassigned, func(i, j int) bool {
-		return model.FillBlockLessDesc(board.Unassigned[i].At, board.Unassigned[j].At, board.Unassigned[i].CardID, board.Unassigned[j].CardID, board.Unassigned[i].TxKey, board.Unassigned[j].TxKey)
-	})
+	sortBlocksNewestFirst(board.Unassigned)
 	if board.Unassigned == nil {
 		board.Unassigned = []FillBlock{}
 	}
 	return board
+}
+
+// sortBlocksNewestFirst applies the one canonical display order (model.FillBlockLessDesc)
+// to a lane. Car columns and the unassigned tray both use it — the two lanes must
+// not read in opposite directions on one page.
+func sortBlocksNewestFirst(blocks []FillBlock) {
+	sort.SliceStable(blocks, func(i, j int) bool {
+		a, b := blocks[i], blocks[j]
+		return model.FillBlockLessDesc(a.At, b.At, a.Odometer, b.Odometer, a.CardID, b.CardID, a.TxKey, b.TxKey)
+	})
 }
 
 func fillBelongsInRegion(b FillBlock, byE map[string]carMeta, region string) bool {

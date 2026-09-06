@@ -138,7 +138,9 @@ func EvaluateHolds(in ComputeIn) ComputeOut {
 // walkFills builds a time-ordered trusted chain. Latest raw punch is often a fat-finger.
 func walkFills(nickname string, fills []model.Fill) ([]trusted, []model.Hold) {
 	sorted := append([]model.Fill(nil), fills...)
-	sort.Slice(sorted, func(i, j int) bool {
+	// Stable: equal-second punches keep the store's deterministic order, so
+	// two runs over the same data always walk the same chain.
+	sort.SliceStable(sorted, func(i, j int) bool {
 		return sorted[i].ProviderTransactionTime.Before(sorted[j].ProviderTransactionTime)
 	})
 

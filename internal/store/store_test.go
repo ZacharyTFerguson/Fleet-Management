@@ -362,6 +362,124 @@ func TestTwoStoresConcurrentUpsertCarUniquePDI(t *testing.T) {
 	}
 }
 
+// TestListOrderDeterministicOnSameSecond locks the storage sort contract:
+// chronological with explicit tie-breakers, so two reads of the same data can
+// never return same-second transactions in different orders (History tx keys,
+// GPS matching, and the fill picker all replay these lists).
+func TestListOrderDeterministicOnSameSecond(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "order.sqlite")
+	s, err := Open("sqlite", p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	ctx := context.Background()
+	at := time.Date(2026, 9, 3, 16, 0, 0, 0, time.UTC)
+	hi, lo := 90500, 90400
+
+	// Insert deliberately out of order: no-odometer punch first, then high, then low.
+	for _, f := range []model.Fill{
+		{EFleetsID: "27SEPB", ProviderTransactionTime: at, MerchantName: "EVGO"},
+		{EFleetsID: "27SEPB", ProviderTransactionTime: at, Odometer: &hi, MerchantName: "MARATHON"},
+		{EFleetsID: "27SEPB", ProviderTransactionTime: at, Odometer: &lo, MerchantName: "SUNOCO"},
+		{EFleetsID: "27SEPB", ProviderTransactionTime: at.Add(-time.Hour), Odometer: &lo, MerchantName: "OLDEST"},
+	} {
+		if err := s.UpsertFill(ctx, f); err != nil {
+			t.Fatal(err)
+		}
+	}
+	fills, err := s.ListFills(ctx, "27SEPB")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var merchants []string
+	for _, f := range fills {
+		merchants = append(merchants, f.MerchantName)
+	}
+	want := []string{"OLDEST", "EVGO", "SUNOCO", "MARATHON"}
+	if len(merchants) != len(want) {
+		t.Fatalf("fills %v", merchants)
+	}
+	for i := range want {
+		if merchants[i] != want[i] {
+			t.Fatalf("fills order %v want %v (time asc, then odometer, then rowid)", merchants, want)
+		}
+	}
+
+	for _, tx := range []model.CardTx{
+		{CardID: "x22020", At: at, RecordedEFleetsID: "27SEPB", Odometer: &hi, StationName: "MARATHON"},
+		{CardID: "x22020", At: at, RecordedEFleetsID: "27SEPB", StationName: "EVGO"},
+		{CardID: "x11010", At: at, RecordedEFleetsID: "27SEPA", Odometer: &lo, StationName: "SHELL"},
+	} {
+		if err := s.UpsertCardTx(ctx, tx); err != nil {
+			t.Fatal(err)
+		}
+	}
+	txs, err := s.ListCardTxs(ctx, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var stations []string
+	for _, tx := range txs {
+		stations = append(stations, tx.StationName)
+	}
+	wantTx := []string{"MARATHON", "SHELL", "EVGO"}
+	if len(stations) != len(wantTx) {
+		t.Fatalf("txs %v", stations)
+	}
+	for i := range wantTx {
+		if stations[i] != wantTx[i] {
+			t.Fatalf("tx order %v want %v (time desc, then higher odometer first with missing last, then card)", stations, wantTx)
+		}
+	}
+}
+
+// TestFillsNullOdoSchemaGuard locks the two layers that keep NULL-odometer
+// punches (EV charging) from duplicating: the partial unique index added in
+// migration 010, and the migration's cleanup of duplicates an older binary
+// may already have written.
+func TestFillsNullOdoSchemaGuard(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "nullodo.sqlite")
+	s, err := Open("sqlite", p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	ctx := context.Background()
+	at := time.Date(2026, 9, 4, 9, 0, 0, 0, time.UTC).Format(time.RFC3339)
+
+	if _, err := s.exec(ctx, `INSERT INTO fills (efleets_id, provider_transaction_time, odometer) VALUES (?,?,NULL)`, "27SEPB", at); err != nil {
+		t.Fatal(err)
+	}
+	// A raw duplicate insert (bypassing the UpsertFill guard) must hit the index.
+	if _, err := s.exec(ctx, `INSERT INTO fills (efleets_id, provider_transaction_time, odometer) VALUES (?,?,NULL)`, "27SEPB", at); err == nil {
+		t.Fatal("partial unique index must reject a second NULL-odometer punch in the same second")
+	}
+
+	// Upgrade path: a database written by an older binary can already hold
+	// duplicates. Recreate that state and re-run migrations: the duplicates
+	// collapse to one row and the index comes back.
+	if _, err := s.db.Exec(`DROP INDEX fills_one_null_odo_per_second`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.exec(ctx, `INSERT INTO fills (efleets_id, provider_transaction_time, odometer) VALUES (?,?,NULL)`, "27SEPB", at); err != nil {
+		t.Fatal(err)
+	}
+	if err := applyMigrations(s.db, "sqlite"); err != nil {
+		t.Fatal(err)
+	}
+	var n int
+	if err := s.queryRow(ctx, `SELECT COUNT(*) FROM fills WHERE efleets_id=? AND odometer IS NULL`, "27SEPB").Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+	if n != 1 {
+		t.Fatalf("migration must collapse legacy NULL-odometer duplicates, got %d rows", n)
+	}
+	if _, err := s.exec(ctx, `INSERT INTO fills (efleets_id, provider_transaction_time, odometer) VALUES (?,?,NULL)`, "27SEPB", at); err == nil {
+		t.Fatal("index must be recreated after re-migration")
+	}
+}
+
 func TestCardTxRoundTrip(t *testing.T) {
 	p := filepath.Join(t.TempDir(), "cards.sqlite")
 	s, err := Open("sqlite", p)

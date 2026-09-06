@@ -13,6 +13,10 @@ var oilNeedles = []string{
 	"oil change",
 	"conventional lube oil",
 	"conventional engine oil",
+	// Firestone/Midas style: "Engine Oil & Filter Change". Surcharge rows are
+	// excluded above before these match.
+	"oil & filter",
+	"oil and filter",
 }
 
 // oilExcludes are maintenance rows that mention oil but are not an oil change.

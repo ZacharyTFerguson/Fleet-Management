@@ -65,7 +65,10 @@ func (s *Store) ListLedger(ctx context.Context, efleetsID string) ([]oil.LedgerR
 		q += ` WHERE efleets_id=?`
 		args = append(args, efleetsID)
 	}
-	q += ` ORDER BY efleets_id, punch_at DESC, recorded_odo`
+	// recorded_odo is part of the ledger's unique key; without it two punches in
+	// the same second could swap between box-score renders. DESC matches the
+	// canonical newest-first tie rule (higher odometer first).
+	q += ` ORDER BY efleets_id, punch_at DESC, recorded_odo DESC`
 	rows, err := s.query(ctx, q, args...)
 	if err != nil {
 		return nil, err

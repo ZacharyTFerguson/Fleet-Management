@@ -29,6 +29,35 @@ func TestWatchFillBatchNewestTen(t *testing.T) {
 	}
 }
 
+// TestNewestFillsFirstTiesMatchHistoryOrder locks the canonical tie order for
+// same-second swipes: higher odometer first (missing odometer last), then card
+// id, then tx key — identical to the History board rule, regardless of input order.
+func TestNewestFillsFirstTiesMatchHistoryOrder(t *testing.T) {
+	at := time.Date(2026, 9, 3, 16, 0, 0, 0, time.UTC)
+	hi, lo := 90500, 90400
+	newer := model.CardTx{CardID: "x22020", At: at.Add(time.Hour), StationName: "NEWEST"}
+	tieHi := model.CardTx{CardID: "x22020", At: at, Odometer: &hi, StationName: "MARATHON"}
+	tieLo := model.CardTx{CardID: "x22020", At: at, Odometer: &lo, StationName: "SUNOCO"}
+	tieNoOdo := model.CardTx{CardID: "x22020", At: at, StationName: "EVGO"}
+	tieOtherCard := model.CardTx{CardID: "x11010", At: at, StationName: "SHELL"}
+	want := []string{"NEWEST", "MARATHON", "SUNOCO", "SHELL", "EVGO"}
+
+	for name, in := range map[string][]model.CardTx{
+		"forward":  {newer, tieHi, tieLo, tieNoOdo, tieOtherCard},
+		"backward": {tieOtherCard, tieNoOdo, tieLo, tieHi, newer},
+	} {
+		got := NewestFillsFirst(in)
+		if len(got) != len(want) {
+			t.Fatalf("%s: len %d", name, len(got))
+		}
+		for i := range want {
+			if got[i].StationName != want[i] {
+				t.Fatalf("%s: position %d = %s want %s", name, i, got[i].StationName, want[i])
+			}
+		}
+	}
+}
+
 func TestIsVirginiaVehicleNCXAndVA15(t *testing.T) {
 	cars := []model.Car{
 		{EFleetsID: "27VA15", Nickname: "VA15", Region: "VA"},

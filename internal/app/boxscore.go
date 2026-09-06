@@ -104,7 +104,10 @@ func (a *App) listStoredBoxScore(ctx context.Context) (FleetBoxScore, error) {
 		rs := byCar[id]
 		oil.SortLedgerRowsDesc(rs)
 		sc := oil.BoxScoreOut{EFleetsID: id, Nickname: nicks[id], Rows: rs, AbsDiffSeries: []int{}}
-		for i := range rs {
+		// Rows display newest-first, but Latest* and AbsDiffSeries are
+		// chronological accumulators (ScorePunches walks oldest->newest), so
+		// walk the display list in reverse or "latest" becomes the oldest punch.
+		for i := len(rs) - 1; i >= 0; i-- {
 			r := rs[i]
 			if r.Difference == nil {
 				r.Difference = r.SignedDifference()

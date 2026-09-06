@@ -65,7 +65,7 @@ func (s *Store) ListLedger(ctx context.Context, efleetsID string) ([]oil.LedgerR
 		q += ` WHERE efleets_id=?`
 		args = append(args, efleetsID)
 	}
-	q += ` ORDER BY efleets_id, punch_at`
+	q += ` ORDER BY efleets_id, punch_at DESC, recorded_odo`
 	rows, err := s.query(ctx, q, args...)
 	if err != nil {
 		return nil, err

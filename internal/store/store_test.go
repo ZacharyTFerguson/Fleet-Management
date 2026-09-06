@@ -386,3 +386,36 @@ func TestCardTxRoundTrip(t *testing.T) {
 		t.Fatalf("idempotent upsert, got %d", len(got))
 	}
 }
+
+func TestListCardTxsNewestFirst(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "cards-order.sqlite")
+	s, err := Open("sqlite", p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	ctx := context.Background()
+	older := time.Date(2026, 6, 1, 10, 0, 0, 0, time.UTC)
+	newer := time.Date(2026, 6, 2, 10, 0, 0, 0, time.UTC)
+	same := time.Date(2026, 6, 3, 10, 0, 0, 0, time.UTC)
+	for _, tx := range []model.CardTx{
+		{CardID: "C-B", At: same, RecordedEFleetsID: "27VA15"},
+		{CardID: "C-A", At: same, RecordedEFleetsID: "27VA15"},
+		{CardID: "C-NEW", At: newer, RecordedEFleetsID: "27VA15"},
+		{CardID: "C-OLD", At: older, RecordedEFleetsID: "27VA15"},
+	} {
+		if err := s.UpsertCardTx(ctx, tx); err != nil {
+			t.Fatal(err)
+		}
+	}
+	got, err := s.ListCardTxs(ctx, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 4 {
+		t.Fatalf("len %d", len(got))
+	}
+	if got[0].CardID != "C-A" || got[1].CardID != "C-B" || got[2].CardID != "C-NEW" || got[3].CardID != "C-OLD" {
+		t.Fatalf("newest-first stable order %+v", got)
+	}
+}

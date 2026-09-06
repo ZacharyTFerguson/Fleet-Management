@@ -237,6 +237,23 @@ func (r LedgerRow) Key() string {
 	return fmt.Sprintf("%s|%s|%d", r.EFleetsID, r.PunchAt.UTC().Format(time.RFC3339), r.Recorded)
 }
 
+// LedgerRowLessDesc reports whether a should appear before b when listing punches
+// newest-first (provider transaction time desc). Tie-breaker: recorded odometer.
+func LedgerRowLessDesc(a, b LedgerRow) bool {
+	atA, atB := a.PunchAt.UTC(), b.PunchAt.UTC()
+	if !atA.Equal(atB) {
+		return atA.After(atB)
+	}
+	return a.Recorded < b.Recorded
+}
+
+// SortLedgerRowsDesc sorts ledger rows newest-first with stable ties.
+func SortLedgerRowsDesc(rows []LedgerRow) {
+	sort.SliceStable(rows, func(i, j int) bool {
+		return LedgerRowLessDesc(rows[i], rows[j])
+	})
+}
+
 // SignedDifference is recorded − expected. Prefer the stored pointer; else overage − shortage
 // when abs_diff was scored (legacy rows before the difference column).
 func (r LedgerRow) SignedDifference() *int {

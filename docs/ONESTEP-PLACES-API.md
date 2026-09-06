@@ -2,114 +2,92 @@
 
 Research note for Fleet-Management. **This pipeline is Gas Stations only** (`type_code` `001`, group `Gas_Stations`). Do not create maintenance, shop, or other place types through this code path.
 
-No account IDs, API keys, PEMs, or passwords belong in this file.
+No account IDs, API keys, PEMs, passwords, or JWTs belong in this file.
 
-## What we already know (high confidence)
+## Auth
 
-Public v3 base (this fleet):
+Public v3 base:
 
 ```text
 https://track.onestepgps.com/v3/api/public
 ```
 
-Auth (same as devices / drive-stop — see [`onestep-api-auth.md`](onestep-api-auth.md)):
-
 | Mode | When | How |
 |------|------|-----|
+| RS256 JWT Bearer | PEM present in vault / env | `Authorization: Bearer <jwt>` signed from API key + PEM |
 | `api-key` query | No PEM | `?api-key=` |
-| RS256 JWT Bearer | PEM present in vault / env | `Authorization: Bearer <jwt>` |
 
-Proven public resources used elsewhere in this repo:
+Never log the PEM or the JWT. Same auth as devices / drive-stop — see [`onestep-api-auth.md`](onestep-api-auth.md).
 
-| Path | Role |
-|------|------|
-| `GET /device` | Inventory (`factory_id`, `device_id`, `display_name`) |
-| `GET /route/drive-stop` | Miles / stop windows. **Only** source of OneStep miles. Never invent miles. |
-| `POST /generate-reports` type `near_address` | Near-address hunt (download often 404; rows come from drive-stop) |
+Portal map (human draw): `https://track.onestepgps.com/v3/ux/map/`
 
-Official apidoc (`https://track.onestepgps.com/v3/apidoc/`) is **login-gated**. Community OneStepGPS samples document `/device` and `/route/drive-stop` only.
+## Proven download (live)
 
-## Download / list locations (what we tried)
+Use **only** these list calls. Paginate with `limit` + `offset`. Do **not** send `belonging_to_groups` or `return_count=true` (live **500**).
 
-`oilchange serve` dry-run and `Client.DiscoverPlaces` GET these candidates (limit=50). Status codes are recorded; response bodies are not logged (they can echo credentials).
+| Step | Path | Query | What we keep |
+|------|------|-------|----------------|
+| 1 | `GET /zone-group` | `limit=50&offset=0` | Group whose `display_name` is `Gas_Stations`. Read `zone_id_list`. Historical live group id is an opaque string — do not hardcode it; look it up. |
+| 2 | `GET /zone` | `limit=100&offset=N` | Keep a zone if `zone_id` is in that list **or** `zone_group_id_list` contains the group id. |
 
-| Path | Expected use | Confidence |
-|------|----------------|------------|
-| `GET /v3/api/public/zone` | List geofence zones | Probe live; treat 200+`result_list` as success |
-| `GET /v3/api/public/zones` | Plural alias | Same |
-| `GET /v3/api/public/marker` | Map markers / POIs | Same |
-| `GET /v3/api/public/markers` | Plural alias | Same |
-| `GET /v3/api/public/place` | Places catalog | Same |
-| `GET /v3/api/public/places` | Plural alias | Same |
-| `GET /v3/api/public/geofence` | Legacy geofence name | Same |
-| `GET /v3/api/public/geofences` | Plural alias | Same |
-| `GET /v3/api/public/poi` | Points of interest | Same |
-| `GET /v3/api/public/user-place` | User-owned places | Same |
-| `GET /v3/api/public/important-location` | Portal “important location” | Same |
+`GET /marker?limit=&offset=` also works for markers. It is not a substitute for the Gas_Stations zone list.
 
-Typical query params (same family as `/device`):
+### Fields we parse (sample zone)
 
-- `api-key` (when not using JWT)
-- `limit` (50–500)
+| Field | Where |
+|-------|--------|
+| `zone_id` | id |
+| `display_name` | Canon label (`A000001_001_SHELL_A_A`) |
+| `detail.lat_lng.{lat,lng}` | coordinates |
+| `detail.custom_fields.address.value` | street address |
+| `shape_data.vertices` | polygon (display only; we do not invent a circle from it) |
+| `zone_group_id_list` | group membership |
 
-### Response shape (when a list parses)
+Wrappers: `result_list` (then `zone_groups` / `data` / `result`). Gas-station matching after download is **exact Canon label** on `display_name` (case-insensitive).
 
-Wrappers tried, in order: `result_list`, `zones`, `markers`, `places`, `geofences`, `data`, `result`, `items`, or a bare array.
+## Failed / do-not-use paths (live)
 
-Per item we keep:
+| Path | Live result | Do not use |
+|------|-------------|------------|
+| `GET /zone/:id` | **500** | Single-zone fetch |
+| `GET /zone` with `belonging_to_groups` | **500** | Group filter query |
+| `GET /zone` with `return_count=true` | **500** | Count wrapper |
+| `POST /zone-list-by-ids` (docs) | **404** | Batch-by-ids |
 
-| Field | Aliases |
-|-------|---------|
-| `id` | `zone_id`, `marker_id`, `place_id` |
-| `name` | `display_name`, `label` |
-| `address` | `street_address` |
-| `lat` / `lng` | `latitude` / `longitude` / `location.lat` |
-| `group` | `group_name`, `folder` |
+Older candidate probes (`/places`, `/geofences`, `/poi`, `/user-place`, `/important-location`) are not the proven Gas_Stations download. `DiscoverPlaces` still pings `/zone-group`, `/zone`, and `/marker` for dry-run status only. Bodies are never logged.
 
-Gas-station matching after create is **exact Canon label** on `name` (case-insensitive). Example: `A000001_001_SHELL_A_A`.
+## Create / update — not proven (portal-first)
 
-## Can the public API create zones?
+Documented `POST` / `PUT` zone and marker exist. **Create via API is not proven** on this fleet key. `PUT` update has historically returned **auth error 500**.
 
-**Not documented as a supported public write.** Portal UX (draw on map → Save) is the proven create path. This repo still POSTs one reviewed gas-station payload at a time to:
+Until a live POST/PUT succeeds on this key:
 
-| Create try | Body (scaffold) |
-|------------|-----------------|
-| `POST /marker`, `/markers`, `/place`, `/places` | `{name, address, lat, lng, group:"Gas_Stations", type:"gas"}` |
-| `POST /zone`, `/zones`, `/geofence`, `/geofences` | circle, `radius` 25 m, `prefer: canopy_pad` |
+1. Review the station, geocode, dry-run.
+2. **Open the portal** and draw the Gas_Stations marker / canopy zone there.
+3. Re-download (`GET /zone-group` + `/zone`) to attach the live `zone_id`.
+4. Do not set `ONESTEP_WRITE_PROVEN=1` until that write is proven.
 
-If every POST is 404/405/403, **say so in the job `last_error` and HOLD**. Do not invent a zone id. Do not bulk-import. Two SAVE failures → HOLD (Canon rules).
+`oilchange serve` refuses `POST` create unless `ONESTEP_WRITE_PROVEN=1`. Dry-run still lists payload + list probes and includes `portal_url`. Send remains confirm-gated (`SEND_TO_ONESTEP` + one-time token). No bulk.
 
-Dry-run (`POST /api/markers/{id}/dry-run`) lists probe statuses and the payload **without sending**.
-
-Live send requires:
-
-1. Human review / approve
-2. Third-party geocode (Nominatim default; Mapbox/Google if a key is on Secrets)
-3. Confirm phrase `SEND_TO_ONESTEP` plus the one-time `confirm_token`
+If a proven write later fails 404/405/403, put the job on HOLD. Do not invent a zone id. Two SAVE failures → HOLD (Canon rules).
 
 ## Auth for portal vs API
 
 | Credential | Places download | Portal draw |
 |------------|-----------------|-------------|
-| API key | Yes | No |
+| API key (+ optional JWT PEM) | Yes | No |
 | Portal username/password | No (not a public-API substitute) | Yes (browser session) |
-| JWT PEM | Optional on public API | n/a |
 
-Store all of the above on the Secrets page (server vault). Never commit them.
+Store credentials on the Secrets page (server vault). Never commit them.
 
 ## Miles lock (do not violate)
 
-Places / zones / markers **must not** write Last Reading. If a workflow needs miles, call `GET /route/drive-stop` with `device_id`, `dt_tracker_from`, `dt_tracker_to`. Never invent OneStep miles.
+Places / zones / markers **must not** write Last Reading. If a workflow needs miles, call `GET /route/drive-stop` with `device_id`, `dt_tracker_from`, `dt_tracker_to`. Never invent OneStep miles. Never use device odometer as a base.
+
+## Mileage box score (related lock)
+
+Expected at a gas card transaction = last **good maintenance** odometer + drive-stop miles since that maintenance timestamp. Recorded = **gas card transaction** odometer + punch time. OneStep odometer is never the base.
 
 ## Group naming
 
 Use **`Gas_Stations`**. Canon Place label stays `GeneralCode_Type_Branding_TopTier_TopTierGrade` (`7_3_5_1_1`). Type segment is always `001` on this pipeline.
-
-## Live probe log
-
-Re-run from a desk session (no secrets in the output):
-
-1. Sign in → Status (OneStep ping)
-2. Stations → pull → approve one row → Dry-run
-
-Record HTTP statuses from `list_probes` into a PR note. Update the table above when a path is proven 200 with a parseable list.

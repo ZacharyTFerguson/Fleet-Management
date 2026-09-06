@@ -87,6 +87,18 @@ func LabelOf(general, typeCode, brand, top, grade string) string {
 	return strings.ToUpper(general) + "_" + typeCode + "_" + brand + "_" + top + "_" + grade
 }
 
+// ParseCanonLabel reads GeneralCode_Type_Branding_TopTier_TopTierGrade. Gas (001) only.
+func ParseCanonLabel(label string) (general, typeCode, brand, top, grade string, ok bool) {
+	parts := strings.Split(strings.ToUpper(strings.TrimSpace(label)), "_")
+	if len(parts) < 5 {
+		return "", "", "", "", "", false
+	}
+	if !codeRe.MatchString(parts[0]) || parts[1] != TypeGas {
+		return "", "", "", "", "", false
+	}
+	return parts[0], parts[1], parts[2], parts[3], parts[4], true
+}
+
 func NextGeneralCode(last string) (string, error) {
 	if last == "" {
 		return "A000001", nil

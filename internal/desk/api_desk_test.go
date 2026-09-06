@@ -40,7 +40,7 @@ func TestSecretsAndStatusRequireLogin(t *testing.T) {
 			return app.StatusReport{SQLite: app.EndpointStatus{OK: true, Detail: "cars=1"}}, nil
 		},
 	})
-	for _, path := range []string{"/api/secrets", "/api/status", "/api/markers"} {
+	for _, path := range []string{"/api/secrets", "/api/status", "/api/markers", "/api/boxscore"} {
 		req := httptest.NewRequest(http.MethodGet, path, nil)
 		rec := httptest.NewRecorder()
 		h.ServeHTTP(rec, req)

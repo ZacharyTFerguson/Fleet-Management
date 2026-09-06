@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"oilchange/internal/onestep"
 	"oilchange/internal/store"
 )
 
@@ -75,8 +76,9 @@ func (a *App) pingSQLite(ctx context.Context) EndpointStatus {
 	}
 	stations, _ := a.Store.CountTable(ctx, "gas_stations")
 	placeN, _ := a.Store.CountTable(ctx, "places")
+	ledgerN, _ := a.Store.CountTable(ctx, "mileage_ledger")
 	st.OK = true
-	st.Detail = fmt.Sprintf("cars=%d gas_stations=%d places=%d", cars, stations, placeN)
+	st.Detail = fmt.Sprintf("cars=%d gas_stations=%d places=%d ledger=%d", cars, stations, placeN, ledgerN)
 	st.Write = "ok (local)"
 	return st
 }
@@ -179,6 +181,10 @@ func (a *App) pingOneStep(ctx context.Context) EndpointStatus {
 		return st
 	}
 	st.OK = true
-	st.Write = "places send is confirm-gated"
+	if onestep.WriteProven() {
+		st.Write = "places send is confirm-gated (ONESTEP_WRITE_PROVEN)"
+	} else {
+		st.Write = "places create not proven — portal-first"
+	}
 	return st
 }

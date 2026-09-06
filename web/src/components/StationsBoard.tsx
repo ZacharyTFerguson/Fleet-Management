@@ -25,7 +25,14 @@ type Job = {
   map_url?: string;
 };
 
-type List = { jobs: Job[]; places: number; note?: string; error?: string };
+type List = {
+  jobs: Job[];
+  places: number;
+  note?: string;
+  error?: string;
+  write_proven?: boolean;
+  portal_url?: string;
+};
 
 export function StationsBoard() {
   const [list, setList] = useState<List | null>(null);
@@ -116,9 +123,37 @@ export function StationsBoard() {
           >
             {busy === "pull" ? "Pulling…" : "Pull gas candidates"}
           </button>
+          <button
+            className="cta"
+            type="button"
+            disabled={!!busy}
+            onClick={async () => {
+              setBusy("onestep");
+              const res = await fetch("/api/markers/onestep", { method: "POST" });
+              const j = await res.json();
+              if (!res.ok) setErr(j.error || "OneStep download failed");
+              else {
+                setList(j);
+                setErr("");
+              }
+              setBusy("");
+            }}
+          >
+            {busy === "onestep" ? "Downloading…" : "Download Gas_Stations from OneStep"}
+          </button>
         </div>
       </div>
       {list?.note ? <p className="matchup-why">{list.note}</p> : null}
+      {list?.portal_url ? (
+        <p className="matchup-why">
+          {list.write_proven
+            ? "API write is opted in (ONESTEP_WRITE_PROVEN). Still confirm-gated, one marker at a time."
+            : "API create is not proven on this key. Draw the zone in the portal after review."}{" "}
+          <a className="portal-link" href={list.portal_url} target="_blank" rel="noreferrer">
+            Open OneStep map
+          </a>
+        </p>
+      ) : null}
       {err ? <p className="search-empty">{err}</p> : null}
 
       <div className="marker-table-wrap">
@@ -210,10 +245,15 @@ export function StationsBoard() {
             <input className="secret-input" value={confirm} onChange={(e) => setConfirm(e.target.value)} />
           </label>
           <div className="roster-actions">
+            {list?.portal_url ? (
+              <a className="cta" href={list.portal_url} target="_blank" rel="noreferrer">
+                Open in portal
+              </a>
+            ) : null}
             <button
               className="cta"
               type="button"
-              disabled={!!busy || confirm !== "SEND_TO_ONESTEP"}
+              disabled={!!busy || confirm !== "SEND_TO_ONESTEP" || !list?.write_proven}
               onClick={() => act(sel.id, "send", { confirm, confirm_token: token })}
             >
               Send marker to OneStep
@@ -221,12 +261,19 @@ export function StationsBoard() {
             <button
               className="cta"
               type="button"
-              disabled={!!busy || confirm !== "SEND_TO_ONESTEP"}
+              disabled={!!busy || confirm !== "SEND_TO_ONESTEP" || !list?.write_proven}
               onClick={() => act(sel.id, "zone", { confirm, confirm_token: token })}
             >
               Place zone near marker
             </button>
           </div>
+          {!list?.write_proven ? (
+            <p className="matchup-why">
+              Send/zone stay locked until a live POST/PUT is proven and{" "}
+              <code>ONESTEP_WRITE_PROVEN=1</code> is set. Dry-run still lists the
+              proven GET paths.
+            </p>
+          ) : null}
           {dry ? <pre className="dry-run">{dry}</pre> : null}
         </article>
       ) : null}

@@ -3,7 +3,7 @@
 export function DeskNav({
   current,
 }: {
-  current: "oil" | "cards" | "history" | "devices" | "stations" | "settings" | "secrets" | "login";
+  current: "oil" | "cards" | "history" | "devices" | "stations" | "boxscore" | "settings" | "secrets" | "login";
 }) {
   return (
     <nav className="desk-nav" aria-label="Desk">
@@ -21,6 +21,9 @@ export function DeskNav({
       </a>
       <a className={current === "stations" ? "is-current" : ""} href="/stations/">
         Stations
+      </a>
+      <a className={current === "boxscore" ? "is-current" : ""} href="/boxscore/">
+        Box score
       </a>
       <a className={current === "settings" ? "is-current" : ""} href="/settings/">
         Status

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"os"
 	"strings"
 )
 
@@ -35,19 +36,16 @@ type PlaceItem struct {
 	RawKind string   `json:"-"`
 }
 
+const (
+	GasStationsGroupName = "Gas_Stations"
+	PortalMapURL         = "https://track.onestepgps.com/v3/ux/map/"
+)
+
+// Proven list paths (liaison live research). Avoid belonging_to_groups and return_count=true (HTTP 500).
 var placeListPaths = []string{
+	"/v3/api/public/zone-group",
 	"/v3/api/public/zone",
-	"/v3/api/public/zones",
 	"/v3/api/public/marker",
-	"/v3/api/public/markers",
-	"/v3/api/public/place",
-	"/v3/api/public/places",
-	"/v3/api/public/geofence",
-	"/v3/api/public/geofences",
-	"/v3/api/public/poi",
-	"/v3/api/public/user-place",
-	"/v3/api/public/user-places",
-	"/v3/api/public/important-location",
 }
 
 var placeCreatePaths = []string{
@@ -77,6 +75,7 @@ func (c *Client) probePlaceGET(ctx context.Context, path string) PlaceProbe {
 	pr := PlaceProbe{Path: path, Method: "GET"}
 	q := url.Values{}
 	q.Set("limit", "50")
+	q.Set("offset", "0")
 	b, err := c.lockedGet(ctx, path, q)
 	if err != nil {
 		pr.Error = sanitizeAuthError(err.Error(), c.Token)
@@ -152,11 +151,21 @@ func looksLikePlace(m map[string]any) bool {
 func mapsToPlaces(rows []map[string]any) []PlaceItem {
 	var out []PlaceItem
 	for _, m := range rows {
+		addr := strAny(m["address"], m["street_address"])
+		if addr == "" {
+			if detail, ok := m["detail"].(map[string]any); ok {
+				if cf, ok := detail["custom_fields"].(map[string]any); ok {
+					if a, ok := cf["address"].(map[string]any); ok {
+						addr = strAny(a["value"])
+					}
+				}
+			}
+		}
 		it := PlaceItem{
 			ID:      strAny(m["id"], m["zone_id"], m["marker_id"], m["place_id"]),
 			Name:    strAny(m["name"], m["display_name"], m["label"]),
-			Address: strAny(m["address"], m["street_address"]),
-			Kind:    strAny(m["type"], m["kind"], m["category"]),
+			Address: addr,
+			Kind:    strAny(m["type"], m["kind"], m["category"], m["zone_type"]),
 			Group:   strAny(m["group"], m["group_name"], m["folder"]),
 		}
 		if lat, ok := floatAny(m["lat"], m["latitude"]); ok {
@@ -173,6 +182,23 @@ func mapsToPlaces(rows []map[string]any) []PlaceItem {
 				if lng, ok := floatAny(loc["lng"], loc["lon"], loc["longitude"]); ok {
 					it.Lng = &lng
 				}
+			}
+		}
+		if it.Lat == nil {
+			if detail, ok := m["detail"].(map[string]any); ok {
+				if ll, ok := detail["lat_lng"].(map[string]any); ok {
+					if lat, ok := floatAny(ll["lat"], ll["latitude"]); ok {
+						it.Lat = &lat
+					}
+					if lng, ok := floatAny(ll["lng"], ll["lon"], ll["longitude"]); ok {
+						it.Lng = &lng
+					}
+				}
+			}
+		}
+		if it.Group == "" {
+			if gl, ok := m["zone_group_id_list"].([]any); ok && len(gl) > 0 {
+				it.Group = strAny(gl[0])
 			}
 		}
 		out = append(out, it)
@@ -220,26 +246,110 @@ func keysOfMap(m map[string]any) string {
 	return strings.Join(keys, ",")
 }
 
-// ListPlaces returns items from the first list path that parses rows.
+// ListPlaces downloads Gas_Stations zones via proven list APIs (group → paginated /zone).
 func (c *Client) ListPlaces(ctx context.Context) (items []PlaceItem, path string, probes []PlaceProbe, err error) {
 	probes = c.DiscoverPlaces(ctx)
-	for _, p := range probes {
-		if !p.OK {
-			continue
-		}
-		q := url.Values{}
-		q.Set("limit", "500")
-		b, e := c.lockedGet(ctx, p.Path, q)
-		if e != nil {
-			continue
-		}
-		got, _ := parsePlaceList(b)
-		if len(got) == 0 {
-			continue
-		}
-		return got, p.Path, probes, nil
+	got, used, e := c.ListGasStationZones(ctx)
+	if e != nil {
+		return nil, "", probes, e
 	}
-	return nil, "", probes, fmt.Errorf("no OneStep public list path returned places/zones/markers")
+	return got, used, probes, nil
+}
+
+// ZoneGroup is one portal folder. We only keep Gas_Stations.
+type ZoneGroup struct {
+	ID      string
+	Name    string
+	ZoneIDs []string
+}
+
+// ListGasStationZones GETs /zone-group then paginates /zone (limit=100). Gas Stations only.
+// Do not send belonging_to_groups or return_count=true (live 500). Do not GET /zone/:id (live 500).
+func (c *Client) ListGasStationZones(ctx context.Context) ([]PlaceItem, string, error) {
+	gid, zoneIDs, err := c.gasStationsGroup(ctx)
+	if err != nil {
+		return nil, "", err
+	}
+	want := map[string]struct{}{}
+	for _, id := range zoneIDs {
+		want[id] = struct{}{}
+	}
+	var out []PlaceItem
+	for offset := 0; offset < 5000; offset += 100 {
+		q := url.Values{}
+		q.Set("limit", "100")
+		q.Set("offset", fmt.Sprintf("%d", offset))
+		b, err := c.lockedGet(ctx, "/v3/api/public/zone", q)
+		if err != nil {
+			return nil, "", err
+		}
+		page, _ := parsePlaceList(b)
+		if len(page) == 0 {
+			break
+		}
+		for _, it := range page {
+			if _, ok := want[it.ID]; ok || (gid != "" && it.Group == gid) {
+				it.Group = GasStationsGroupName
+				if strings.Contains(it.Name, "_001_") || it.Name != "" {
+					out = append(out, it)
+				}
+			}
+		}
+		if len(page) < 100 {
+			break
+		}
+	}
+	return out, "/v3/api/public/zone", nil
+}
+
+func (c *Client) gasStationsGroup(ctx context.Context) (groupID string, zoneIDs []string, err error) {
+	q := url.Values{}
+	q.Set("limit", "50")
+	q.Set("offset", "0")
+	b, err := c.lockedGet(ctx, "/v3/api/public/zone-group", q)
+	if err != nil {
+		return "", nil, err
+	}
+	var wrap map[string]any
+	if err := json.Unmarshal(b, &wrap); err != nil {
+		var arr []map[string]any
+		if err2 := json.Unmarshal(b, &arr); err2 != nil {
+			return "", nil, err
+		}
+		return pickGasGroup(arr)
+	}
+	for _, k := range []string{"result_list", "zone_groups", "data", "result"} {
+		if v, ok := wrap[k].([]any); ok {
+			var maps []map[string]any
+			for _, x := range v {
+				if m, ok := x.(map[string]any); ok {
+					maps = append(maps, m)
+				}
+			}
+			return pickGasGroup(maps)
+		}
+	}
+	return "", nil, fmt.Errorf("zone-group: no Gas_Stations group")
+}
+
+func pickGasGroup(rows []map[string]any) (string, []string, error) {
+	for _, m := range rows {
+		name := strAny(m["display_name"], m["name"])
+		if !strings.EqualFold(name, GasStationsGroupName) && name != "Gas Stations" {
+			continue
+		}
+		id := strAny(m["id"], m["zone_group_id"])
+		var zids []string
+		if sl, ok := m["zone_id_list"].([]any); ok {
+			for _, x := range sl {
+				if s, ok := x.(string); ok && s != "" {
+					zids = append(zids, s)
+				}
+			}
+		}
+		return id, zids, nil
+	}
+	return "", nil, fmt.Errorf("zone-group: Gas_Stations not found")
 }
 
 // MarkerPayload is the dry-run / send body. Name must be the Canon Place label.
@@ -277,20 +387,31 @@ func (c *Client) DryRunMarker(ctx context.Context, p MarkerPayload) (map[string]
 	}
 	probes := c.DiscoverPlaces(ctx)
 	out := map[string]any{
-		"dry_run":     true,
-		"would_send":  p,
-		"list_probes": probes,
-		"create_try":  placeCreatePaths,
-		"zone_try":    zoneCreatePaths,
-		"note":        "No POST was sent. Confirm SEND_TO_ONESTEP on a reviewed job to create one gas-station marker.",
+		"dry_run":       true,
+		"would_send":    p,
+		"list_probes":   probes,
+		"create_try":    placeCreatePaths,
+		"zone_try":      zoneCreatePaths,
+		"write_proven":  WriteProven(),
+		"portal_url":    PortalMapURL,
+		"note":          "No POST was sent. Public create/update is documented but not proven on this key (PUT historically 500). Portal-first until ONESTEP_WRITE_PROVEN=1.",
 	}
 	return out, nil
 }
 
-// CreateMarker POSTs one gas-station marker. Caller must have passed the confirm gate.
+// WriteProven is explicit opt-in. Default is portal-first (API create not proven).
+func WriteProven() bool {
+	v := strings.TrimSpace(strings.ToLower(os.Getenv("ONESTEP_WRITE_PROVEN")))
+	return v == "1" || v == "true"
+}
+
+// CreateMarker POSTs one gas-station marker only when write is proven. Otherwise portal-first.
 func (c *Client) CreateMarker(ctx context.Context, p MarkerPayload) (id string, path string, raw []byte, err error) {
 	if err := p.ValidateGas(); err != nil {
 		return "", "", nil, err
+	}
+	if !WriteProven() {
+		return "", "", nil, fmt.Errorf("OneStep API create is not proven on this key — open the portal (%s) and draw the Gas_Stations marker/zone. Set ONESTEP_WRITE_PROVEN=1 only after a live POST/PUT succeeds", PortalMapURL)
 	}
 	body, err := json.Marshal(p)
 	if err != nil {
@@ -314,6 +435,9 @@ func (c *Client) CreateMarker(ctx context.Context, p MarkerPayload) (id string, 
 
 // CreateZoneNear POSTs a small circle at the marker (canopy/pad). Gas Stations only.
 func (c *Client) CreateZoneNear(ctx context.Context, name string, lat, lng float64, radiusM int) (id string, path string, err error) {
+	if !WriteProven() {
+		return "", "", fmt.Errorf("OneStep API zone create is not proven — open the portal (%s) and draw the Gas_Stations zone. Set ONESTEP_WRITE_PROVEN=1 only after a live POST/PUT succeeds", PortalMapURL)
+	}
 	if !strings.Contains(name, "_001_") {
 		return "", "", fmt.Errorf("zone name must be a gas Canon label (type 001)")
 	}

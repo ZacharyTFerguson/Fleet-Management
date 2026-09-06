@@ -109,7 +109,7 @@ func (s *Store) InsertHeartbeat(ctx context.Context, target string, ok bool, det
 
 func (s *Store) CountTable(ctx context.Context, name string) (int, error) {
 	switch name {
-	case "cars", "gas_stations", "places", "gas_station_marker_jobs", "desk_users", "vault_secrets":
+	case "cars", "gas_stations", "places", "gas_station_marker_jobs", "desk_users", "vault_secrets", "mileage_ledger", "drive_stop_windows":
 	default:
 		return 0, fmt.Errorf("refusing count of %s", name)
 	}

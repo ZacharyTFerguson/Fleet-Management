@@ -6,9 +6,11 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 
 	"oilchange/internal/app"
 	"oilchange/internal/deskauth"
+	"oilchange/internal/oil"
 	"oilchange/internal/store"
 )
 
@@ -25,9 +27,15 @@ type DeskAPI struct {
 	Geocode  func(ctx context.Context, id string) (*store.MarkerJob, error)
 	Review   func(ctx context.Context, id, action, notes string) (*store.MarkerJob, error)
 	DryRun   func(ctx context.Context, id string) (map[string]any, error)
-	Send     func(ctx context.Context, id, phrase, token string) (*store.MarkerJob, error)
-	Zone     func(ctx context.Context, id, phrase, token string) (*store.MarkerJob, error)
-	Confirm  func(ctx context.Context, id string) (string, error)
+	Send          func(ctx context.Context, id, phrase, token string) (*store.MarkerJob, error)
+	Zone          func(ctx context.Context, id, phrase, token string) (*store.MarkerJob, error)
+	Confirm       func(ctx context.Context, id string) (string, error)
+	PullOneStep   func(ctx context.Context) (app.MarkerList, error)
+	BoxScore      func(ctx context.Context) (app.FleetBoxScore, error)
+	RebuildScore  func(ctx context.Context) (app.FleetBoxScore, error)
+	MeasureScore  func(ctx context.Context, efleetsID string, punchAt time.Time) (oil.BoxScoreOut, error)
+	DismissScore  func(ctx context.Context, efleetsID, punchAt string, recorded int) error
+	CorrectScore  func(ctx context.Context, efleetsID, punchAt string, recorded int) error
 }
 
 func mountDeskAPI(mux *http.ServeMux, api *DeskAPI) {
@@ -63,6 +71,18 @@ func mountDeskAPI(mux *http.ServeMux, api *DeskAPI) {
 			return
 		}
 		serveMarkerAction(w, r, api)
+	})
+	mux.HandleFunc("/api/boxscore", func(w http.ResponseWriter, r *http.Request) {
+		if !requireDesk(w, r, api) {
+			return
+		}
+		serveBoxScore(w, r, api)
+	})
+	mux.HandleFunc("/api/boxscore/", func(w http.ResponseWriter, r *http.Request) {
+		if !requireDesk(w, r, api) {
+			return
+		}
+		serveBoxScoreAction(w, r, api)
 	})
 }
 
@@ -267,7 +287,24 @@ func serveMarkerAction(w http.ResponseWriter, r *http.Request, api *DeskAPI) {
 		return
 	}
 	rest := strings.TrimPrefix(r.URL.Path, "/api/markers/")
-	parts := strings.Split(strings.Trim(rest, "/"), "/")
+	rest = strings.Trim(rest, "/")
+	if rest == "onestep" {
+		if api.PullOneStep == nil {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
+		list, err := api.PullOneStep(r.Context())
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+			return
+		}
+		enc := json.NewEncoder(w)
+		enc.SetIndent("", "  ")
+		_ = enc.Encode(list)
+		return
+	}
+	parts := strings.Split(rest, "/")
 	if len(parts) != 2 {
 		http.NotFound(w, r)
 		return
@@ -311,6 +348,105 @@ func serveMarkerAction(w http.ResponseWriter, r *http.Request, api *DeskAPI) {
 	case "zone":
 		j, err := api.Zone(r.Context(), id, body.Confirm, body.ConfirmToken)
 		writeJob(w, j, err)
+	default:
+		http.NotFound(w, r)
+	}
+}
+
+func serveBoxScore(w http.ResponseWriter, r *http.Request, api *DeskAPI) {
+	switch r.Method {
+	case http.MethodGet, http.MethodHead:
+		if api.BoxScore == nil {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			_ = json.NewEncoder(w).Encode(map[string]string{"error": "box score unavailable"})
+			return
+		}
+		out, err := api.BoxScore(r.Context())
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			_ = json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+			return
+		}
+		if r.Method == http.MethodHead {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		enc := json.NewEncoder(w)
+		enc.SetIndent("", "  ")
+		_ = enc.Encode(out)
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+func serveBoxScoreAction(w http.ResponseWriter, r *http.Request, api *DeskAPI) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	action := strings.Trim(strings.TrimPrefix(r.URL.Path, "/api/boxscore/"), "/")
+	var body struct {
+		EFleetsID string `json:"efleets_id"`
+		PunchAt   string `json:"punch_at"`
+		Recorded  int    `json:"recorded"`
+	}
+	b, _ := io.ReadAll(io.LimitReader(r.Body, 1<<16))
+	_ = json.Unmarshal(b, &body)
+	switch action {
+	case "rebuild":
+		if api.RebuildScore == nil {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
+		out, err := api.RebuildScore(r.Context())
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			_ = json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+			return
+		}
+		enc := json.NewEncoder(w)
+		enc.SetIndent("", "  ")
+		_ = enc.Encode(out)
+	case "measure":
+		if api.MeasureScore == nil {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
+		at, err := time.Parse(time.RFC3339, strings.TrimSpace(body.PunchAt))
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(map[string]string{"error": "punch_at must be RFC3339"})
+			return
+		}
+		out, err := api.MeasureScore(r.Context(), strings.TrimSpace(body.EFleetsID), at)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+			return
+		}
+		_ = json.NewEncoder(w).Encode(out)
+	case "dismiss":
+		if api.DismissScore == nil {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
+		if err := api.DismissScore(r.Context(), body.EFleetsID, body.PunchAt, body.Recorded); err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string]bool{"ok": true})
+	case "correct":
+		if api.CorrectScore == nil {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
+		if err := api.CorrectScore(r.Context(), body.EFleetsID, body.PunchAt, body.Recorded); err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string]bool{"ok": true})
 	default:
 		http.NotFound(w, r)
 	}

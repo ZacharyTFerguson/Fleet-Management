@@ -23,6 +23,19 @@ func TestNextGeneralCodeAndLabel(t *testing.T) {
 	}
 }
 
+func TestParseCanonLabelGasOnly(t *testing.T) {
+	g, typ, brand, top, grade, ok := ParseCanonLabel("A000001_001_SHELL_A_A")
+	if !ok || g != "A000001" || typ != TypeGas || brand != "SHELL" || top != "A" || grade != "A" {
+		t.Fatalf("%s %s %s %s %s %v", g, typ, brand, top, grade, ok)
+	}
+	if _, _, _, _, _, ok := ParseCanonLabel("A000001_002_ACME_A_A"); ok {
+		t.Fatal("type 002 must fail")
+	}
+	if _, _, _, _, _, ok := ParseCanonLabel("SHELL"); ok {
+		t.Fatal("bare name must fail")
+	}
+}
+
 func TestIsGasMerchantExcludesShops(t *testing.T) {
 	if !IsGasMerchant("SHELL", "100 Main") {
 		t.Fatal("shell")

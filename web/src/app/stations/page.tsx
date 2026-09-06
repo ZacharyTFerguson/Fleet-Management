@@ -12,8 +12,10 @@ export default function StationsPage() {
         <h1 className="headline">Gas Stations</h1>
         <p className="lede">
           Canon labels only (<code>GeneralCode_Type_Branding_TopTier_TopTierGrade</code>).
-          Review → third-party map check → dry-run → one confirm-gated send.
-          No shops. No bulk OneStep.
+          Proven download is Gas_Stations only (<code>/zone-group</code> then{" "}
+          <code>/zone</code>). Review → third-party map → dry-run. API create is
+          not proven — portal-first until a live write is confirmed. No shops. No
+          bulk.
         </p>
       </header>
       <StationsBoard />

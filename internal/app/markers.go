@@ -14,9 +14,11 @@ import (
 const sendConfirmPhrase = "SEND_TO_ONESTEP"
 
 type MarkerList struct {
-	Jobs   []store.MarkerJob `json:"jobs"`
-	Places int               `json:"places"`
-	Note   string            `json:"note"`
+	Jobs        []store.MarkerJob `json:"jobs"`
+	Places      int               `json:"places"`
+	Note        string            `json:"note"`
+	WriteProven bool              `json:"write_proven"`
+	PortalURL   string            `json:"portal_url"`
 }
 
 func (a *App) ListMarkerJobs(ctx context.Context) (MarkerList, error) {
@@ -28,11 +30,85 @@ func (a *App) ListMarkerJobs(ctx context.Context) (MarkerList, error) {
 	if err != nil {
 		return MarkerList{}, err
 	}
+	note := "Gas Stations only (type 001 / Gas_Stations). Download uses proven GET /zone-group + /zone. API create is not proven — portal-first until ONESTEP_WRITE_PROVEN=1. Miles still come from drive-stop, never from this page."
 	return MarkerList{
-		Jobs:   jobs,
-		Places: len(pls),
-		Note:   "Gas Stations only (type 001 / Gas_Stations). Send is confirm-gated. Miles still come from drive-stop, never from this page.",
+		Jobs:        jobs,
+		Places:      len(pls),
+		Note:        note,
+		WriteProven: onestep.WriteProven(),
+		PortalURL:   onestep.PortalMapURL,
 	}, nil
+}
+
+// PullOneStepGasStations downloads live Gas_Stations zones (proven list APIs) into the catalog.
+func (a *App) PullOneStepGasStations(ctx context.Context) (MarkerList, error) {
+	c := a.oneStepClient()
+	if c == nil || c.Token == "" {
+		return MarkerList{}, fmt.Errorf("OneStep API key missing")
+	}
+	items, _, err := c.ListGasStationZones(ctx)
+	if err != nil {
+		return MarkerList{}, err
+	}
+	for _, it := range items {
+		if err := a.upsertOneStepGasPlace(ctx, it); err != nil {
+			return MarkerList{}, err
+		}
+	}
+	return a.ListMarkerJobs(ctx)
+}
+
+func (a *App) upsertOneStepGasPlace(ctx context.Context, it onestep.PlaceItem) error {
+	general, typeCode, brand, top, grade, ok := places.ParseCanonLabel(it.Name)
+	if !ok {
+		return nil
+	}
+	if err := places.GasOnly(typeCode); err != nil {
+		return err
+	}
+	p, err := a.Store.GetPlace(ctx, general)
+	if err != nil {
+		return err
+	}
+	if p == nil {
+		created, err := places.NewGasPlace(general, it.Name, it.Address, "", "onestep_zone")
+		if err != nil {
+			return err
+		}
+		created.BrandCode = brand
+		created.TopTier = top
+		created.TopTierGrade = grade
+		created.Label = places.LabelOf(general, typeCode, brand, top, grade)
+		created.Name = it.Name
+		p = &created
+	}
+	p.OneStepZoneID = it.ID
+	if it.Address != "" {
+		p.Address = it.Address
+	}
+	if it.Lat != nil {
+		p.Lat = it.Lat
+	}
+	if it.Lng != nil {
+		p.Lng = it.Lng
+	}
+	if err := a.Store.UpsertPlace(ctx, *p); err != nil {
+		return err
+	}
+	draft := places.DraftFor(*p)
+	if it.Lat != nil {
+		draft.Lat = it.Lat
+	}
+	if it.Lng != nil {
+		draft.Lng = it.Lng
+	}
+	id := "job-" + p.GeneralCode
+	existing, _, _ := a.Store.GetMarkerJob(ctx, id)
+	stage := "onestep"
+	if existing != nil && existing.Stage != "" && existing.Stage != "review" {
+		stage = existing.Stage
+	}
+	return a.Store.UpsertMarkerJob(ctx, id, p.GeneralCode, stage, onestep.CompactJSON(draft), "")
 }
 
 // PullGasCandidates seeds places + review jobs from gas_stations and fuel merchants.

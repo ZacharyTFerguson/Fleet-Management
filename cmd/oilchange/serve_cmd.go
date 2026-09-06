@@ -90,9 +90,15 @@ func cmdServe(cfg config.Config, args []string) int {
 				Geocode:   a.GeocodeMarker,
 				Review:    a.ReviewMarker,
 				DryRun:    a.DryRunMarker,
-				Send:      a.SendMarker,
-				Zone:      a.SendZone,
-				Confirm:   a.ConfirmTokenFor,
+				Send:         a.SendMarker,
+				Zone:         a.SendZone,
+				Confirm:      a.ConfirmTokenFor,
+				PullOneStep:  a.PullOneStepGasStations,
+				BoxScore:     a.ListBoxScore,
+				RebuildScore: a.RebuildBoxScore,
+				MeasureScore: a.MeasureBoxScorePunch,
+				DismissScore: a.DismissLedger,
+				CorrectScore: a.CorrectLedger,
 			}
 		}
 	}

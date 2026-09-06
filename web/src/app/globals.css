@@ -930,3 +930,38 @@ html.driver-mode .cta.driver-toggle.is-on {
 .marker-detail {
   margin-top: 1rem;
 }
+
+.portal-link {
+  color: var(--sodium);
+  font-weight: 600;
+}
+
+.filter-row {
+  margin: 0.75rem 0;
+}
+
+.trend-badge {
+  display: inline-block;
+  padding: 0.15rem 0.45rem;
+  border-radius: 0.3rem;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.trend-badge.up {
+  background: var(--hold-bg);
+  color: var(--hold);
+}
+
+.trend-badge.down {
+  background: var(--live-bg);
+  color: var(--live);
+}
+
+.trend-badge.flat,
+.trend-badge.hold,
+.trend-badge.out {
+  background: rgba(142, 182, 201, 0.16);
+  color: var(--steel);
+}

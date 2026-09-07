@@ -104,6 +104,8 @@ Do not commit `oilchange.env`, sqlite files, `data/runtime/`, PEMs, or `web/data
 | [`docs/NEON-FOR-LLMS.md`](NEON-FOR-LLMS.md) | Neon is already the sqlite backup — keep using it; do not recreate the project |
 | [`docs/onestep-api-auth.md`](onestep-api-auth.md) | Public v3 auth and drive-stop query names |
 | [`docs/ONESTEP-PLACES-API.md`](ONESTEP-PLACES-API.md) | Proven Gas_Stations list (`/zone-group` + `/zone`); portal-first create |
+| [`docs/PLACE-CODES-readme.md`](PLACE-CODES-readme.md) | Canon Place ID grammar (`7_3_5_1_1`: GeneralCode_Type_Branding_TopTier_TopTierGrade) |
+| [`docs/CANON-PLACE-AND-CATALOG-RULES.md`](CANON-PLACE-AND-CATALOG-RULES.md) | Sequential mint, append-only catalog, fuel UI shows Canon label |
 | [`docs/MILEAGE-BOX-SCORE.md`](MILEAGE-BOX-SCORE.md) | Last Reading vs gas-card box score; expected is not last oil + interval |
 | [`docs/collab/README.md`](collab/README.md) | Collaborator notes for other sessions |
 | [`docs/ACCIDENTAL-TWIN.md`](ACCIDENTAL-TWIN.md) | Wrong GitHub repo — do not use it |

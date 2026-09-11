@@ -111,7 +111,7 @@ func (a *App) PairDevicesByVIN(ctx context.Context, opt PairVINOpts) (PairVINRes
 	}
 
 	apply := func(d model.OneStepDevice) (model.OneStepDevice, bool) {
-		if oil.HasLogisticsPersonnel(d.DisplayName) {
+		if oil.SkipDeviceCarJoin(d.DisplayName) {
 			return d, false
 		}
 		if d.LinkedCarEFleetsID != nil && strings.TrimSpace(*d.LinkedCarEFleetsID) != "" {

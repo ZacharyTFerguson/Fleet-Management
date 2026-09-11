@@ -76,6 +76,9 @@ func TestIsVirginiaVehicleNCXAndVA15(t *testing.T) {
 	if !IsVirginiaVehicle("27VA19", "", nil) {
 		t.Fatal("27VA19 by id shape")
 	}
+	if IsVirginiaVehicle("Unknown", "VA RENTAL 2", cars) {
+		t.Fatal("VA RENTAL 2 is not a Virginia fleet id")
+	}
 }
 
 func TestSeedWatchedFactoryIDsVirginiaThenHits(t *testing.T) {

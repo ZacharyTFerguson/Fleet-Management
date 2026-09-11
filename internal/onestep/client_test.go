@@ -582,6 +582,18 @@ func TestMapCSVIgnoresLogisticsPersonnelLink(t *testing.T) {
 	if !foundTyler {
 		t.Fatal("tyler box stays in inventory unlinked (display_name is a label only)")
 	}
+	foundRental := 0
+	for _, d := range devs {
+		if d.FactoryID == "351358810724200" || d.FactoryID == "350457794656486" {
+			foundRental++
+			if d.LinkedCarEFleetsID != nil {
+				t.Fatalf("rental display_name must not join a car: %+v", d)
+			}
+		}
+	}
+	if foundRental != 2 {
+		t.Fatal("Rental 1 and Rental 2 stay in inventory as labels")
+	}
 }
 
 func TestLinkByFactoryIDNotDisplayName(t *testing.T) {

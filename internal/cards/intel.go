@@ -78,6 +78,16 @@ func ScorePairings(txs []model.CardTx, now time.Time) []model.CardPairing {
 		if oil.HasLogisticsPersonnel(t.DriverFirst, t.DriverLast) {
 			continue
 		}
+		// Rental / office CVNs stay buckets even if a fleet box sat at the pump.
+		if isOfficeLabel(t.RecordedEFleetsID) || isOfficeLabel(t.RecordedCVN) {
+			off := officeHolder(t)
+			if off != "" {
+				k := key{card, "office", off}
+				n[k]++
+				score[k] += w
+			}
+			continue
+		}
 		// GPS-called car is the join when present. Enterprise Vehicle is fallback.
 		car := strings.TrimSpace(t.CalledEFleetsID)
 		if car != "" && !isUnknownCar(car) && !isOfficeLabel(car) {

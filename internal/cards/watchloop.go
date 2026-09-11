@@ -61,6 +61,9 @@ func NicknameRegion(s string) string {
 }
 
 func looksVirginiaID(id string) bool {
+	if oil.IsRentalLabel(id) {
+		return false
+	}
 	u := strings.ToUpper(strings.TrimSpace(id))
 	if NicknameRegion(u) == "VA" {
 		return true
@@ -75,6 +78,9 @@ func looksVirginiaID(id string) bool {
 // IsVirginiaVehicle is a seed lock, not a join. DETAILS last-write-wins is
 // trusted for VA nicknames/ids so we know which box to ask OneStep about.
 func IsVirginiaVehicle(efleetsID, cvn string, cars []model.Car) bool {
+	if oil.IsRentalLabel(efleetsID, cvn) {
+		return false
+	}
 	if looksVirginiaID(efleetsID) || looksVirginiaID(cvn) {
 		return true
 	}
@@ -111,7 +117,7 @@ func FactoryIDsForLinkedCar(devices []model.OneStepDevice, efleetsID string) []s
 		if d.Dead || !d.Active {
 			continue
 		}
-		if oil.HasLogisticsPersonnel(d.DisplayName) {
+		if oil.SkipDeviceCarJoin(d.DisplayName) {
 			continue
 		}
 		if d.LinkedCarEFleetsID == nil || strings.TrimSpace(*d.LinkedCarEFleetsID) != efleetsID {

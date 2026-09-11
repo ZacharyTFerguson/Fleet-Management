@@ -357,6 +357,36 @@ func TestLogisticsPersonnelDoesNotLinkDevice(t *testing.T) {
 	}
 }
 
+func TestRentalLabelIsNotVA19(t *testing.T) {
+	if !IsRentalLabel("Rental 1") || !IsRentalLabel("VA RENTAL 2") {
+		t.Fatal("CVN rental labels")
+	}
+	if !IsRentalLabel("PDI Rental #1") || !IsRentalLabel("NYC-6: Julian (PDI Rental #2)") {
+		t.Fatal("OneStep display_name rental stickers")
+	}
+	if IsRentalLabel("VA19") || IsRentalLabel("VA-19") || IsRentalLabel("27VA19") || IsRentalLabel("VA15") {
+		t.Fatal("fleet nicknames are not rental buckets")
+	}
+	if SkipDeviceCarJoin("VA-19: Lindsey Glazier G,V DFR") {
+		t.Fatal("VA19 GPS sticker is a factory_id-linked car, not a rental skip")
+	}
+	if !SkipDeviceCarJoin("PDI Rental #1") || !SkipDeviceCarJoin("Tyler spare") {
+		t.Fatal("rental and logistics boxes skip device↔car join")
+	}
+	in := ComputeIn{
+		Nickname: "VA19",
+		Fills:    []model.Fill{fill(100000, 10, false, "VA19")},
+		Devices:  []model.OneStepDevice{{FactoryID: "351358810724200", DisplayName: "Rental 1", Dead: false}},
+		MilesSince: []model.DriveStopMiles{{
+			FactoryID: "351358810724200", Since: at(10), Miles: 3,
+		}},
+	}
+	out := EvaluateHolds(in)
+	if !out.SkipWrite || !hasCode(out.Holds, model.HoldNoDevice) {
+		t.Fatalf("rental display_name must not supply VA19 miles, %+v", out)
+	}
+}
+
 func TestNoDeviceHold(t *testing.T) {
 	in := ComputeIn{
 		Nickname: "VA1",

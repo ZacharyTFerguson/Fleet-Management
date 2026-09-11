@@ -620,6 +620,11 @@ func splitEras(hits []gpsHit, nick map[string]string) []CardEra {
 		for _, h := range list {
 			carsOf[card][h.car] = struct{}{}
 			if cur == nil || cur.EFleetsID != h.car {
+				if cur != nil {
+					t := h.at
+					cur.SwitchedAt = &t
+					cur.NextPairAt = &t
+				}
 				flush()
 				era := CardEra{
 					CardID:     card,
@@ -629,6 +634,7 @@ func splitEras(hits []gpsHit, nick map[string]string) []CardEra {
 					HolderKey:  h.car,
 					From:       h.at,
 					To:         h.at,
+					PairStarted: h.at,
 					EvidenceN:  1,
 				}
 				cur = &era

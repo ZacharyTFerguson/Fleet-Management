@@ -264,6 +264,7 @@ func ClassifyLadder(gps GPSFirstResult, txs []model.CardTx, fleet []model.Car, d
 	gps.Calls = calls
 	gps.Eras = backEras
 	eras := mergeLadderEras(backEras, classified, info, byCardCar, nick)
+	eras = ApplyPairDates(eras)
 	cov := RosterCoverage(fleet, devices, eras, cars)
 	cov.Blocked = LadderBlocker(txs, gpsPosVisits(gps))
 	if cov.Blocked == "" {
@@ -558,6 +559,7 @@ func mergeLadderEras(gpsEras []CardEra, classified map[string]LadderCard, info m
 						HolderKey:  car,
 						From:       h.from,
 						To:         h.to,
+						PairStarted: h.from,
 						EvidenceN:  h.evidence,
 						Stations:   sortedKeys(h.stations),
 						Split:      true,
@@ -795,6 +797,20 @@ func FormatLadder(res LadderResult) string {
 			fmt.Fprintf(&b, "  %s card=%s car=%s name=%s stations=%d rung=%d n=%d\n",
 				flag, c.CardID, c.HolderKey, c.Nickname, c.StationN, c.Rung, c.EvidenceN)
 		}
+	}
+	for _, e := range res.Eras {
+		if eraHolderType(e) != HolderCar {
+			continue
+		}
+		name := firstNonEmpty(e.Nickname, e.HolderKey, e.EFleetsID)
+		flag := "ERA"
+		if e.Split {
+			flag = "SPLIT"
+		}
+		fmt.Fprintf(&b, "  %s card=%s car=%s name=%s from=%s to=%s %s n=%d\n",
+			flag, e.CardID, e.EFleetsID, name,
+			e.From.UTC().Format(time.RFC3339), e.To.UTC().Format(time.RFC3339),
+			FormatPairDates(e), e.EvidenceN)
 	}
 	const peopleCap = 12
 	people := res.People

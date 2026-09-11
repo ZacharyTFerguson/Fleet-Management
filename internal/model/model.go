@@ -161,17 +161,20 @@ type GPSCardMatch struct {
 // HolderType car (default) / person / office. Logistics-personnel cards stay person
 // and must never create a device↔car join. Last Reading must not read this.
 type CardEra struct {
-	CardID     string    `json:"card_id"`
-	EFleetsID  string    `json:"efleets_id"`
-	Nickname   string    `json:"nickname,omitempty"`
-	HolderType string    `json:"holder_type,omitempty"` // car (default), person, office
-	HolderKey  string    `json:"holder_key,omitempty"`
-	From       time.Time `json:"from"`
-	To         time.Time `json:"to"`
-	EvidenceN  int       `json:"evidence_n"`
-	Stations   []string  `json:"stations,omitempty"`
-	Split      bool      `json:"split"`
-	Rung       int       `json:"rung,omitempty"`
+	CardID      string     `json:"card_id"`
+	EFleetsID   string     `json:"efleets_id"`
+	Nickname    string     `json:"nickname,omitempty"`
+	HolderType  string     `json:"holder_type,omitempty"` // car (default), person, office
+	HolderKey   string     `json:"holder_key,omitempty"`
+	From        time.Time  `json:"from"`
+	To          time.Time  `json:"to"`
+	PairStarted time.Time  `json:"pair_started,omitempty"` // first swipe evidence in this car era
+	SwitchedAt  *time.Time `json:"switched_at,omitempty"`  // when the next car takes over (GPS anchor)
+	NextPairAt  *time.Time `json:"next_pair_at,omitempty"` // start of the following car era, or null if current
+	EvidenceN   int        `json:"evidence_n"`
+	Stations    []string   `json:"stations,omitempty"`
+	Split       bool       `json:"split"`
+	Rung        int        `json:"rung,omitempty"`
 }
 
 // CardPairing is a scored car, person, or office link for one card over the full history.

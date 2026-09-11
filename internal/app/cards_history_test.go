@@ -95,6 +95,31 @@ func TestCardsHistoryFindsSplitCardErasWithNamedMerchants(t *testing.T) {
 	if len(persisted) == 0 {
 		t.Fatal("card_eras must be persisted")
 	}
+	var va15, va19 *model.CardEra
+	for i := range persisted {
+		e := &persisted[i]
+		if e.CardID != "CARD-MIX-99" || eraHolder(*e) != cards.HolderCar {
+			continue
+		}
+		switch e.EFleetsID {
+		case "27VA15":
+			va15 = e
+		case "27VA19":
+			va19 = e
+		}
+	}
+	if va15 == nil || va19 == nil {
+		t.Fatalf("persisted pair eras %+v", persisted)
+	}
+	if va15.PairStarted.IsZero() {
+		t.Fatalf("VA15 pair_started missing: %+v", va15)
+	}
+	if va15.SwitchedAt == nil || va15.NextPairAt == nil {
+		t.Fatalf("VA15 must record switch to VA19: %+v", va15)
+	}
+	if va19.SwitchedAt != nil || va19.NextPairAt != nil {
+		t.Fatalf("current VA19 era must not switch: %+v", va19)
+	}
 }
 
 func TestCardsHistoryTrackerMerchantsLockViaGPSPump(t *testing.T) {

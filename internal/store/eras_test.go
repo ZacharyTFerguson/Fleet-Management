@@ -18,12 +18,14 @@ func TestReplaceErasPersistsPersonAndSplitCarHistory(t *testing.T) {
 	defer s.Close()
 	ctx := context.Background()
 	from := time.Date(2026, 8, 1, 10, 0, 0, 0, time.UTC)
+	switchAt := from.Add(48 * time.Hour)
 	rows := []model.CardEra{
 		{
 			CardID: "CARD-MIX", EFleetsID: "27VA15", Nickname: "VA15",
 			HolderType: "car", HolderKey: "27VA15",
-			From: from, To: from.Add(24 * time.Hour), EvidenceN: 3,
-			Stations: []string{"PUMP01", "PUMP02"}, Split: true, Rung: 3,
+			From: from, To: from.Add(24 * time.Hour), PairStarted: from,
+			SwitchedAt: &switchAt, NextPairAt: &switchAt,
+			EvidenceN: 3, Stations: []string{"PUMP01", "PUMP02"}, Split: true, Rung: 3,
 		},
 		{
 			CardID: "CARD-TYLER", HolderType: "person", HolderKey: "TYLER SPARE",
@@ -43,6 +45,9 @@ func TestReplaceErasPersistsPersonAndSplitCarHistory(t *testing.T) {
 	}
 	if got[0].CardID != "CARD-MIX" || !got[0].Split || got[0].HolderType != "car" || got[0].Rung != 3 {
 		t.Fatalf("car era %+v", got[0])
+	}
+	if got[0].PairStarted.IsZero() || got[0].SwitchedAt == nil || !got[0].SwitchedAt.Equal(switchAt) {
+		t.Fatalf("pair dates %+v", got[0])
 	}
 	if got[1].HolderType != "person" || got[1].EFleetsID != "" {
 		t.Fatalf("person era must not invent a car: %+v", got[1])

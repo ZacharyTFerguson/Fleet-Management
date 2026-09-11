@@ -4,7 +4,7 @@ This folder is for **other Grok / agent sessions working in the same repo**, not
 
 Workspace: `C:\Users\Zacha\go\local9_3_2026` (repo root). Ignore nested `Fleet-Management/` unless you are syncing that tree on purpose.
 
-Oil Desk last oil not showing / eFleets roster presort: [`OIL-CHANGES-NOT-REFLECTED.md`](OIL-CHANGES-NOT-REFLECTED.md).
+Oil Desk last oil not showing / eFleets roster presort: [`OIL-CHANGES-NOT-REFLECTED.md`](OIL-CHANGES-NOT-REFLECTED.md). Rental 1 / Rental 2 vs the one VA19 swipe: [`RENTAL-VA19-ALIAS.md`](RENTAL-VA19-ALIAS.md).
 
 ## How to work here
 

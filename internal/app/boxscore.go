@@ -217,7 +217,7 @@ func liveLinked(devs []model.OneStepDevice) []model.OneStepDevice {
 		if d.Dead || d.FactoryID == "" {
 			continue
 		}
-		if oil.HasLogisticsPersonnel(d.DisplayName) {
+		if oil.SkipDeviceCarJoin(d.DisplayName) {
 			continue
 		}
 		out = append(out, d)

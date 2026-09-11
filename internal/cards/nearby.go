@@ -153,7 +153,8 @@ func CardHasPersonEra(eras []model.CardEra, cardID string) bool {
 		if e.CardID != cardID {
 			continue
 		}
-		if strings.TrimSpace(e.HolderType) == HolderPerson {
+		ht := strings.TrimSpace(e.HolderType)
+		if ht == HolderPerson || ht == HolderOffice {
 			return true
 		}
 	}
@@ -202,6 +203,9 @@ func HuntNearbyFull(visits []model.StopVisit, txs []model.CardTx, stations []Geo
 		if oil.HasLogisticsPersonnel(tx.DriverFirst, tx.DriverLast) {
 			continue
 		}
+		if oil.IsRentalLabel(tx.RecordedEFleetsID, tx.RecordedCVN) {
+			continue
+		}
 		st := resolveStation(tx, byStation)
 		if !st.hasPos {
 			continue
@@ -230,7 +234,7 @@ func HuntNearbyFull(visits []model.StopVisit, txs []model.CardTx, stations []Geo
 				continue
 			}
 			fid := strings.TrimSpace(v.FactoryID)
-			if dev, ok := devByFactory[fid]; ok && oil.HasLogisticsPersonnel(dev.DisplayName) {
+			if dev, ok := devByFactory[fid]; ok && oil.SkipDeviceCarJoin(dev.DisplayName) {
 				continue
 			}
 			a := ca.dev[fid]

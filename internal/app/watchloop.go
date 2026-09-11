@@ -244,7 +244,7 @@ func watchDevicesByFactory(devs []model.OneStepDevice, factoryIDs []string) []mo
 		if d.Dead {
 			continue
 		}
-		if oil.HasLogisticsPersonnel(d.DisplayName) {
+		if oil.SkipDeviceCarJoin(d.DisplayName) {
 			continue
 		}
 		if _, ok := seen[id]; ok {

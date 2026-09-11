@@ -295,7 +295,7 @@ func liveDevices(devs []model.OneStepDevice) []model.OneStepDevice {
 		if d.Dead || d.FactoryID == "" {
 			continue
 		}
-		if HasLogisticsPersonnel(d.DisplayName) {
+		if SkipDeviceCarJoin(d.DisplayName) {
 			continue
 		}
 		live = append(live, d)

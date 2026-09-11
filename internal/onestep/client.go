@@ -902,7 +902,7 @@ func LoadMapCSV(path string) ([]model.OneStepDevice, error) {
 		dead := strings.ToLower(pick(row, "dead", "retired"))
 		d.Dead = dead == "1" || dead == "true" || dead == "yes" || dead == "dead"
 		d.Active = !d.Dead
-		if oil.HasLogisticsPersonnel(name) {
+		if oil.SkipDeviceCarJoin(name) {
 			d.LinkedCarEFleetsID = nil
 		} else if eid != "" {
 			d.LinkedCarEFleetsID = &eid
@@ -914,7 +914,7 @@ func LoadMapCSV(path string) ([]model.OneStepDevice, error) {
 
 // LinkByFactoryID attaches a car using factory_id equality only. Display_name is not consulted.
 func LinkByFactoryID(dev model.OneStepDevice, factoryToCar map[string]string) model.OneStepDevice {
-	if oil.HasLogisticsPersonnel(dev.DisplayName) {
+	if oil.SkipDeviceCarJoin(dev.DisplayName) {
 		dev.LinkedCarEFleetsID = nil
 		return dev
 	}
@@ -958,7 +958,7 @@ func VINToEFleets(cars []model.Car) map[string]string {
 // LinkByVIN attaches a car using exact 17-char VIN equality to cars.vin.
 // Display_name and plate are not consulted. An existing factory_id link is kept.
 func LinkByVIN(dev model.OneStepDevice, vinToCar map[string]string) model.OneStepDevice {
-	if oil.HasLogisticsPersonnel(dev.DisplayName) {
+	if oil.SkipDeviceCarJoin(dev.DisplayName) {
 		dev.LinkedCarEFleetsID = nil
 		return dev
 	}

@@ -372,6 +372,19 @@ func classifyCard(card string, inf *cardInfo, hits map[string]*carHit, rungs []i
 		return lc
 	}
 
+	// Office and rental buckets stay off the car roster even if a linked
+	// fleet box (VA19) happened to sit at the same pumps. GPS 3-station
+	// exclusive sits still apply to CARD-MIX-99 / CARD-19.
+	if inf != nil && inf.office != "" {
+		lc.Bucket = HolderOffice
+		lc.HolderKey = inf.office
+		lc.Nickname = inf.office
+		lc.EvidenceN = inf.n
+		lc.Stations = sortedKeys(inf.stations)
+		lc.StationN = len(lc.Stations)
+		return lc
+	}
+
 	if len(locked) >= 2 {
 		lc.Bucket = HolderCar
 		lc.Split = true
@@ -412,17 +425,6 @@ func classifyCard(card string, inf *cardInfo, hits map[string]*carHit, rungs []i
 		for _, a := range any {
 			lc.Cars = append(lc.Cars, a.car)
 		}
-		return lc
-	}
-
-	// Office stays office even if a GPS car happened to sit during a swipe.
-	if inf != nil && inf.office != "" {
-		lc.Bucket = HolderOffice
-		lc.HolderKey = inf.office
-		lc.Nickname = inf.office
-		lc.EvidenceN = inf.n
-		lc.Stations = sortedKeys(inf.stations)
-		lc.StationN = len(lc.Stations)
 		return lc
 	}
 
@@ -595,7 +597,7 @@ func RosterCoverage(fleet []model.Car, devices []model.OneStepDevice, eras []Car
 		if car == "" || isUnknownCar(car) {
 			continue
 		}
-		if oil.HasLogisticsPersonnel(d.DisplayName) {
+		if oil.SkipDeviceCarJoin(d.DisplayName) {
 			continue
 		}
 		linked[car] = struct{}{}
@@ -851,6 +853,9 @@ func rungFor(n int, rungs []int) int {
 }
 
 func officeHolder(t model.CardTx) string {
+	if key := oil.RentalHolderKey(t.RecordedCVN, t.RecordedEFleetsID); key != "" {
+		return key
+	}
 	for _, s := range []string{t.RecordedEFleetsID, t.RecordedCVN} {
 		if isOfficeLabel(s) {
 			return strings.TrimSpace(s)
@@ -860,6 +865,9 @@ func officeHolder(t model.CardTx) string {
 }
 
 func isOfficeLabel(s string) bool {
+	if oil.IsRentalLabel(s) {
+		return true
+	}
 	u := strings.ToLower(strings.TrimSpace(s))
 	if u == "" {
 		return false

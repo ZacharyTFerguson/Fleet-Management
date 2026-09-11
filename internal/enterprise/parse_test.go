@@ -134,6 +134,56 @@ func TestParseWrongCardSynthetic(t *testing.T) {
 	}
 }
 
+func TestParseRentalFillsAreNotVA19(t *testing.T) {
+	f, err := os.Open(testdata(t, "enterprise", "details_rental.csv"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	fills, _, cards, err := ParseFills(f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(fills) != 3 {
+		t.Fatalf("fills %d", len(fills))
+	}
+	var va19, rent1, rent2 int
+	for _, fl := range fills {
+		if fl.CardID == "CARD-19" {
+			va19++
+			if fl.EFleetsID != "27VA19" || fl.ProviderCompanyVehicleNumber != "VA19" {
+				t.Fatalf("CARD-19 is the VA19 control: %+v", fl)
+			}
+		}
+		if fl.CardID == "CARD-RENT-1" {
+			rent1++
+			if fl.EFleetsID == "27VA19" || fl.ProviderCompanyVehicleNumber == "VA19" {
+				t.Fatalf("Rental 1 dump onto VA19: %+v", fl)
+			}
+			if fl.ProviderCompanyVehicleNumber != "Rental 1" {
+				t.Fatalf("Rental 1 CVN %+v", fl)
+			}
+		}
+		if fl.CardID == "CARD-RENT-2" {
+			rent2++
+			if fl.EFleetsID == "27VA19" || fl.ProviderCompanyVehicleNumber == "VA19" {
+				t.Fatalf("Rental 2 dump onto VA19: %+v", fl)
+			}
+			if fl.ProviderCompanyVehicleNumber != "VA RENTAL 2" {
+				t.Fatalf("VA RENTAL 2 CVN %+v", fl)
+			}
+		}
+	}
+	if va19 != 1 || rent1 != 1 || rent2 != 1 {
+		t.Fatalf("want one CARD-19 + one each rental, va19=%d rent1=%d rent2=%d", va19, rent1, rent2)
+	}
+	for _, c := range cards {
+		if c.ID == "CARD-RENT-1" && c.LinkedCarEFleetsID != nil && *c.LinkedCarEFleetsID == "27VA19" {
+			t.Fatalf("rental card linked to VA19: %+v", c)
+		}
+	}
+}
+
 func TestHeaderTrimCustName(t *testing.T) {
 	idx := headerIndex([]string{"Cust Name ", "Vehicle"})
 	if _, ok := idx["cust name"]; !ok {

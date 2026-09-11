@@ -105,6 +105,162 @@ func TestCardsWatchFetchesOnlyWatchedBoxes(t *testing.T) {
 	}
 }
 
+func TestCardsWatchVirginiaSkipsNonVACards(t *testing.T) {
+	prev := watchDriveStopMinInterval
+	watchDriveStopMinInterval = 20 * time.Millisecond
+	defer func() { watchDriveStopMinInterval = prev }()
+
+	p := filepath.Join(t.TempDir(), "oil.sqlite")
+	st, err := store.Open("sqlite", p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+
+	var vaHits, njHits int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.Contains(r.URL.Path, "/device"):
+			_, _ = w.Write([]byte(`{"result_list":[
+				{"factory_id":"FACT-VA","device_id":"DEV-VA","active":true},
+				{"factory_id":"FACT-NJ","device_id":"DEV-NJ","active":true}
+			]}`))
+		case strings.Contains(r.URL.Path, "/route/drive-stop"):
+			did := r.URL.Query().Get("device_id")
+			if did == "DEV-VA" {
+				atomic.AddInt32(&vaHits, 1)
+			}
+			if did == "DEV-NJ" {
+				atomic.AddInt32(&njHits, 1)
+			}
+			_, _ = w.Write([]byte(`{"drive_stop_list":[]}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer srv.Close()
+
+	c := onestep.NewClient(srv.URL, "tok")
+	c.HTTP = srv.Client()
+	cache := filepath.Join(t.TempDir(), "gps-stops.json")
+	a := &App{Cfg: config.Config{SQLitePath: p}, Store: st, GPSStopsPath: cache, OneStep: c}
+	ctx := context.Background()
+	ny := enterprise.NY()
+	va := "292NCX"
+	if err := st.UpsertCar(ctx, model.Car{EFleetsID: va, Nickname: "292NCX", Region: "VA"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.UpsertDevice(ctx, model.OneStepDevice{
+		FactoryID: "FACT-VA", DeviceID: "DEV-VA", LinkedCarEFleetsID: &va, Active: true,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	nj := "27CKN3"
+	if err := st.UpsertCar(ctx, model.Car{EFleetsID: nj, Nickname: "NJ1", Region: "NJ"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.UpsertDevice(ctx, model.OneStepDevice{
+		FactoryID: "FACT-NJ", DeviceID: "DEV-NJ", LinkedCarEFleetsID: &nj, Active: true,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	fill := time.Date(2026, 8, 20, 14, 0, 0, 0, ny)
+	if err := st.UpsertCardTx(ctx, model.CardTx{
+		CardID: "CARD-VA", At: fill.UTC(), RecordedEFleetsID: va,
+		StationName: "SHEETZ", StationAddress: "203 CRAIGDELL RD, LOWER BURRELL, PA",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.UpsertCardTx(ctx, model.CardTx{
+		CardID: "CARD-NJ", At: fill.UTC(), RecordedEFleetsID: nj,
+		StationName: "WAWA", StationAddress: "1 MAIN ST, NEWARK, NJ",
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	res, err := a.CardsWatch(ctx, CardsWatchOpts{LiveStops: true, Virginia: true, SkipVIN: true, Pace: 20 * time.Millisecond})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if atomic.LoadInt32(&njHits) != 0 {
+		t.Fatalf("--virginia fetched NJ box, hits=%d", njHits)
+	}
+	if atomic.LoadInt32(&vaHits) < 1 {
+		t.Fatalf("expected VA drive-stop, hits=%d", vaHits)
+	}
+	for _, c := range res.Cards {
+		if c.CardID == "CARD-NJ" {
+			t.Fatalf("NJ card in virginia watch: %+v", c)
+		}
+	}
+}
+
+func TestCardsWatchSkipVINDoesNotAskEmpty(t *testing.T) {
+	prev := watchDriveStopMinInterval
+	watchDriveStopMinInterval = 20 * time.Millisecond
+	defer func() { watchDriveStopMinInterval = prev }()
+
+	p := filepath.Join(t.TempDir(), "oil.sqlite")
+	st, err := store.Open("sqlite", p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+
+	var askEmpty int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.Contains(r.URL.Path, "/device"):
+			if strings.TrimSpace(r.URL.Query().Get("device_id")) != "" {
+				atomic.AddInt32(&askEmpty, 1)
+			}
+			_, _ = w.Write([]byte(`{"result_list":[
+				{"factory_id":"FACT-VA","device_id":"DEV-VA","active":true},
+				{"factory_id":"FACT-LOOSE","device_id":"DEV-LOOSE","active":true}
+			]}`))
+		case strings.Contains(r.URL.Path, "/route/drive-stop"):
+			_, _ = w.Write([]byte(`{"drive_stop_list":[]}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer srv.Close()
+
+	c := onestep.NewClient(srv.URL, "tok")
+	c.HTTP = srv.Client()
+	cache := filepath.Join(t.TempDir(), "gps-stops.json")
+	a := &App{Cfg: config.Config{SQLitePath: p}, Store: st, GPSStopsPath: cache, OneStep: c}
+	ctx := context.Background()
+	ny := enterprise.NY()
+	va := "292NCX"
+	if err := st.UpsertCar(ctx, model.Car{EFleetsID: va, Nickname: "292NCX", Region: "VA"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.UpsertDevice(ctx, model.OneStepDevice{
+		FactoryID: "FACT-VA", DeviceID: "DEV-VA", LinkedCarEFleetsID: &va, Active: true,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.UpsertDevice(ctx, model.OneStepDevice{
+		FactoryID: "FACT-LOOSE", DeviceID: "DEV-LOOSE", Active: true,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	fill := time.Date(2026, 8, 20, 14, 0, 0, 0, ny)
+	if err := st.UpsertCardTx(ctx, model.CardTx{
+		CardID: "CARD-VA", At: fill.UTC(), RecordedEFleetsID: va,
+		StationName: "SHEETZ", StationAddress: "203 CRAIGDELL RD, LOWER BURRELL, PA",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := a.CardsWatch(ctx, CardsWatchOpts{LiveStops: true, SkipVIN: true, Pace: 20 * time.Millisecond}); err != nil {
+		t.Fatal(err)
+	}
+	if atomic.LoadInt32(&askEmpty) != 0 {
+		t.Fatalf("--skip-vin must not GET /device?device_id=, hits=%d", askEmpty)
+	}
+}
+
 func TestCardsWatchPersistsWhenWatchedSetComplete(t *testing.T) {
 	p := filepath.Join(t.TempDir(), "oil.sqlite")
 	st, err := store.Open("sqlite", p)

@@ -151,7 +151,7 @@ nearby certain=0 likely=1 watch=47 cards=20 radius=1mi window=fill-day±1 covera
 
 A second full-fleet nearby `--live` is the wrong next step. After the 2026-09-04 260-box pull the leftover work is: **ask only the cars already on the watch list** (plus Virginia recorded vehicles, which this fleet treats as the right seed).
 
-`oilchange cards watch [--live] [--persist] [--fills 10] [--pace 35s]`:
+`oilchange cards watch [--live] [--persist] [--virginia] [--skip-vin] [--fills 10] [--pace 35s]`:
 
 1. GPS-first uses the stop cache only (`OneStep` is niled around that call). Watch `--live` must not fleet-fetch linked boxes through `cards rebuild` GPS-first.
 2. Unknown fills only (same `EligibleUnknownFills` as nearby). PERSON stays watch-only.
@@ -159,8 +159,8 @@ A second full-fleet nearby `--live` is the wrong next step. After the 2026-09-04
 4. Per card: take the **newest 10** provider swipes. Seed `factory_id`s from cache 1-mile hits, plus **only the newest** VA recorded vehicle’s linked box (mixed DETAILS Vehicle columns are not extra fetches), plus one hypothesis roster car if the list is still empty. Never invent an unpaired `factory_id`. Persist ranks that same newest VA box, so 1-mile spectators do not have to span the window.
 5. `--live` drive-stop those boxes for the **union** of those 10 fill-day ±1 windows, skipping a box already spanning-covered. One `device_id` per GET. Default **35 s** between calls; a `429`/`503` `Retry-After` waits that long and retries once.
 6. Hunt still scores **all** eligible fills for that card (May exclusive days + August fetches). Persist if watched-set coverage is complete, exactly one certain **linked** car, not PERSON, not unpaired. Persist ranks the newest VA seed box (1-mile spectators do not block). No VA seed → rank the hunt hits that were fetched; a DETAILS Vehicle hypothesis is not a join.
-7. `cards rebuild --no-gps` keeps nearby-certain car eras the ladder did not replace, so a rematch cannot wipe a watch persist.
-8. After the GPS watch, **ask OneStep for VIN** on leftover unpaired boxes (not only hunt hits): `GET /device?device_id=&latest_point=true` (OBD `device_state.vin` only). Exact 17-char match to `cars.vin` writes the factory_id→Enterprise link. `display_name` is never a join. CLI: `oilchange devices vin`. Then `cards history --no-gps` rematches GPS-at-the-pump and keeps watch-persisted car eras in coverage.
+7. `cards rebuild --no-gps` keeps nearby-certain car eras the ladder did not replace, so a rematch cannot wipe a watch persist. GPS-first rebuild with OneStep attached also unpaced-fetches every linked box missing from `gps-stops.json` — after a VA/watched pull, rematch with `--no-gps` so that is not a second 260-box dump.
+8. After the GPS watch, **ask OneStep for VIN** on leftover unpaired boxes (not only hunt hits): `GET /device?device_id=&latest_point=true` (OBD `device_state.vin` only). Exact 17-char match to `cars.vin` writes the factory_id→Enterprise link. `display_name` is never a join. CLI: `oilchange devices vin`. `--skip-vin` skips that AskEmpty loop (do not re-run `devices vin` while OneStep is cooling down). `--virginia` limits the unknown-card loop to Virginia recorded vehicles (rental labels are not VA). Then `cards history --no-gps` rematches GPS-at-the-pump and keeps watch-persisted car eras in coverage.
 
 When OneStep is **cooling down** (429 / Retry-After), do **not** keep hitting live `/device`. Save the portal Device Information export to gitignored `data/runtime/device-information.json` (report rows use `imei` as `factory_id` and report `vin`; `params.vin` is ignored). Apply it later with `oilchange devices vin --from data/runtime/device-information.json` or the Oil Desk button **Apply saved OneStep device information** (`POST /api/devices/vin-from-file`). That path is file-parse + sqlite upsert only.
 

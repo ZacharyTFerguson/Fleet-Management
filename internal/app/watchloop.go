@@ -20,6 +20,8 @@ type CardsWatchOpts struct {
 	CardID    string
 	LiveStops bool
 	Persist   bool
+	Virginia  bool          // only cards whose recorded vehicle is Virginia (VA audit)
+	SkipVIN   bool          // skip post-watch AskEmpty /device VIN GETs (do not re-run devices vin)
 	Fills     int           // newest punches per card to fetch (default 10)
 	Pace      time.Duration // min interval between drive-stop GETs (default 35s)
 }
@@ -74,6 +76,15 @@ func (a *App) CardsWatch(ctx context.Context, opt CardsWatchOpts) (cards.NearbyR
 	if opt.CardID != "" {
 		txs = cards.FillsForCard(txs, opt.CardID)
 	}
+	if opt.Virginia {
+		var va []model.CardTx
+		for _, t := range txs {
+			if cards.IsVirginiaVehicle(t.RecordedEFleetsID, t.RecordedCVN, fleet) {
+				va = append(va, t)
+			}
+		}
+		txs = va
+	}
 	if len(txs) == 0 {
 		return empty, nil
 	}
@@ -109,8 +120,8 @@ func (a *App) CardsWatch(ctx context.Context, opt CardsWatchOpts) (cards.NearbyR
 	}
 	prior := cards.HuntNearbyFull(visits, txs, gps.Stations, devs, cards.DefaultStopSlack, false)
 	order := cards.WatchCardOrder(txs, prior, fleet)
-	fmt.Fprintf(os.Stderr, "watch cards=%d fills_cap=%d live=%v persist=%v pace=%s (watched boxes only; not a fleet pull)\n",
-		len(order), maxFills, opt.LiveStops && a.OneStep != nil, opt.Persist, pace)
+	fmt.Fprintf(os.Stderr, "watch cards=%d fills_cap=%d live=%v persist=%v virginia=%v skip_vin=%v pace=%s (watched boxes only; not a fleet pull)\n",
+		len(order), maxFills, opt.LiveStops && a.OneStep != nil, opt.Persist, opt.Virginia, opt.SkipVIN, pace)
 
 	var merged cards.NearbyResult
 	allComplete := true
@@ -163,7 +174,7 @@ func (a *App) CardsWatch(ctx context.Context, opt CardsWatchOpts) (cards.NearbyR
 		merged = mergeWatchResults(merged, one, allComplete)
 	}
 	merged.CoverageComplete = allComplete
-	if opt.LiveStops && a.OneStep != nil {
+	if opt.LiveStops && a.OneStep != nil && !opt.SkipVIN {
 		// After the GPS watch, ask OneStep what OBD VIN is on each
 		// leftover unpaired box and join exact 17-char VIN to cars.vin.
 		pr, perr := a.PairDevicesByVIN(ctx, PairVINOpts{

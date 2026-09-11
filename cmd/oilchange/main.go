@@ -86,7 +86,7 @@ func usage() {
   oilchange cards ladder [--no-gps]
   oilchange cards coverage [--no-gps]
   oilchange cards nearby [--card ID] [--live] [--report] [--persist] [--report-cap N]
-  oilchange cards watch [--card ID] [--live] [--persist] [--fills 10] [--pace 35s]
+  oilchange cards watch [--card ID] [--live] [--persist] [--virginia] [--skip-vin] [--fills 10] [--pace 35s]
   oilchange devices sync [--map PATH] [--information PATH]
   oilchange devices list [--csv [--out PATH] [--live] [--map PATH]]
   oilchange devices csv [--out PATH] [--live] [--map PATH]
@@ -290,6 +290,8 @@ func cmdCards(ctx context.Context, cfg config.Config, args []string) int {
 	reportCap := fs.Int("report-cap", 3, "cards nearby --report max generate jobs")
 	watchFills := fs.Int("fills", 10, "cards watch: newest punches per card to fetch")
 	watchPace := fs.Duration("pace", 35*time.Second, "cards watch: min interval between drive-stop GETs (Retry-After wins)")
+	watchVA := fs.Bool("virginia", false, "cards watch: only Virginia recorded vehicles (VA GPS audit)")
+	skipVIN := fs.Bool("skip-vin", false, "cards watch: do not AskEmpty /device VIN after GPS (do not re-run devices vin)")
 	if err := fs.Parse(args[1:]); err != nil {
 		return model.ExitError
 	}
@@ -398,6 +400,8 @@ func cmdCards(ctx context.Context, cfg config.Config, args []string) int {
 			CardID:    *cardID,
 			LiveStops: *liveStops,
 			Persist:   *persistNearby,
+			Virginia:  *watchVA,
+			SkipVIN:   *skipVIN,
 			Fills:     *watchFills,
 			Pace:      *watchPace,
 		})

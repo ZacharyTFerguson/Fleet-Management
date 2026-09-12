@@ -110,6 +110,26 @@ func TestOpaquePDIID(t *testing.T) {
 	}
 }
 
+func TestParseShopRODoesNotSeedTransmissionOilAndFilter(t *testing.T) {
+	// Firestone-style "oil and filter" needles also match driveline services.
+	// A later transmission RO at higher miles must not become last oil.
+	csv := `RO Created Date,RO Completed Date,RO ID,Vehicle,Odometer,Service Desc,Shop Name
+08/01/2026,08/01/2026,RO-OIL,27SEPA,119800.0,Engine Oil & Filter Change,Firestone
+09/10/2026,09/10/2026,RO-TRANS,27SEPA,125400.0,Transmission Oil and Filter,Firestone
+09/10/2026,09/10/2026,RO-TC,27SEPA,125410.0,Transfer Case Oil and Filter Service,Midas
+`
+	_, _, oils, err := ParseShopROs(strings.NewReader(csv))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(oils) != 1 {
+		t.Fatalf("driveline oil-and-filter ROs must not seed last oil, got %d: %+v", len(oils), oils)
+	}
+	if oils[0].Miles != 119800 || oils[0].EFleetsID != "27SEPA" {
+		t.Fatalf("want the engine oil RO, got %+v", oils[0])
+	}
+}
+
 func TestParseWrongCardSynthetic(t *testing.T) {
 	f, err := os.Open(testdata(t, "enterprise", "details_wrongcard.csv"))
 	if err != nil {

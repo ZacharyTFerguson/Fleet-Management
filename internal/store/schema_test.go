@@ -44,6 +44,9 @@ func TestCanonicalSchemaHasRemoteParity(t *testing.T) {
 	if err := s.queryRow(ctx, `SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name='fills_one_null_odo_per_second'`).Scan(&idx); err != nil || idx != 1 {
 		t.Fatalf("fills_one_null_odo_per_second: %d %v", idx, err)
 	}
+	if err := s.queryRow(ctx, `SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name='places_type_idx'`).Scan(&idx); err != nil || idx != 1 {
+		t.Fatalf("places_type_idx: %d %v", idx, err)
+	}
 
 	if _, err := s.exec(ctx, `INSERT INTO mileage_ledger (
 		efleets_id, punch_at, recorded_odo, difference, overage, shortage, status, in_trend, created_at, updated_at)

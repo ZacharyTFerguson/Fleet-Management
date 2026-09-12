@@ -140,12 +140,24 @@ func TestCopyDurableSQLiteToSQLite(t *testing.T) {
 		t.Fatalf("eras %+v %v", eras, err)
 	}
 
+	if err := src.UpsertVaultSecret(ctx, "supabase_service_role", []byte("nonce"), []byte("cipher")); err != nil {
+		t.Fatal(err)
+	}
+	srcVault, err := src.CountTable(ctx, "vault_secrets")
+	if err != nil || srcVault != 1 {
+		t.Fatalf("src vault %d %v", srcVault, err)
+	}
+
 	again, err := CopyDurable(ctx, src, dest)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if again.Cars != 1 {
 		t.Fatalf("second copy %+v", again)
+	}
+	destVault, err := dest.CountTable(ctx, "vault_secrets")
+	if err != nil || destVault != 0 {
+		t.Fatalf("vault_secrets must stay on sqlite working store, dest=%d %v", destVault, err)
 	}
 	holds, err = dest.ListHoldEvents(ctx)
 	if err != nil || len(holds) != 1 {

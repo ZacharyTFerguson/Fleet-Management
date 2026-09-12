@@ -21,7 +21,7 @@ eFleets / OneStep / compute  →  SQLite (OILCHANGE_DB)     ← daily driver
 
 SQLite stays the DSN whenever `OILCHANGE_DB` is set. `DATABASE_URL` is a **second** pgx connection used only by backup.
 
-Redundancy when needed: SQLite is the working store. Neon is the backup. This fleet’s Supabase is Oil Desk today; later a full sqlite-table copy if Neon is down. Do not add S3, extra Neon, or direct AWS.
+Redundancy when needed: SQLite is the working store. Neon is the backup. This fleet’s Supabase is Oil Desk (`fleet_cars`) plus the durable `fleet_*` schema for a later full copy. Do not add S3, extra Neon, or direct AWS.
 
 ## Project (already exists)
 
@@ -88,7 +88,7 @@ Refuse `DATABASE_URL` that looks like XRAY (`chjqcznyxvtjbamttqdj`), `supabase.c
 | `internal/store/migrate.go` | `002_rls.sql` ignores missing Supabase `anon`/`authenticated` roles on Neon |
 | `oilchange.env.example` | documents Neon as backup |
 
-Tables copied (unprefixed): `cars`, `cards`, `gas_stations`, `maintenance_locations`, `fills`, `shop_ros`, `oil_changes`, `hold_events`, `onestep_devices`, `drive_stop_miles`, `card_transactions`, `card_pairings`.
+Tables copied (unprefixed): `cars`, `cards`, `gas_stations`, `maintenance_locations`, `fills`, `shop_ros`, `oil_changes`, `hold_events`, `onestep_devices`, `drive_stop_miles`, `card_transactions`, `card_pairings`, `card_eras`, `transaction_assignments`, `assignment_events`, `places`, `mileage_ledger`, `drive_stop_windows`. Canon lookup tables (`place_types`, `place_brands`, `toptier_codes`, `toptier_grades`) are schema/seed only — `CopyDurable` does not rewrite them. `vault_secrets` / `desk_users` are created by migrate and stay empty on Neon.
 
 Opening `store.Open("pgx", unpooledURL)` applies `migrations/*.sql` (and `002_rls.sql` on pgx). First backup creates empty tables then copies rows.
 
@@ -123,7 +123,7 @@ Last verified copy (approx): sqlite cars=205, fills=201, open holds=205, cards=2
 - Neon Auth, Functions, AI Gateway, Data API
 - Using the `uploads` bucket for sqlite file dumps
 - Extra Neon, S3, or direct AWS
-- Building a full Supabase sqlite-table backup until the human asks (today `oilchange sync` is Oil Desk `fleet_cars` only)
+- Building a full Supabase sqlite-table **data** backup until the human asks (schema is in `supabase/migrations/`; today `oilchange sync` is Oil Desk `fleet_cars` only)
 - Migrating Oil Desk reads off Supabase onto Neon
 - Nested untracked tree `Fleet-Management/` (implement in **repo root**)
 - Creating a second Neon project

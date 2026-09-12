@@ -95,14 +95,16 @@ Pooled vs direct (Neon): migrations, dumps, and session-level SQL must use the *
 
 ## Schema to back up
 
-Canonical schema: `migrations/001_schema.sql` plus `003_cards_intel.sql` and `004_onestep_devices.sql`. On pgx, `store.applyMigrations` also runs `002_rls.sql`.
+Canonical schema: `migrations/001_schema.sql` through `011_place_catalog.sql`. On pgx, `store.applyMigrations` also runs `002_rls.sql`.
 
 Tables (unprefixed names — this is the dedicated Neon DB, **not** the shared Supabase `fleet_*` names):
 
 - `cars`, `cards`, `gas_stations`, `maintenance_locations`
 - `fills`, `shop_ros`, `oil_changes`, `hold_events`
-- `onestep_devices`, `drive_stop_miles`
-- `card_transactions`, `card_pairings`
+- `onestep_devices`, `drive_stop_miles`, `drive_stop_windows`
+- `card_transactions`, `card_pairings`, `card_eras`, `transaction_assignments`, `assignment_events`
+- `places`, `place_types`, `place_brands`, `toptier_codes`, `toptier_grades`
+- `mileage_ledger` (includes signed `difference`)
 
 Do **not** rename these to `fleet_*` on Neon. `fleet_*` is only for the shared Supabase project so reception/Users stay intact.
 

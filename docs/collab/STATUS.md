@@ -4,7 +4,7 @@ Updated: 2026-09-05 (UTC) — added [`OIL-CHANGES-NOT-REFLECTED.md`](OIL-CHANGES
 
 ## True now
 
-- Daily driver is sqlite (`OILCHANGE_DB=./oilchange.sqlite`). Neon `Fleet_Manage_Oil` on project `Fleet_Management_Neon` (`icy-thunder-13848536`, branch `production`) is the backup. Unpooled `DATABASE_URL` (no `-pooler`, not XRAY `chjqcznyxvtjbamttqdj`). Do not add S3, extra Neon, or direct AWS. This fleet’s Supabase is Oil Desk today; later a second full copy if Neon is down; today `sync` is Oil Desk `fleet_cars` only.
+- Daily driver is sqlite (`OILCHANGE_DB=./oilchange.sqlite`). Neon `Fleet_Manage_Oil` on project `Fleet_Management_Neon` (`icy-thunder-13848536`, branch `production`) is the backup. Unpooled `DATABASE_URL` (no `-pooler`, not XRAY `chjqcznyxvtjbamttqdj`). Do not add S3, extra Neon, or direct AWS. This fleet’s Supabase is Oil Desk (`fleet_cars`) plus durable `fleet_*` schema; today `sync` is Oil Desk `fleet_cars` only.
 - Oil Desk: `oilchange serve` at `http://127.0.0.1:4739`, mirror `web/data/cars.json` (`source=mock-mirror`, synced ~2026-09-04T03:03:06Z).
 - Roster: **205** cars on the operator desktop. **146** Last Reading (fill odo + drive-stop miles). **189** last oil from Enterprise shop ROs. **0** `NO_DRIVESTOP`. Open HOLDs: **55** `NO_DEVICE`, **4** `NO_TRUSTED_FILL`. This Cloud Agent sqlite is a file-drop mix (205 live ids + demo `27TESTA`/`27TESTB` = **207** rows) and does **not** hold those Last Reading values — do not copy an empty agent db over the desktop sqlite.
 - `oilchange cards watch [--live] [--persist] [--fills 10] [--pace 35s]` loops unknown cards: newest 10 punches, drive-stop **only watched** `factory_id`s (VA seed + 1-mile hits). After the hunt it asks OneStep `GET /device?device_id=&latest_point=true` for OBD VIN on unpaired watched boxes and joins exact 17-char `device_state.vin` = `cars.vin`. `oilchange devices vin` is the same VIN ask for the whole unpaired set. When OneStep is cooling down, save Device Information JSON to `data/runtime/device-information.json` and click **Apply saved OneStep device information** on Oil Desk (or `devices vin --from`) — no live `/device`. Then `cards history --no-gps` rematches GPS-at-the-pump. Never Last Reading. Never `display_name`.
@@ -150,7 +150,7 @@ sqlite after rematch: cars=205, `onestep_devices`=264 (204 linked rows, 60 unpai
 - Capture a real Maintenance Detail export URL (or CDP) so last oil is not stuck on Downloads CSVs.
 - Optional: collapse stacked `hold_events` so event count matches cars on HOLD.
 - Do not “fill in” Last Reading for those HOLDs.
-- Later (not now): full sqlite-table copy onto this fleet’s Supabase so there is still a backup if Neon is down. Do not add S3, extra Neon, or direct AWS.
+- Durable `fleet_*` schema is on this fleet’s Supabase (eras, ledger, places catalog). `oilchange sync` still publishes `fleet_cars` only — do not add S3, extra Neon, or direct AWS.
 
 ## Env (presence only)
 

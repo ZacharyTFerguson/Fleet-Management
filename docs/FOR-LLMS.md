@@ -27,7 +27,7 @@ eFleets / OneStep / compute  →  SQLite (OILCHANGE_DB)     ← daily driver
                                     └─ oilchange backup-neon → Neon Postgres (backup only)
 ```
 
-SQLite (`OILCHANGE_DB`) is the working store for ingest, compute, and serve. Neon is a durable copy of those sqlite tables — not the daily driver. The Oil Desk remote is this fleet’s Supabase `fleet_cars` table. **Later**, that same project is a **full** sqlite-table copy so there is still a backup if Neon is down. Today `sync` is still desk cars/holds, not that full copy. Do **not** add S3, extra Neon, or direct AWS. Command cheat-sheet: [`README.md`](../README.md).
+SQLite (`OILCHANGE_DB`) is the working store for ingest, compute, and serve. Neon is a durable copy of those sqlite tables — not the daily driver. The Oil Desk remote is this fleet’s Supabase `fleet_cars` table. The same project now has the rest of the durable `fleet_*` schema (eras, ledger, places catalog, …) so a full copy can land if Neon is down. Today `sync` is still desk cars/holds, not that full copy. Do **not** add S3, extra Neon, or direct AWS. Command cheat-sheet: [`README.md`](../README.md).
 
 | Cmd | Role |
 |---|---|

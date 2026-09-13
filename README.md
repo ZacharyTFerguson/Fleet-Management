@@ -48,7 +48,7 @@ Sit-still / important-location Node app lives in a separate PR (`cursor/importan
 | `cards ladder` | Exclusive GPS pump sits → cards at 3, then 5, then 10 stations. Buckets Cars / People / Offices. Persists `card_eras`. Prints coverage (device link + GPS-named card era). Never Last Reading. |
 | `cards coverage` | Coverage one-liner only (`cards ladder` metric). |
 | `cards nearby` | Fill-day ±1, 1 mile: watch GPS boxes at unknown-card pumps (provider swipe time, not bank posting). `--live` / `--report` / `--persist`. Never Last Reading. |
-| `cards watch` | Loop unknown cards: newest `--fills` (default 10) punches, **watched boxes only**, `--pace 35s` (Retry-After wins). Virginia recorded vehicles seed which `factory_id` to ask about. `--live` / `--persist`. Do not re-run a 260-box nearby `--live`. |
+| `cards watch` | Loop unknown cards: newest `--fills` (default 10) punches, **watched boxes only**, `--pace 35s` (Retry-After wins). Virginia recorded vehicles seed which `factory_id` to ask about. `--live` / `--persist`. `--virginia` limits the loop to VA recorded vehicles. `--skip-vin` skips post-watch AskEmpty `/device` VIN GETs (do not re-run `devices vin`). Do not re-run a 260-box nearby `--live`. |
 | `env` | which `oilchange.env` keys loaded (presence only; never prints values) |
 
 Exit: `0` ok, `1` error, `2` compute finished with open HOLDs (report still allowed).

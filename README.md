@@ -8,6 +8,8 @@ Project purpose, vehicle/card identity model, and completion review:
 
 LLM intro (goal, what it does, locks): [`docs/FOR-LLMS.md`](docs/FOR-LLMS.md).
 
+Canon Place names (`7_3_5_1_1`): grammar [`docs/PLACE-CODES-readme.md`](docs/PLACE-CODES-readme.md), catalog/fuel UI rules [`docs/CANON-PLACE-AND-CATALOG-RULES.md`](docs/CANON-PLACE-AND-CATALOG-RULES.md).
+
 ```
 go build -o oilchange ./cmd/oilchange
 go test ./...

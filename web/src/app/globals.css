@@ -1403,3 +1403,90 @@ html.driver-mode .iod-card {
 .iod-use-svg .iod-use-result {
   stroke: var(--iod-oil);
 }
+
+/* Oil Desk home — Impreza spec disclosure */
+.iod-spec-fold {
+  margin: 0 0 1rem;
+  border: 2px solid var(--card-edge);
+  border-radius: 6px;
+  background: var(--card);
+}
+
+.iod-spec-fold > summary {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0.55rem 0.9rem;
+  cursor: pointer;
+  font-family: var(--font-body);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  color: var(--fog);
+  user-select: none;
+  transition: background 160ms ease, color 160ms ease;
+}
+
+.iod-spec-fold > summary::-webkit-details-marker {
+  display: none;
+}
+
+.iod-spec-fold > summary::marker {
+  content: "";
+}
+
+.iod-spec-fold > summary::after {
+  content: "+";
+  flex-shrink: 0;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 1.05rem;
+  color: var(--steel);
+  line-height: 1;
+}
+
+.iod-spec-fold[open] > summary {
+  border-bottom: 2px solid var(--card-edge);
+}
+
+.iod-spec-fold[open] > summary::after {
+  content: "−";
+}
+
+.iod-spec-fold > summary:hover {
+  background: color-mix(in srgb, var(--steel) 18%, transparent);
+}
+
+.iod-spec-fold > :not(summary) {
+  padding: 0.85rem 0.95rem 1rem;
+}
+
+.iod-spec-fold-body {
+  padding: 0.85rem 0.95rem 1rem;
+}
+
+html.driver-mode .iod-spec-fold {
+  border-color: #000;
+  background: #fff;
+}
+
+html.driver-mode .iod-spec-fold > summary {
+  color: #000;
+  font-weight: 700;
+}
+
+html.driver-mode .iod-spec-fold > summary::after {
+  color: #000;
+}
+
+html.driver-mode .iod-spec-fold[open] > summary {
+  border-bottom-color: #000;
+}
+
+html.driver-mode .iod-spec-fold > summary:hover {
+  background: color-mix(in srgb, #000 8%, #fff);
+}

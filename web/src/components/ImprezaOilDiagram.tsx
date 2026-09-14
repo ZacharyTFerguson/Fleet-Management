@@ -23,7 +23,7 @@ export function ImprezaOilDiagram() {
       <div className="iod-diagram-wrap">
         <svg
           className="iod-svg"
-          viewBox="0 0 1100 640"
+          viewBox="0 0 1100 660"
           aria-labelledby={`${titleId} ${descId}`}
         >
           <title id={titleId}>2024 Subaru Impreza engine oil use</title>
@@ -61,15 +61,15 @@ export function ImprezaOilDiagram() {
             </marker>
           </defs>
 
-          <rect className="iod-board" x="8" y="8" width="1084" height="624" rx="10" />
+          <rect className="iod-board" x="8" y="8" width="1084" height="644" rx="10" />
 
-          <text className="iod-kicker" x="36" y="44">
+          <text className="iod-kicker" x="32" y="40">
             2024 SUBARU IMPREZA
           </text>
-          <text className="iod-headline" x="36" y="82">
+          <text className="iod-headline" x="32" y="76">
             Engine oil use
           </text>
-          <text className="iod-sub" x="36" y="108">
+          <text className="iod-sub" x="32" y="100">
             {spec.engine} · {spec.displacement} · DOHC DIT · firing {spec.firingOrder}
           </text>
 
@@ -77,41 +77,41 @@ export function ImprezaOilDiagram() {
           <g className={on("gallery", step)} onClick={() => setStep("gallery")}>
             <rect
               className="iod-block"
-              x="250"
-              y="168"
-              width="240"
-              height="150"
+              x="248"
+              y="200"
+              width="230"
+              height="138"
               rx="14"
               fill={`url(#${uid}-metal)`}
             />
-            <rect className="iod-gallery" x="210" y="228" width="400" height="18" rx="8" />
-            <text className="iod-node-label" x="370" y="204" textAnchor="middle">
+            <rect className="iod-gallery" x="208" y="258" width="384" height="16" rx="8" />
+            <text className="iod-node-label" x="363" y="232" textAnchor="middle">
               Crankcase
             </text>
-            <text className="iod-node-label iod-small" x="370" y="242" textAnchor="middle">
+            <text className="iod-node-label iod-on-oil iod-small" x="363" y="270" textAnchor="middle">
               Main gallery
             </text>
           </g>
 
           <g className={on("banks", step)} onClick={() => setStep("banks")}>
-            <Bank x={78} y={176} side="left" />
-            <Bank x={498} y={176} side="right" />
+            <Bank x={88} y={198} side="left" />
+            <Bank x={478} y={198} side="right" />
           </g>
 
           {/* Pump */}
           <g className={on("pump", step)} onClick={() => setStep("pump")}>
-            <circle className="iod-pump" cx="370" cy="348" r="32" />
-            <circle className="iod-pump-hub" cx="370" cy="348" r="12" />
-            <text className="iod-node-label" x="370" y="394" textAnchor="middle">
+            <circle className="iod-pump" cx="363" cy="372" r="30" />
+            <circle className="iod-pump-hub" cx="363" cy="372" r="12" />
+            <text className="iod-node-label" x="318" y="376" textAnchor="end">
               Oil pump
             </text>
           </g>
 
-          {/* Filter */}
+          {/* Filter — right of pan, left of spec cards */}
           <g className={on("filter", step)} onClick={() => setStep("filter")}>
-            <rect className="iod-filter" x="528" y="300" width="52" height="98" rx="12" />
-            <rect className="iod-filter-cap" x="522" y="292" width="64" height="16" rx="4" />
-            <text className="iod-node-label" x="554" y="428" textAnchor="middle">
+            <rect className="iod-filter" x="618" y="318" width="48" height="90" rx="12" />
+            <rect className="iod-filter-cap" x="612" y="308" width="60" height="16" rx="4" />
+            <text className="iod-node-label" x="642" y="430" textAnchor="middle">
               Filter
             </text>
           </g>
@@ -120,61 +120,58 @@ export function ImprezaOilDiagram() {
           <g className={on("pan", step)} onClick={() => setStep("pan")}>
             <path
               className="iod-pan"
-              d="M 190 412 H 530 Q 560 412 560 438 V 478 Q 560 502 530 502 H 190 Q 160 502 160 478 V 438 Q 160 412 190 412 Z"
+              d="M 188 438 H 508 Q 538 438 538 462 V 500 Q 538 524 508 524 H 188 Q 158 524 158 500 V 462 Q 158 438 188 438 Z"
             />
             <rect
               className="iod-sump"
-              x="176"
-              y="448"
-              width="368"
-              height="44"
+              x="174"
+              y="470"
+              width="348"
+              height="42"
               rx="12"
               fill={`url(#${uid}-oil)`}
             />
-            <text className="iod-node-label iod-on-oil" x="360" y="476" textAnchor="middle">
+            <text className="iod-node-label iod-on-oil" x="348" y="496" textAnchor="middle">
               Oil pan · {spec.capacityWithFilterUsQt} qt with filter
             </text>
           </g>
 
-          {/* Dipstick */}
+          {/* Dipstick — left of the banks, below the title */}
           <g className={on("check", step)} onClick={() => setStep("check")}>
-            <rect className="iod-stick" x="128" y="150" width="10" height="268" rx="3" />
-            <rect className="iod-stick-handle" x="116" y="132" width="34" height="22" rx="6" />
-            <text className="iod-node-label" x="133" y="118" textAnchor="middle">
+            <rect className="iod-stick-handle" x="46" y="168" width="32" height="20" rx="6" />
+            <rect className="iod-stick" x="57" y="186" width="10" height="248" rx="3" />
+            <text className="iod-node-label" x="62" y="158" textAnchor="middle">
               Dipstick
             </text>
-            <g transform="translate(36 200)">
-              <rect className="iod-gauge" x="0" y="0" width="56" height="130" rx="6" />
-              <text className="iod-gauge-mark" x="28" y="28" textAnchor="middle">
+            <g transform="translate(8 214)">
+              <rect className="iod-gauge" x="0" y="0" width="52" height="124" rx="6" />
+              <text className="iod-gauge-mark" x="26" y="26" textAnchor="middle">
                 F
               </text>
               <rect
                 className="iod-sump"
-                x="14"
-                y="40"
-                width="28"
-                height="52"
+                x="13"
+                y="38"
+                width="26"
+                height="50"
                 rx="3"
                 fill={`url(#${uid}-oil)`}
               />
-              <text className="iod-gauge-mark" x="28" y="114" textAnchor="middle">
+              <text className="iod-gauge-mark" x="26" y="110" textAnchor="middle">
                 L
               </text>
             </g>
-            <text className="iod-call-mini" x="28" y="360">
+            <text className="iod-call-mini" x="10" y="358">
               L→F {spec.lowToFullUsQt} qt
             </text>
           </g>
 
-          {/* Filler */}
+          {/* Filler sits on the right bank, clear of spec cards */}
           <g className={on("check", step)} onClick={() => setStep("check")}>
-            <rect className="iod-neck" x="612" y="128" width="18" height="48" rx="4" />
-            <circle className="iod-filler" cx="621" cy="118" r="16" />
-            <text className="iod-node-label" x="662" y="124">
-              Fill cap
-            </text>
-            <text className="iod-call-mini" x="662" y="146">
-              {spec.requiredViscosity} only
+            <rect className="iod-neck" x="540" y="148" width="16" height="40" rx="4" />
+            <circle className="iod-filler" cx="548" cy="140" r="14" />
+            <text className="iod-node-label" x="548" y="128" textAnchor="middle">
+              Fill
             </text>
           </g>
 
@@ -182,36 +179,33 @@ export function ImprezaOilDiagram() {
           <g className="iod-flows" filter={`url(#${uid}-glow)`}>
             <path
               className="iod-flow"
-              d="M 360 448 V 380"
+              d="M 348 470 V 402"
               markerEnd={`url(#${uid}-arrow)`}
             />
             <path
               className="iod-flow"
-              d="M 400 348 H 522"
+              d="M 393 372 H 618"
               markerEnd={`url(#${uid}-arrow)`}
             />
             <path
               className="iod-flow"
-              d="M 554 300 V 246 H 500"
+              d="M 642 308 V 266 H 500"
               markerEnd={`url(#${uid}-arrow)`}
             />
             <path
               className="iod-flow iod-return"
-              d="M 250 246 H 210 V 430"
+              d="M 248 266 H 196 V 448"
+              markerEnd={`url(#${uid}-arrow)`}
+            />
+            <path className="iod-flow iod-return" d="M 500 266 H 642 V 308" />
+            <path
+              className="iod-flow iod-return"
+              d="M 292 338 V 438"
               markerEnd={`url(#${uid}-arrow)`}
             />
             <path
               className="iod-flow iod-return"
-              d="M 490 246 H 554 V 292"
-            />
-            <path
-              className="iod-flow iod-return"
-              d="M 290 318 V 412"
-              markerEnd={`url(#${uid}-arrow)`}
-            />
-            <path
-              className="iod-flow iod-return"
-              d="M 430 318 V 412"
+              d="M 430 338 V 438"
               markerEnd={`url(#${uid}-arrow)`}
             />
           </g>
@@ -219,36 +213,36 @@ export function ImprezaOilDiagram() {
           {/* Spec stack */}
           <g className="iod-specs">
             <SpecCard
-              x={720}
-              y={132}
+              x={745}
+              y={145}
               kicker="Required oil"
               value={spec.requiredViscosity}
               detail={`${spec.requiredForm} · ${spec.requiredGrade}`}
             />
             <SpecCard
-              x={720}
-              y={248}
+              x={745}
+              y={253}
               kicker="Change + filter"
               value={`${spec.capacityWithFilterUsQt} US qt`}
               detail={`${spec.capacityWithFilterL} L · oil only ${spec.capacityOilOnlyUsQt} qt`}
             />
             <SpecCard
-              x={720}
-              y={364}
+              x={745}
+              y={361}
               kicker="Subaru schedule"
               value={`${SUBARU_SCHEDULE_MILES.toLocaleString()} mi`}
               detail={`or ${SUBARU_SCHEDULE_MONTHS} months · whichever first`}
             />
             <SpecCard
-              x={720}
-              y={480}
+              x={745}
+              y={469}
               kicker="Oil Desk due clock"
               value={`${FLEET_DEFAULT_INTERVAL_MILES.toLocaleString()} mi`}
               detail="Default when interval_miles is unset"
             />
           </g>
 
-          <text className="iod-footnote" x="36" y="612">
+          <text className="iod-footnote" x="32" y="638">
             {spec.source}. Capacities are guidelines — confirm on the level gauge.
           </text>
         </svg>
@@ -335,11 +329,12 @@ function on(id: OilCircuitStepId, step: OilCircuitStepId) {
 
 function Bank({ x, y, side }: { x: number; y: number; side: "left" | "right" }) {
   const label = side === "left" ? "LH 2 · 4" : "RH 1 · 3";
+  const cx = x + 68;
   return (
     <g>
-      <ellipse className="iod-cyl" cx={x + 70} cy={y + 28} rx="72" ry="28" />
-      <ellipse className="iod-cyl" cx={x + 70} cy={y + 96} rx="72" ry="28" />
-      <text className="iod-node-label iod-small" x={x + 70} y={y + 148} textAnchor="middle">
+      <ellipse className="iod-cyl" cx={cx} cy={y + 28} rx="64" ry="26" />
+      <ellipse className="iod-cyl" cx={cx} cy={y + 94} rx="64" ry="26" />
+      <text className="iod-node-label iod-small" x={cx} y={y + 138} textAnchor="middle">
         {label}
       </text>
     </g>
@@ -361,14 +356,14 @@ function SpecCard({
 }) {
   return (
     <g transform={`translate(${x} ${y})`}>
-      <rect className="iod-card" x="0" y="0" width="340" height="100" rx="8" />
-      <text className="iod-kicker" x="20" y="32">
+      <rect className="iod-card" x="0" y="0" width="320" height="96" rx="8" />
+      <text className="iod-kicker" x="18" y="28">
         {kicker}
       </text>
-      <text className="iod-card-value" x="20" y="68">
+      <text className="iod-card-value" x="18" y="64">
         {value}
       </text>
-      <text className="iod-sub" x="20" y="88">
+      <text className="iod-sub" x="18" y="84">
         {detail}
       </text>
     </g>

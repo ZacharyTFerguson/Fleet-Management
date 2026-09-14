@@ -1171,7 +1171,8 @@ html.driver-mode .iod-card {
 .iod-hot.is-on .iod-cyl,
 .iod-hot.is-on .iod-stick,
 .iod-hot.is-on .iod-gauge,
-.iod-hot.is-on .iod-filler {
+.iod-hot.is-on .iod-filler,
+.iod-hot.is-on .iod-card {
   stroke: var(--iod-oil);
   stroke-width: 3;
 }

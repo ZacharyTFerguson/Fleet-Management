@@ -57,10 +57,6 @@ export function ImprezaOilChangeByUse() {
             qt guideline · clock depends on driving
           </text>
 
-          <text className="iod-node-label" x="550" y="132" textAnchor="middle">
-            How is this car used?
-          </text>
-
           {OIL_CHANGE_BY_USE.map((l, i) => (
             <UseLane
               key={l.id}

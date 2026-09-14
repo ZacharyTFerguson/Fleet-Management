@@ -1,9 +1,21 @@
 "use client";
 
+/* Static export + oilchange serve: plain <a> keeps trailing-slash routes working without a Next router. */
+/* eslint-disable @next/next/no-html-link-for-pages */
+
 export function DeskNav({
   current,
 }: {
-  current: "oil" | "cards" | "history" | "devices" | "stations" | "boxscore" | "settings" | "secrets" | "login";
+  current:
+    | "oil"
+    | "cards"
+    | "history"
+    | "devices"
+    | "stations"
+    | "boxscore"
+    | "settings"
+    | "secrets"
+    | "login";
 }) {
   return (
     <nav className="desk-nav" aria-label="Desk">

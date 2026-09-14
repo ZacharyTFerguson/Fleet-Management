@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState, useTransition } from "react";
+import { ImprezaOilChangeByUse } from "@/components/ImprezaOilChangeByUse";
 import type { FleetSnapshot } from "@/lib/types";
 import { formatMiles, remainingMiles } from "@/lib/types";
 
@@ -151,6 +152,16 @@ export function CarsBoard() {
           enterKeyHint="search"
         />
       </label>
+
+      <details className="iod-spec-fold">
+        <summary className="field-label">2024 Impreza spec</summary>
+        <ImprezaOilChangeByUse compact />
+        <p className="iod-spec-fold-more">
+          <a className="lede-link" href="/impreza/">
+            Full spec — engine circuit and booklet notes
+          </a>
+        </p>
+      </details>
 
       {visible.length === 0 ? (
         <p className="search-empty" role="status">

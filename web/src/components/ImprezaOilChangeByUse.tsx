@@ -7,15 +7,25 @@ import {
   OIL_CHANGE_BY_USE,
   OIL_CONSUMPTION_DRIVERS,
   SUBARU_SCHEDULE_MONTHS,
+  SUBARU_SEVERE_MILES,
+  SUBARU_SEVERE_MONTHS,
   type OilChangeUseId,
 } from "@/lib/imprezaOil";
 
-export function ImprezaOilChangeByUse() {
+type UseLane = (typeof OIL_CHANGE_BY_USE)[number];
+
+const HIGHWAY = OIL_CHANGE_BY_USE[0];
+const FLEET = OIL_CHANGE_BY_USE[1];
+
+export function ImprezaOilChangeByUse({ compact = false }: { compact?: boolean } = {}) {
   const [useId, setUse] = useState<OilChangeUseId>("fleet");
-  const lane = OIL_CHANGE_BY_USE.find((l) => l.id === useId) ?? OIL_CHANGE_BY_USE[1];
+  const lane = OIL_CHANGE_BY_USE.find((l) => l.id === useId) ?? FLEET;
 
   return (
-    <section className="impreza-oil iod-use-block" aria-labelledby="iod-use-title">
+    <section
+      className={`impreza-oil iod-use-block${compact ? " is-compact" : ""}`}
+      aria-labelledby="iod-use-title"
+    >
       <div className="iod-diagram-wrap">
         <svg
           className="iod-svg iod-use-svg"
@@ -25,10 +35,14 @@ export function ImprezaOilChangeByUse() {
           <title id="iod-use-title">2024 Subaru Impreza oil change by use</title>
           <desc id="iod-use-desc">
             Change interval depends on how the car is used. Highway mixed driving follows
-            the Subaru booklet at {OIL_CHANGE_BY_USE[0].changeLabel}. This fleet clocks{" "}
-            {FLEET_DEFAULT_INTERVAL_MILES.toLocaleString()} miles. Severe use changes sooner
-            and checks oil every second fuel fill. Every change is {spec.requiredViscosity}{" "}
-            and a new filter, about {spec.capacityWithFilterUsQt} US qt.
+            the Subaru Warranty & Maintenance Booklet at {HIGHWAY.changeLabel}. This
+            fleet clocks {FLEET_DEFAULT_INTERVAL_MILES.toLocaleString("en-US")} miles.
+            Severe use is {SUBARU_SEVERE_MILES.toLocaleString("en-US")} miles /{" "}
+            {SUBARU_SEVERE_MONTHS} months per booklet Note 1 — repeated short distance
+            driving, extremely cold weather, or repeated trailer towing. Dusty roads
+            are not a booklet oil-severe trigger. Check oil every second fuel fill. Every
+            change is {spec.requiredViscosity} and a new filter, about{" "}
+            {spec.capacityWithFilterUsQt} US qt.
           </desc>
           <defs>
             <marker
@@ -87,30 +101,35 @@ export function ImprezaOilChangeByUse() {
               {spec.lowToFullUsQt} qt. Do not go above F when cold.
             </text>
             <text className="iod-sub" x="56" y="518">
-              Time still counts: Subaru {SUBARU_SCHEDULE_MONTHS} months even if miles are low.
+              Time still counts: booklet {SUBARU_SCHEDULE_MONTHS} months highway,{" "}
+              {SUBARU_SEVERE_MONTHS} months severe, even if miles are low.
             </text>
           </g>
         </svg>
       </div>
 
-      <div className="iod-use-picks" role="tablist" aria-label="Driving use">
-        {OIL_CHANGE_BY_USE.map((l) => (
-          <button
-            key={l.id}
-            type="button"
-            role="tab"
-            aria-selected={useId === l.id}
-            className={`iod-step ${useId === l.id ? "is-on" : ""}`}
-            onClick={() => setUse(l.id)}
-          >
-            <span className="iod-n">{l.n}</span>
-            <span className="iod-step-copy">
-              <strong>{l.title}</strong>
-              <span>{l.when}</span>
-            </span>
-          </button>
-        ))}
-      </div>
+      {compact ? null : (
+        <div className="iod-use-picks" role="tablist" aria-label="Driving use">
+          {OIL_CHANGE_BY_USE.map((l) => (
+            <button
+              key={l.id}
+              type="button"
+              role="tab"
+              aria-selected={useId === l.id}
+              className={`iod-step ${useId === l.id ? "is-on" : ""}`}
+              onClick={() => setUse(l.id)}
+            >
+              <span className="iod-n">{l.n}</span>
+              <span className="iod-step-copy">
+                <strong>{l.title}</strong>
+                <span>
+                  {l.changeLabel} · {l.when}
+                </span>
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
 
       <p className="iod-live" aria-live="polite">
         <span className="field-label">This use</span>
@@ -120,31 +139,42 @@ export function ImprezaOilChangeByUse() {
         {lane.action} {lane.check}
       </p>
 
-      <ol className="iod-use-path" aria-label="From use to change">
-        <li>
-          <span className="field-label">Use</span>
-          {lane.when}
-        </li>
-        <li>
-          <span className="field-label">Oil is used</span>
-          Driving style, idle, dust, heat, and cold change how fast the fill drops. Same car,
-          different drivers, different results.
-        </li>
-        <li>
-          <span className="field-label">Check</span>
-          {lane.check}
-        </li>
-        <li>
-          <span className="field-label">Change</span>
-          {lane.changeDetail}. Always {spec.requiredViscosity} and a new filter.
-        </li>
-      </ol>
+      {compact ? null : (
+        <>
+          <ol className="iod-use-path" aria-label="From use to change">
+            <li>
+              <span className="field-label">Use</span>
+              {lane.when}
+            </li>
+            <li>
+              <span className="field-label">Oil is used</span>
+              Driving style, idle, heat, and cold change how fast the fill drops. Same car,
+              different drivers, different results.
+            </li>
+            <li>
+              <span className="field-label">Check</span>
+              {lane.check}
+            </li>
+            <li>
+              <span className="field-label">Change</span>
+              {lane.changeDetail}. Always {spec.requiredViscosity} and a new filter.
+            </li>
+          </ol>
 
-      <p className="iod-use-note">
-        Severe / high-use checks: {OIL_CONSUMPTION_DRIVERS.join(" · ")}.
-      </p>
+          <p className="iod-use-note">
+            Fill can drop faster with: {OIL_CONSUMPTION_DRIVERS.join(" · ")}. Dusty roads
+            are an air-cleaner item, not booklet oil-severe.
+          </p>
+        </>
+      )}
     </section>
   );
+}
+
+function svgChangeDetail(lane: UseLane): string {
+  if (lane.id === "severe") return "Booklet Note 1 — whichever first";
+  if (lane.id === "normal") return "Booklet items 1–2 — whichever first";
+  return "Oil Desk due clock — not 6,000";
 }
 
 function UseLane({
@@ -154,7 +184,7 @@ function UseLane({
   selected,
   onPick,
 }: {
-  lane: (typeof OIL_CHANGE_BY_USE)[number];
+  lane: UseLane;
   x: number;
   y: number;
   selected: boolean;
@@ -171,7 +201,7 @@ function UseLane({
         {lane.changeLabel}
       </text>
       <text className="iod-sub" x={x + 18} y={y + 102}>
-        {lane.changeDetail}
+        {svgChangeDetail(lane)}
       </text>
       {lines.map((line, i) => (
         <text key={line} className="iod-sub" x={x + 18} y={y + 132 + i * 18}>

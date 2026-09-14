@@ -155,9 +155,11 @@ export function CarsBoard() {
 
       <details className="iod-spec-fold">
         <summary className="field-label">2024 Impreza spec</summary>
-        <ImprezaOilChangeByUse />
-        <p>
-          <a className="lede-link" href="/impreza/">Full spec</a>
+        <ImprezaOilChangeByUse compact />
+        <p className="iod-spec-fold-more">
+          <a className="lede-link" href="/impreza/">
+            Full spec — engine circuit and booklet notes
+          </a>
         </p>
       </details>
 

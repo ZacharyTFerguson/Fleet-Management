@@ -5,6 +5,7 @@ import {
   OIL_CHANGE_BY_USE,
   OIL_CIRCUIT_STEPS,
   OIL_CONSUMPTION_DRIVERS,
+  SUBARU_BOOKLET_OIL_SEVERE_CONDITIONS,
   SUBARU_SCHEDULE_MILES,
   SUBARU_SCHEDULE_MONTHS,
   SUBARU_SEVERE_MILES,
@@ -41,5 +42,9 @@ assert.equal(OIL_CHANGE_BY_USE[2].changeLabel, "3,000 mi / 3 mo");
 assert.ok(OIL_CHANGE_BY_USE[2].changeDetail.includes("Note 1"));
 assert.ok(OIL_CHANGE_BY_USE[2].check.toLowerCase().includes("2nd"));
 assert.ok(!OIL_CHANGE_BY_USE[2].when.toLowerCase().includes("dust"));
+assert.equal(SUBARU_BOOKLET_OIL_SEVERE_CONDITIONS.length, 3);
+assert.ok(
+  SUBARU_BOOKLET_OIL_SEVERE_CONDITIONS.every((c) => !c.toLowerCase().includes("dust")),
+);
 
 console.log("imprezaOil: ok");

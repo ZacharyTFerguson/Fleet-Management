@@ -8,7 +8,6 @@ export function DeskNav({
 }: {
   current:
     | "oil"
-    | "impreza"
     | "cards"
     | "history"
     | "devices"

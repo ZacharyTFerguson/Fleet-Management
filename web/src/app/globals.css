@@ -1404,6 +1404,18 @@ html.driver-mode .iod-card {
   stroke: var(--iod-oil);
 }
 
+.iod-use-block.is-compact {
+  margin-bottom: 0;
+}
+
+.iod-use-block.is-compact .iod-diagram-wrap {
+  margin-bottom: 0.65rem;
+}
+
+.iod-use-block.is-compact .iod-live {
+  margin-bottom: 0;
+}
+
 /* Oil Desk home — Impreza spec disclosure */
 .iod-spec-fold {
   margin: 0 0 1rem;
@@ -1465,8 +1477,8 @@ html.driver-mode .iod-card {
   padding: 0.85rem 0.95rem 1rem;
 }
 
-.iod-spec-fold-body {
-  padding: 0.85rem 0.95rem 1rem;
+.iod-spec-fold-more {
+  margin: 0;
 }
 
 html.driver-mode .iod-spec-fold {

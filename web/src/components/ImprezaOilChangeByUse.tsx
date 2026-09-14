@@ -20,20 +20,23 @@ const FLEET = OIL_CHANGE_BY_USE[1];
 export function ImprezaOilChangeByUse({ compact = false }: { compact?: boolean } = {}) {
   const [useId, setUse] = useState<OilChangeUseId>("fleet");
   const lane = OIL_CHANGE_BY_USE.find((l) => l.id === useId) ?? FLEET;
+  const titleId = compact ? "iod-use-title-desk" : "iod-use-title";
+  const descId = compact ? "iod-use-desc-desk" : "iod-use-desc";
+  const arrowId = compact ? "iod-use-arrow-desk" : "iod-use-arrow";
 
   return (
     <section
       className={`impreza-oil iod-use-block${compact ? " is-compact" : ""}`}
-      aria-labelledby="iod-use-title"
+      aria-labelledby={titleId}
     >
       <div className="iod-diagram-wrap">
         <svg
           className="iod-svg iod-use-svg"
           viewBox="0 0 1100 560"
-          aria-labelledby="iod-use-title iod-use-desc"
+          aria-labelledby={`${titleId} ${descId}`}
         >
-          <title id="iod-use-title">2024 Subaru Impreza oil change by use</title>
-          <desc id="iod-use-desc">
+          <title id={titleId}>2024 Subaru Impreza oil change by use</title>
+          <desc id={descId}>
             Change interval depends on how the car is used. Highway mixed driving follows
             the Subaru Warranty & Maintenance Booklet at {HIGHWAY.changeLabel}. This
             fleet clocks {FLEET_DEFAULT_INTERVAL_MILES.toLocaleString("en-US")} miles.
@@ -46,7 +49,7 @@ export function ImprezaOilChangeByUse({ compact = false }: { compact?: boolean }
           </desc>
           <defs>
             <marker
-              id="iod-use-arrow"
+              id={arrowId}
               viewBox="0 0 10 10"
               refX="8"
               refY="5"
@@ -83,9 +86,9 @@ export function ImprezaOilChangeByUse({ compact = false }: { compact?: boolean }
           ))}
 
           <g className="iod-flows" pointerEvents="none">
-            <path className="iod-flow" d="M 196 368 V 400" markerEnd="url(#iod-use-arrow)" />
-            <path className="iod-flow" d="M 550 368 V 400" markerEnd="url(#iod-use-arrow)" />
-            <path className="iod-flow" d="M 904 368 V 400" markerEnd="url(#iod-use-arrow)" />
+            <path className="iod-flow" d="M 196 368 V 400" markerEnd={`url(#${arrowId})`} />
+            <path className="iod-flow" d="M 550 368 V 400" markerEnd={`url(#${arrowId})`} />
+            <path className="iod-flow" d="M 904 368 V 400" markerEnd={`url(#${arrowId})`} />
           </g>
 
           <g>
@@ -192,7 +195,20 @@ function UseLane({
 }) {
   const lines = wrapLaneWhen(lane.when);
   return (
-    <g className={`iod-hot ${selected ? "is-on" : ""}`} onClick={onPick}>
+    <g
+      className={`iod-hot ${selected ? "is-on" : ""}`}
+      role="button"
+      tabIndex={0}
+      aria-pressed={selected}
+      aria-label={`${lane.title}: ${lane.changeLabel}`}
+      onClick={onPick}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onPick();
+        }
+      }}
+    >
       <rect className="iod-card" x={x} y={y} width="332" height="212" rx="8" />
       <text className="iod-kicker" x={x + 18} y={y + 32}>
         {lane.n} · {lane.title}

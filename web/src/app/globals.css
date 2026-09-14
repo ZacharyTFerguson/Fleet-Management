@@ -1342,3 +1342,63 @@ html.driver-mode .iod-card {
     animation: none;
   }
 }
+
+.iod-section-title {
+  margin: 0.25rem 0 1rem;
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--steel);
+}
+
+.iod-use-block {
+  margin-bottom: 2rem;
+}
+
+.iod-use-picks {
+  display: grid;
+  gap: 0.65rem;
+  margin: 0 0 1rem;
+}
+
+@media (min-width: 860px) {
+  .iod-use-picks {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.iod-use-path {
+  list-style: none;
+  margin: 0 0 1rem;
+  padding: 0;
+  display: grid;
+  gap: 0.65rem;
+}
+
+@media (min-width: 860px) {
+  .iod-use-path {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.iod-use-path li {
+  margin: 0;
+  padding: 0.85rem 0.95rem;
+  background: var(--card);
+  border: 2px solid var(--card-edge);
+  border-radius: 4px;
+  color: var(--fog);
+  line-height: 1.4;
+}
+
+.iod-use-note {
+  margin: 0 0 0.5rem;
+  color: var(--mist);
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.iod-use-svg .iod-use-result {
+  stroke: var(--iod-oil);
+}

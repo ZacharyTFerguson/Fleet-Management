@@ -82,4 +82,42 @@ export const OIL_CONSUMPTION_DRIVERS = [
   "Frequent accel / decel",
 ] as const;
 
+/** Oil-change clock by how the car is used. Severe has no printed mile number — Subaru says sooner. */
+export const OIL_CHANGE_BY_USE = [
+  {
+    id: "normal",
+    n: 1,
+    title: "Highway / mixed",
+    when: "Longer trips. Engine fully warms. Not dusty, not extreme cold.",
+    changeLabel: "6,000 mi / 6 mo",
+    changeDetail: "Subaru booklet — whichever first",
+    miles: SUBARU_SCHEDULE_MILES,
+    check: "At scheduled service. Top off if the dipstick is below L.",
+    action: "Change oil and filter on the booklet clock.",
+  },
+  {
+    id: "fleet",
+    n: 2,
+    title: "This fleet (PDI)",
+    when: "Regional mix: stop-and-go, idle, heat and cold, short hops between jobs.",
+    changeLabel: "5,000 mi",
+    changeDetail: "Oil Desk due clock — do not wait for 6,000",
+    miles: FLEET_DEFAULT_INTERVAL_MILES,
+    check: "Treat as closer to severe than highway. Watch the dipstick.",
+    action: "Change oil and filter when Oil Desk remaining hits zero.",
+  },
+  {
+    id: "severe",
+    n: 3,
+    title: "Severe / high use",
+    when: "Dusty roads, repeated short trips, extreme cold, long idle, heavy traffic, hard accel.",
+    changeLabel: "Sooner",
+    changeDetail: "Subaru: more often than the booklet",
+    miles: null,
+    check: "Every 2nd fuel fill. Change sooner if you are adding oil between services.",
+    action: "Do not wait for 6,000 or 5,000 if the car is using oil or the use is severe.",
+  },
+] as const;
+
+export type OilChangeUseId = (typeof OIL_CHANGE_BY_USE)[number]["id"];
 export type OilCircuitStepId = (typeof OIL_CIRCUIT_STEPS)[number]["id"];

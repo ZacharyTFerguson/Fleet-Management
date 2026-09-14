@@ -14,7 +14,7 @@ export default function Home() {
         <p className="lede">
           Cars on the roster, kept current as sync lands through the day.{" "}
           <a className="lede-link" href="/impreza/">
-            2024 Impreza oil diagram
+            2024 Impreza oil change by use
           </a>
         </p>
       </header>

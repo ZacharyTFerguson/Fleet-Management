@@ -1,11 +1,15 @@
-/** 2024 Subaru Impreza engine-oil spec, from the owner's manual Ch. 12. */
+/** 2024 Subaru Impreza engine-oil spec: Owner’s Manual Ch. 11–12 plus Warranty & Maintenance Booklet (MSA5M2401W) Note 1. */
 
 /** Matches Go `model.DefaultInterval` — Oil Desk due clock when `interval_miles` is unset. */
 export const FLEET_DEFAULT_INTERVAL_MILES = 5000;
 
-/** Subaru Warranty & Maintenance Booklet: oil + filter, whichever comes first. */
+/** Warranty & Maintenance Booklet schedule table items 1 (engine oil) and 2 (oil filter): R every 6,000 miles / 6 months, whichever first. */
 export const SUBARU_SCHEDULE_MILES = 6000;
 export const SUBARU_SCHEDULE_MONTHS = 6;
+
+/** Booklet Note 1: under severe driving conditions**, oil AND filter every 3,000 miles (4,800 km) or 3 months. */
+export const SUBARU_SEVERE_MILES = 3000;
+export const SUBARU_SEVERE_MONTHS = 3;
 
 export const IMPREZA_2024_OIL = {
   year: 2024,
@@ -28,7 +32,8 @@ export const IMPREZA_2024_OIL = {
   lowToFullUsQt: 1.1,
   lowToFullL: 1.0,
   checkWaitMinutes: 5,
-  source: "2024 Subaru Impreza Owner’s Manual, Engine Oil (Ch. 11) and Specifications (Ch. 12)",
+  source:
+    "2024 Subaru Impreza Owner’s Manual, Engine Oil (Ch. 11) and Specifications (Ch. 12); 2024 Subaru Warranty & Maintenance Booklet (MSA5M2401W) Note 1",
 } as const;
 
 export const OIL_CIRCUIT_STEPS = [
@@ -70,6 +75,10 @@ export const OIL_CIRCUIT_STEPS = [
   },
 ] as const;
 
+/**
+ * Owner’s Manual consumption / “change more often” drivers (Ch. 11).
+ * Dusty roads belong here — booklet dusty conditions map to Item 8 (air cleaner), not oil.
+ */
 export const OIL_CONSUMPTION_DRIVERS = [
   "New engine / break-in",
   "Wrong viscosity or lower-quality oil",
@@ -82,16 +91,30 @@ export const OIL_CONSUMPTION_DRIVERS = [
   "Frequent accel / decel",
 ] as const;
 
-/** Oil-change clock by how the car is used. Severe has no printed mile number — Subaru says sooner. */
+/**
+ * Booklet Note 1 ** conditions that apply to Maintenance Items 1 and 2 (engine oil and filter) only.
+ * a. Repeated short distance driving (Items 1 and 2 only)
+ * d. Driving in extremely cold weather (Items 1, 2, 17, 18)
+ * g. Repeated trailer towing (Items 1, 2, …)
+ * Dusty is Item 8 (air cleaner), not oil.
+ */
+export const SUBARU_BOOKLET_OIL_SEVERE_CONDITIONS = [
+  "Repeated short distance driving (Items 1 and 2 only)",
+  "Driving in extremely cold weather (Items 1, 2, 17, 18)",
+  "Repeated trailer towing (Items 1, 2, ...)",
+] as const;
+
+/** Oil-change clock by how the car is used. Booklet table + Note 1; fleet is Oil Desk policy between them. */
 export const OIL_CHANGE_BY_USE = [
   {
     id: "normal",
     n: 1,
     title: "Highway / mixed",
-    when: "Longer trips. Engine fully warms. Not dusty, not extreme cold.",
+    when: "Longer trips. Engine fully warms. Not short-trip, extreme-cold, or trailer-tow.",
     changeLabel: "6,000 mi / 6 mo",
-    changeDetail: "Subaru booklet — whichever first",
+    changeDetail: "Booklet schedule table items 1 and 2 — whichever first",
     miles: SUBARU_SCHEDULE_MILES,
+    months: SUBARU_SCHEDULE_MONTHS,
     check: "At scheduled service. Top off if the dipstick is below L.",
     action: "Change oil and filter on the booklet clock.",
   },
@@ -101,8 +124,9 @@ export const OIL_CHANGE_BY_USE = [
     title: "This fleet (PDI)",
     when: "Regional mix: stop-and-go, idle, heat and cold, short hops between jobs.",
     changeLabel: "5,000 mi",
-    changeDetail: "Oil Desk due clock — do not wait for 6,000",
+    changeDetail: "Oil Desk due clock — between booklet normal and severe",
     miles: FLEET_DEFAULT_INTERVAL_MILES,
+    months: null,
     check: "Treat as closer to severe than highway. Watch the dipstick.",
     action: "Change oil and filter when Oil Desk remaining hits zero.",
   },
@@ -110,12 +134,14 @@ export const OIL_CHANGE_BY_USE = [
     id: "severe",
     n: 3,
     title: "Severe / high use",
-    when: "Dusty roads, repeated short trips, extreme cold, long idle, heavy traffic, hard accel.",
-    changeLabel: "Sooner",
-    changeDetail: "Subaru: more often than the booklet",
-    miles: null,
-    check: "Every 2nd fuel fill. Change sooner if you are adding oil between services.",
-    action: "Do not wait for 6,000 or 5,000 if the car is using oil or the use is severe.",
+    when: "Repeated short distance driving, extremely cold weather, or repeated trailer towing.",
+    changeLabel: "3,000 mi / 3 mo",
+    changeDetail:
+      "Warranty & Maintenance Booklet Note 1 — 3,000 mi (4,800 km) or 3 months, whichever first",
+    miles: SUBARU_SEVERE_MILES,
+    months: SUBARU_SEVERE_MONTHS,
+    check: "Each fuel fill (booklet p.27). Every 2nd fill under consumption (Owner’s Manual).",
+    action: "Change oil and filter on the Note 1 clock. Do not wait for 6,000 or 5,000.",
   },
 ] as const;
 

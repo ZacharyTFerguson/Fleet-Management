@@ -7,7 +7,7 @@ export default function ImprezaOilPage() {
     <main className="shell iod-shell">
       <div className="atmosphere" aria-hidden="true" />
       <div className="grain" aria-hidden="true" />
-      <DeskNav current="impreza" />
+      <DeskNav current="oil" />
       <header className="hero">
         <p className="brand">FLEET</p>
         <h1 className="headline">2024 Impreza oil</h1>

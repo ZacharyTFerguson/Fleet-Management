@@ -23,9 +23,6 @@ export function DeskNav({
       <a className={current === "oil" ? "is-current" : ""} href="/">
         Oil
       </a>
-      <a className={current === "impreza" ? "is-current" : ""} href="/impreza/">
-        Impreza
-      </a>
       <a className={current === "cards" ? "is-current" : ""} href="/cards/">
         Cards
       </a>

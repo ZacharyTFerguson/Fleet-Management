@@ -7,7 +7,8 @@
     "build": "next build",
     "build:static": "bash scripts/static-export.sh",
     "start": "next start -H 127.0.0.1 -p 4739",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "test": "node --experimental-strip-types src/lib/historyTap.test.mjs && node --experimental-strip-types src/lib/imprezaOil.test.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.1",

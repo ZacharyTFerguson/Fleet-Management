@@ -132,6 +132,7 @@ html.driver-mode .grain {
 
 .desk-nav {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.5rem;
   padding-top: 0.25rem;
 }
@@ -229,6 +230,17 @@ html.driver-mode .brand {
   font-size: 1.05rem;
   line-height: 1.5;
   color: var(--mist);
+}
+
+.lede-link {
+  color: var(--sodium);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+}
+
+html.driver-mode .lede-link {
+  color: #000;
 }
 
 .roster {
@@ -977,4 +989,356 @@ html.driver-mode .cta.driver-toggle.is-on {
 .trend-badge.out {
   background: rgba(142, 182, 201, 0.16);
   color: var(--steel);
+}
+
+/* —— 2024 Impreza oil-use diagram —— */
+
+.iod-shell {
+  max-width: 1180px;
+}
+
+.impreza-oil {
+  --iod-oil: #f0c040;
+  --iod-oil-deep: #9a6a10;
+  --iod-metal: #2a3d4a;
+  --iod-metal-hi: #3d5668;
+  --iod-line: var(--steel);
+  --iod-ink: var(--fog);
+  margin: 0 0 2.5rem;
+}
+
+html.driver-mode .impreza-oil {
+  --iod-oil: #b8860b;
+  --iod-oil-deep: #6d4e08;
+  --iod-metal: #d8e4dc;
+  --iod-metal-hi: #ffffff;
+  --iod-line: #0b1218;
+  --iod-ink: #000000;
+}
+
+.iod-diagram-wrap {
+  overflow-x: auto;
+  margin: 0 0 1.25rem;
+  border: 2px solid var(--card-edge);
+  border-radius: 8px;
+  background: var(--card);
+}
+
+.iod-svg {
+  display: block;
+  width: 100%;
+  min-width: 52rem;
+  height: auto;
+}
+
+.iod-board {
+  fill: rgba(8, 16, 22, 0.55);
+  stroke: var(--line);
+  stroke-width: 1.5;
+}
+
+html.driver-mode .iod-board {
+  fill: #ffffff;
+}
+
+.iod-kicker {
+  fill: var(--steel);
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+}
+
+.iod-headline {
+  fill: var(--primary);
+  font-family: var(--font-display);
+  font-size: 32px;
+  font-weight: 800;
+}
+
+.iod-sub,
+.iod-footnote,
+.iod-call-mini,
+.iod-node-label {
+  fill: var(--mist);
+  font-family: var(--font-body);
+  font-size: 13px;
+}
+
+.iod-node-label {
+  font-weight: 600;
+  font-size: 12px;
+  fill: var(--primary);
+}
+
+.iod-node-label.iod-small {
+  font-size: 11px;
+  fill: var(--mist);
+}
+
+.iod-gauge-mark {
+  fill: var(--primary);
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.iod-card-value {
+  fill: var(--sodium);
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 800;
+}
+
+.iod-block,
+.iod-pan,
+.iod-filter,
+.iod-filter-cap,
+.iod-pump,
+.iod-cyl,
+.iod-stick,
+.iod-stick-handle,
+.iod-neck,
+.iod-filler,
+.iod-gauge,
+.iod-card {
+  stroke: var(--iod-line);
+  stroke-width: 2;
+}
+
+.iod-pan,
+.iod-filter,
+.iod-filter-cap,
+.iod-cyl,
+.iod-stick,
+.iod-stick-handle,
+.iod-neck,
+.iod-filler,
+.iod-gauge {
+  fill: var(--iod-metal);
+}
+
+.iod-pump {
+  fill: var(--iod-metal-hi);
+}
+
+.iod-pump-hub {
+  fill: var(--iod-oil);
+  stroke: var(--iod-oil-deep);
+  stroke-width: 2;
+}
+
+.iod-gallery {
+  fill: var(--iod-oil);
+  stroke: var(--iod-oil-deep);
+  stroke-width: 1.5;
+}
+
+.iod-card {
+  fill: rgba(12, 22, 30, 0.72);
+}
+
+html.driver-mode .iod-card {
+  fill: #f4f7f2;
+}
+
+.iod-flow {
+  fill: none;
+  stroke: var(--iod-oil);
+  stroke-width: 3.5;
+  stroke-linecap: round;
+  stroke-dasharray: 10 12;
+  animation: iod-march 1.6s linear infinite;
+}
+
+.iod-flow.iod-return {
+  stroke-width: 2.5;
+  opacity: 0.75;
+}
+
+.iod-flows {
+  pointer-events: none;
+}
+
+.iod-hot {
+  cursor: pointer;
+}
+
+.iod-hot.is-on .iod-block,
+.iod-hot.is-on .iod-pan,
+.iod-hot.is-on .iod-filter,
+.iod-hot.is-on .iod-pump,
+.iod-hot.is-on .iod-cyl,
+.iod-hot.is-on .iod-stick,
+.iod-hot.is-on .iod-gauge,
+.iod-hot.is-on .iod-filler {
+  stroke: var(--iod-oil);
+  stroke-width: 3;
+}
+
+.iod-steps {
+  list-style: none;
+  margin: 0 0 1rem;
+  padding: 0;
+  display: grid;
+  gap: 0.65rem;
+}
+
+@media (min-width: 860px) {
+  .iod-steps {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.iod-step {
+  display: flex;
+  gap: 0.75rem;
+  width: 100%;
+  text-align: left;
+  padding: 0.85rem 0.9rem;
+  border: 2px solid var(--card-edge);
+  border-radius: 6px;
+  background: var(--card);
+  color: inherit;
+  cursor: pointer;
+}
+
+.iod-step.is-on {
+  border-color: var(--sodium);
+  box-shadow: inset 4px 0 0 var(--sodium);
+}
+
+.iod-n {
+  flex-shrink: 0;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-display);
+  font-weight: 800;
+  background: var(--live-bg);
+  color: var(--live);
+  border: 2px solid var(--live);
+}
+
+.iod-step.is-on .iod-n {
+  background: var(--sodium);
+  color: #111;
+  border-color: var(--sodium);
+}
+
+.iod-step-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.iod-step-copy strong {
+  font-family: var(--font-display);
+  font-size: 1.02rem;
+  color: var(--primary);
+}
+
+.iod-step-copy span {
+  color: var(--mist);
+  font-size: 0.92rem;
+  line-height: 1.4;
+}
+
+.iod-live {
+  margin: 0 0 1.4rem;
+  padding: 0.9rem 1rem;
+  border: 1px dashed var(--line);
+  color: var(--fog);
+  line-height: 1.45;
+}
+
+.iod-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+@media (min-width: 860px) {
+  .iod-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.iod-panel {
+  padding: 1.1rem 1.15rem 1.2rem;
+  background: var(--card);
+  border: 2px solid var(--card-edge);
+  border-radius: 4px;
+}
+
+.iod-panel h2 {
+  margin: 0 0 0.65rem;
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--steel);
+}
+
+.iod-panel p,
+.iod-panel li {
+  color: var(--fog);
+  line-height: 1.5;
+}
+
+.iod-panel ol,
+.iod-panel p {
+  margin: 0 0 0.75rem;
+  padding-left: 1.15rem;
+}
+
+.iod-panel p {
+  padding-left: 0;
+}
+
+.iod-chips {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.iod-chips li {
+  padding: 0.28rem 0.55rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 0.82rem;
+  color: var(--fog);
+}
+
+@keyframes iod-march {
+  to {
+    stroke-dashoffset: -22;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .iod-flow {
+    animation: none;
+    stroke-dasharray: none;
+  }
+}
+
+@media print {
+  .atmosphere,
+  .grain,
+  .desk-nav {
+    display: none !important;
+  }
+
+  .iod-svg {
+    min-width: 0;
+  }
+
+  .iod-flow {
+    animation: none;
+  }
 }

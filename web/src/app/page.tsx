@@ -12,7 +12,10 @@ export default function Home() {
         <p className="brand">FLEET</p>
         <h1 className="headline">Oil Desk</h1>
         <p className="lede">
-          Cars on the roster, kept current as sync lands through the day.
+          Cars on the roster, kept current as sync lands through the day.{" "}
+          <a className="lede-link" href="/impreza/">
+            2024 Impreza oil diagram
+          </a>
         </p>
       </header>
 

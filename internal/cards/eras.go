@@ -121,8 +121,10 @@ func anchorsFromAssigned(txs []model.CardTx, assigned map[string]gpsHit) []forwa
 
 // eraWindow is one car's backprop segment. [from, to) — to is exclusive.
 type eraWindow struct {
-	card, car string
-	from, to  time.Time
+	card, car    string
+	from, to     time.Time
+	anchor       time.Time // first GPS exclusive-pump sit for this car
+	nextAnchor   time.Time // first anchor of the following car era
 }
 
 func backpropWindows(card string, anchors []forwardAnchor) []eraWindow {
@@ -141,9 +143,10 @@ func backpropWindows(card string, anchors []forwardAnchor) []eraWindow {
 	}
 	var wins []eraWindow
 	for i, s := range starts {
-		w := eraWindow{card: card, car: s.car, from: s.at}
+		w := eraWindow{card: card, car: s.car, from: s.at, anchor: s.at}
 		if i+1 < len(starts) {
 			w.to = starts[i+1].at
+			w.nextAnchor = starts[i+1].at
 		}
 		wins = append(wins, w)
 	}
@@ -335,14 +338,25 @@ func backpropEras(anchors []forwardAnchor, txs []model.CardTx, assigned map[stri
 			if evidence == 0 {
 				continue
 			}
-			out = append(out, CardEra{
+			era := CardEra{
 				CardID: card, EFleetsID: w.car,
 				Nickname:   firstNonEmpty(nick[w.car], w.car),
 				HolderType: HolderCar, HolderKey: w.car,
 				From: from, To: to, EvidenceN: evidence,
 				Stations: stationsForAnchors(list, w.car),
 				Split:    len(cars) > 1,
-			})
+			}
+			if !from.IsZero() {
+				era.PairStarted = from
+			} else if !w.anchor.IsZero() {
+				era.PairStarted = w.anchor
+			}
+			if !w.nextAnchor.IsZero() {
+				t := w.nextAnchor
+				era.SwitchedAt = &t
+				era.NextPairAt = &t
+			}
+			out = append(out, era)
 		}
 	}
 	sort.Slice(out, func(i, j int) bool {

@@ -57,11 +57,18 @@ func (s *Store) ReplaceEras(ctx context.Context, rows []model.CardEra) error {
 		if e.Split {
 			split = 1
 		}
+		pairStarted := e.PairStarted
+		if pairStarted.IsZero() {
+			pairStarted = from
+		}
 		if _, err := tx.ExecContext(ctx, s.pg(`INSERT INTO card_eras (
-			card_id, holder_type, holder_key, efleets_id, nickname, from_at, to_at, evidence_n, stations, split, rung
-		) VALUES (?,?,?,?,?,?,?,?,?,?,?)`),
+			card_id, holder_type, holder_key, efleets_id, nickname, from_at, to_at,
+			pair_started_at, switched_at, next_pair_at,
+			evidence_n, stations, split, rung
+		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`),
 			card, ht, hk, nullIfEmpty(e.EFleetsID), e.Nickname,
 			from.UTC().Format(time.RFC3339), to.UTC().Format(time.RFC3339),
+			timeOrNull(pairStarted), timePtrOrNull(e.SwitchedAt), timePtrOrNull(e.NextPairAt),
 			e.EvidenceN, string(st), split, e.Rung); err != nil {
 			return err
 		}
@@ -72,7 +79,8 @@ func (s *Store) ReplaceEras(ctx context.Context, rows []model.CardEra) error {
 // ListEras returns persisted card location history, oldest first.
 func (s *Store) ListEras(ctx context.Context) ([]model.CardEra, error) {
 	rows, err := s.query(ctx, `SELECT card_id, holder_type, holder_key, COALESCE(efleets_id,''), COALESCE(nickname,''),
-		from_at, to_at, evidence_n, COALESCE(stations,''), split, rung FROM card_eras
+		from_at, to_at, COALESCE(pair_started_at,''), COALESCE(switched_at,''), COALESCE(next_pair_at,''),
+		evidence_n, COALESCE(stations,''), split, rung FROM card_eras
 		ORDER BY card_id, from_at, holder_type, holder_key`)
 	if err != nil {
 		return nil, err
@@ -81,10 +89,11 @@ func (s *Store) ListEras(ctx context.Context) ([]model.CardEra, error) {
 	var out []model.CardEra
 	for rows.Next() {
 		var e model.CardEra
-		var from, to, st string
+		var from, to, pairStarted, switched, nextPair, st string
 		var split int
 		if err := rows.Scan(&e.CardID, &e.HolderType, &e.HolderKey, &e.EFleetsID, &e.Nickname,
-			&from, &to, &e.EvidenceN, &st, &split, &e.Rung); err != nil {
+			&from, &to, &pairStarted, &switched, &nextPair,
+			&e.EvidenceN, &st, &split, &e.Rung); err != nil {
 			return nil, err
 		}
 		if t, err := time.Parse(time.RFC3339, from); err == nil {
@@ -93,6 +102,11 @@ func (s *Store) ListEras(ctx context.Context) ([]model.CardEra, error) {
 		if t, err := time.Parse(time.RFC3339, to); err == nil {
 			e.To = t
 		}
+		if t, err := time.Parse(time.RFC3339, pairStarted); err == nil {
+			e.PairStarted = t
+		}
+		e.SwitchedAt = parseTimePtr(switched)
+		e.NextPairAt = parseTimePtr(nextPair)
 		e.Split = split != 0
 		if st != "" && st != "null" {
 			_ = json.Unmarshal([]byte(st), &e.Stations)
@@ -107,4 +121,30 @@ func nullIfEmpty(s string) any {
 		return nil
 	}
 	return s
+}
+
+func timeOrNull(t time.Time) any {
+	if t.IsZero() {
+		return nil
+	}
+	return t.UTC().Format(time.RFC3339)
+}
+
+func timePtrOrNull(t *time.Time) any {
+	if t == nil || t.IsZero() {
+		return nil
+	}
+	return t.UTC().Format(time.RFC3339)
+}
+
+func parseTimePtr(s string) *time.Time {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return nil
+	}
+	t, err := time.Parse(time.RFC3339, s)
+	if err != nil || t.IsZero() {
+		return nil
+	}
+	return &t
 }

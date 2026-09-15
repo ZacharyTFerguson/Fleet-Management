@@ -818,10 +818,10 @@ func (a *App) CardsSplit(ctx context.Context, cardID string) error {
 		if ht == cards.HolderOffice {
 			flag = "OFFICE"
 		}
-		fmt.Printf("%s card=%s type=%s key=%s car=%s name=%s from=%s to=%s n=%d rung=%d stations=%s\n",
+		fmt.Printf("%s card=%s type=%s key=%s car=%s name=%s from=%s to=%s %s n=%d rung=%d stations=%s\n",
 			flag, e.CardID, ht, firstNonEmpty(e.HolderKey, e.EFleetsID), e.EFleetsID, name,
 			e.From.UTC().Format(time.RFC3339), e.To.UTC().Format(time.RFC3339),
-			e.EvidenceN, e.Rung, strings.Join(e.Stations, ","))
+			cards.FormatPairDates(e), e.EvidenceN, e.Rung, strings.Join(e.Stations, ","))
 	}
 	if n == 0 {
 		if cardID == "" {

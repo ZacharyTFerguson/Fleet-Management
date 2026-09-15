@@ -433,6 +433,20 @@ func TestIsOilChangeService(t *testing.T) {
 	if IsOilChangeService("Wiper Blade") {
 		t.Fatal("wiper")
 	}
+	// Cycle 1 needles match these driveline lines unless excluded. A later
+	// transmission RO would otherwise advance cars.last_oil_* past the real oil.
+	if IsOilChangeService("Transmission Oil and Filter") {
+		t.Fatal("transmission oil and filter is not an engine oil change")
+	}
+	if IsOilChangeService("Automatic Transmission Oil & Filter Change") {
+		t.Fatal("transmission oil & filter is not an engine oil change")
+	}
+	if IsOilChangeService("Transfer Case Oil and Filter Service") {
+		t.Fatal("transfer case oil and filter is not an engine oil change")
+	}
+	if IsOilChangeService("Rear Differential Oil and Filter") {
+		t.Fatal("differential oil and filter is not an engine oil change")
+	}
 }
 
 func TestDueAtNeverUsedAsWriteColumn(t *testing.T) {

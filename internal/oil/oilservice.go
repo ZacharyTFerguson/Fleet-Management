@@ -20,6 +20,8 @@ var oilNeedles = []string{
 }
 
 // oilExcludes are maintenance rows that mention oil but are not an oil change.
+// "oil & filter" / "oil and filter" were added for Firestone/Midas engine lines;
+// driveline services use the same wording and must not seed last_oil_*.
 var oilExcludes = []string{
 	"oil pan",
 	"oil leak",
@@ -34,6 +36,11 @@ var oilExcludes = []string{
 	"oil temperature",
 	"oil feed",
 	"lube chassis",
+	"transmission oil",
+	"transfer case",
+	"differential oil",
+	"transaxle oil",
+	"gear oil",
 }
 
 // IsOilChangeService reports whether a shop RO line is an oil change we may seed last_oil_* from.

@@ -145,6 +145,56 @@ func TestUpsertCarReconcilesOilChangeImportedBeforeRoster(t *testing.T) {
 	}
 }
 
+// TestInsertOilChangeForwardOnlyAfterReconcile is the maintenance-first path:
+// shop RO lands before the car, UpsertCar copies last_oil_date as a DATE string,
+// then a later same-calendar-day oil-done (America/New_York midnight, the
+// eFleets stamp) must not beat a higher stored mileage just because Equal()
+// fails across those two encodings.
+func TestInsertOilChangeForwardOnlyAfterReconcile(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "oil-forward-after-reconcile.sqlite")
+	s, err := Open("sqlite", p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	ctx := context.Background()
+	day := time.Date(2026, 8, 20, 0, 0, 0, 0, time.UTC)
+	if err := s.InsertOilChange(ctx, model.OilChange{
+		EFleetsID: "27TESTA", Miles: 179598, Date: day, Location: "Valvoline", Source: "shop_ro",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.UpsertCar(ctx, model.Car{EFleetsID: "27TESTA", Nickname: "VA19"}); err != nil {
+		t.Fatal(err)
+	}
+	ny := time.FixedZone("America/New_York", -4*60*60)
+	sameDayNY := time.Date(2026, 8, 20, 0, 0, 0, 0, ny)
+	if err := s.InsertOilChange(ctx, model.OilChange{
+		EFleetsID: "27TESTA", Miles: 90000, Date: sameDayNY, Location: "Typo", Source: "oil-done",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	car, err := s.CarByEFleets(ctx, "27TESTA")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if car.LastOilMiles == nil || *car.LastOilMiles != 179598 {
+		t.Fatalf("same-day lower miles must not move last oil backward after reconcile, got %+v", car.LastOilMiles)
+	}
+	if err := s.InsertOilChange(ctx, model.OilChange{
+		EFleetsID: "27TESTA", Miles: 180100, Date: sameDayNY, Location: "Same-day higher", Source: "oil-done",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	car, err = s.CarByEFleets(ctx, "27TESTA")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if car.LastOilMiles == nil || *car.LastOilMiles != 180100 {
+		t.Fatalf("same-day higher miles must still advance last oil, got %+v", car.LastOilMiles)
+	}
+}
+
 func TestRemigrateReopenSameSQLite(t *testing.T) {
 	p := filepath.Join(t.TempDir(), "reopen.sqlite")
 	s1, err := Open("sqlite", p)

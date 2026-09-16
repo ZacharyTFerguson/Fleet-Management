@@ -226,12 +226,32 @@ func (s *Store) reconcileLastOilTx(ctx context.Context, tx *sql.Tx, efleetsID st
 	if err != nil {
 		return err
 	}
+	stamp := oilDayRFC3339(day)
+	dayKey := strings.TrimSpace(day)
+	if len(dayKey) > 10 {
+		dayKey = dayKey[:10]
+	}
 	_, err = tx.ExecContext(ctx, s.pg(`UPDATE cars SET last_oil_miles=?, last_oil_date=?
 		WHERE efleets_id=? AND (
-			last_oil_date IS NULL OR last_oil_date < ? OR
-			(last_oil_date = ? AND (last_oil_miles IS NULL OR last_oil_miles < ?))
-		)`), miles, day, efleetsID, day, day, miles)
+			last_oil_date IS NULL OR substr(last_oil_date, 1, 10) < ? OR
+			(substr(last_oil_date, 1, 10) = ? AND (last_oil_miles IS NULL OR last_oil_miles < ?))
+		)`), miles, stamp, efleetsID, dayKey, dayKey, miles)
 	return err
+}
+
+// oilDayRFC3339 turns oil_changes.date (YYYY-MM-DD) into the same RFC3339
+// midnight UTC stamp InsertOilChange writes, so last_oil_date compares as a
+// timestamp after maintenance-first reconcile.
+func oilDayRFC3339(day string) string {
+	if t, err := time.Parse("2006-01-02", strings.TrimSpace(day)); err == nil {
+		return t.UTC().Format(time.RFC3339)
+	}
+	return day
+}
+
+// oilDayKey is the calendar day used for last-oil forward-only checks.
+func oilDayKey(t time.Time) string {
+	return t.UTC().Format("2006-01-02")
 }
 
 func (s *Store) carByEFleetsTx(ctx context.Context, tx *sql.Tx, id string) (*model.Car, error) {
@@ -769,10 +789,15 @@ func (s *Store) InsertOilChange(ctx context.Context, o model.OilChange) error {
 		return err
 	}
 	if c.LastOilDate != nil {
-		if c.LastOilDate.After(o.Date) {
+		// Compare calendar days, not raw timestamps. Reconcile used to store
+		// DATE-only text; shop ROs are America/New_York midnight. Equal()
+		// across those encodings would let a same-day lower odo move last oil
+		// backward.
+		storedDay, incomingDay := oilDayKey(*c.LastOilDate), oilDayKey(o.Date)
+		if storedDay > incomingDay {
 			return nil
 		}
-		if c.LastOilDate.Equal(o.Date) && c.LastOilMiles != nil && *c.LastOilMiles >= o.Miles {
+		if storedDay == incomingDay && c.LastOilMiles != nil && *c.LastOilMiles >= o.Miles {
 			return nil
 		}
 	}

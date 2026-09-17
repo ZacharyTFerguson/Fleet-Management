@@ -145,6 +145,70 @@ func TestUpsertCarReconcilesOilChangeImportedBeforeRoster(t *testing.T) {
 	}
 }
 
+func TestMergeCarRemoteLastOilForwardOnly(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "merge-last-oil.sqlite")
+	s, err := Open("sqlite", p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	ctx := context.Background()
+	if err := s.UpsertCar(ctx, model.Car{EFleetsID: "27TESTA", Nickname: "VA19"}); err != nil {
+		t.Fatal(err)
+	}
+	localDay := time.Date(2026, 8, 20, 0, 0, 0, 0, time.UTC)
+	if err := s.InsertOilChange(ctx, model.OilChange{EFleetsID: "27TESTA", Miles: 100500, Date: localDay, Location: "Valvoline", Source: "shop_ro"}); err != nil {
+		t.Fatal(err)
+	}
+
+	staleMiles := 90000
+	staleDay := time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)
+	if err := s.MergeCarRemote(ctx, model.Car{EFleetsID: "27TESTA", LastOilMiles: &staleMiles, LastOilDate: &staleDay}); err != nil {
+		t.Fatal(err)
+	}
+	car, err := s.CarByEFleets(ctx, "27TESTA")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if car.LastOilMiles == nil || *car.LastOilMiles != 100500 {
+		t.Fatalf("stale remote last oil must not move miles backward: %+v", car.LastOilMiles)
+	}
+	if car.LastOilDate == nil || lastOilDayUTC(car.LastOilDate) != "2026-08-20" {
+		t.Fatalf("stale remote last oil must not move date backward: %+v", car.LastOilDate)
+	}
+
+	sameDayLower := 99000
+	if err := s.MergeCarRemote(ctx, model.Car{EFleetsID: "27TESTA", LastOilMiles: &sameDayLower, LastOilDate: &localDay}); err != nil {
+		t.Fatal(err)
+	}
+	car, _ = s.CarByEFleets(ctx, "27TESTA")
+	if car.LastOilMiles == nil || *car.LastOilMiles != 100500 {
+		t.Fatalf("same-day lower remote miles must stay put: %+v", car.LastOilMiles)
+	}
+
+	sameDayHigher := 100800
+	if err := s.MergeCarRemote(ctx, model.Car{EFleetsID: "27TESTA", LastOilMiles: &sameDayHigher, LastOilDate: &localDay}); err != nil {
+		t.Fatal(err)
+	}
+	car, _ = s.CarByEFleets(ctx, "27TESTA")
+	if car.LastOilMiles == nil || *car.LastOilMiles != 100800 {
+		t.Fatalf("same-day higher remote miles must advance: %+v", car.LastOilMiles)
+	}
+
+	newerMiles := 101200
+	newerDay := time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC)
+	if err := s.MergeCarRemote(ctx, model.Car{EFleetsID: "27TESTA", LastOilMiles: &newerMiles, LastOilDate: &newerDay}); err != nil {
+		t.Fatal(err)
+	}
+	car, _ = s.CarByEFleets(ctx, "27TESTA")
+	if car.LastOilMiles == nil || *car.LastOilMiles != 101200 {
+		t.Fatalf("later remote last oil must advance: %+v", car.LastOilMiles)
+	}
+	if car.LastOilDate == nil || lastOilDayUTC(car.LastOilDate) != "2026-09-01" {
+		t.Fatalf("later remote last oil date: %+v", car.LastOilDate)
+	}
+}
+
 func TestRemigrateReopenSameSQLite(t *testing.T) {
 	p := filepath.Join(t.TempDir(), "reopen.sqlite")
 	s1, err := Open("sqlite", p)

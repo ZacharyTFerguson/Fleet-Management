@@ -10,8 +10,18 @@ import (
 
 // MergeCarRemote copies non-null remote last oil / Last Reading / HOLD / interval
 // onto an existing cars row. Remote NULL does not wipe a local value or HOLD.
+// Last oil is forward-only (later calendar day, or same day with higher miles),
+// matching InsertOilChange — a stale Supabase value must not move last oil backward.
 // It does not invent miles and does not call WriteLastReading.
 func (s *Store) MergeCarRemote(ctx context.Context, c model.Car) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	oilMiles := anyIntPtr(c.LastOilMiles)
+	oilDate := anyTimeRFC3339(c.LastOilDate)
+	if existing, err := s.carByEFleetsLocked(ctx, c.EFleetsID); err != nil || !remoteLastOilAdvances(existing, c) {
+		oilMiles = nil
+		oilDate = nil
+	}
 	now := time.Now().UTC().Format(time.RFC3339)
 	iv := c.IntervalMiles
 	_, err := s.exec(ctx, `UPDATE cars SET
@@ -24,10 +34,47 @@ func (s *Store) MergeCarRemote(ctx context.Context, c model.Car) error {
 		interval_miles=CASE WHEN ? > 0 THEN ? ELSE interval_miles END,
 		updated_at=?
 		WHERE efleets_id=?`,
-		anyIntPtr(c.LastOilMiles), anyTimeRFC3339(c.LastOilDate),
+		oilMiles, oilDate,
 		anyIntPtr(c.LastReadingMiles), anyTimeRFC3339(c.LastReadingAt), anyStrPtr(c.LastReadingSource),
 		anyStrPtr(c.HoldReason), iv, iv, now, c.EFleetsID)
 	return err
+}
+
+func lastOilDayUTC(t *time.Time) string {
+	if t == nil || t.IsZero() {
+		return ""
+	}
+	return t.UTC().Format("2006-01-02")
+}
+
+// remoteLastOilAdvances reports whether remote last oil is later than local
+// (later YYYY-MM-DD, or same day with higher miles). Calendar-day compare so
+// DATE-only reconcile stamps and RFC3339 oil-done stamps agree.
+func remoteLastOilAdvances(local *model.Car, remote model.Car) bool {
+	if remote.LastOilDate == nil && remote.LastOilMiles == nil {
+		return false
+	}
+	if local == nil || (local.LastOilDate == nil && local.LastOilMiles == nil) {
+		return true
+	}
+	remoteDay := lastOilDayUTC(remote.LastOilDate)
+	localDay := lastOilDayUTC(local.LastOilDate)
+	if remoteDay == "" {
+		return localDay == "" && local.LastOilMiles == nil
+	}
+	if localDay == "" {
+		return true
+	}
+	if remoteDay != localDay {
+		return remoteDay > localDay
+	}
+	if remote.LastOilMiles == nil {
+		return false
+	}
+	if local.LastOilMiles == nil {
+		return true
+	}
+	return *remote.LastOilMiles > *local.LastOilMiles
 }
 
 // ApplyCarSnapshot copies last oil, Last Reading, HOLD, and interval onto an

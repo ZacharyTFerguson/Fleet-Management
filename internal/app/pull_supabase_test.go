@@ -75,3 +75,45 @@ func TestPullSupabaseMergesNonNullAndKeepsLocalReading(t *testing.T) {
 		t.Fatalf("expected copied hold %+v", seed.HoldReason)
 	}
 }
+
+func TestPullSupabaseDoesNotRegressFresherLocalLastOil(t *testing.T) {
+	staleMiles := 90000
+	staleDate := "2026-06-01"
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode([]syncsupabase.CarRow{
+			{PDIID: "PDI-0001", EFleetsID: "27TESTA", Nickname: "VA19", LastOilMiles: &staleMiles, LastOilDate: &staleDate},
+		})
+	}))
+	defer srv.Close()
+
+	p := filepath.Join(t.TempDir(), "oil.sqlite")
+	st, err := store.Open("sqlite", p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	ctx := t.Context()
+	if err := st.UpsertCar(ctx, model.Car{EFleetsID: "27TESTA", Nickname: "VA19"}); err != nil {
+		t.Fatal(err)
+	}
+	localDay := time.Date(2026, 8, 20, 0, 0, 0, 0, time.UTC)
+	if err := st.InsertOilChange(ctx, model.OilChange{EFleetsID: "27TESTA", Miles: 100500, Date: localDay, Location: "Valvoline", Source: "shop_ro"}); err != nil {
+		t.Fatal(err)
+	}
+
+	a := &App{Cfg: config.Config{SupabaseURL: srv.URL, SupabaseAnonKey: "anon"}, Store: st}
+	if _, err := a.PullSupabase(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	car, err := st.CarByEFleets(ctx, "27TESTA")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if car.LastOilMiles == nil || *car.LastOilMiles != 100500 {
+		t.Fatalf("pull-supabase must not clobber fresher local last oil with stale remote: %+v", car.LastOilMiles)
+	}
+	if car.LastOilDate == nil || car.LastOilDate.UTC().Format("2006-01-02") != "2026-08-20" {
+		t.Fatalf("pull-supabase last oil date: %+v", car.LastOilDate)
+	}
+}

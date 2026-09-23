@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"sync"
 	"testing"
 )
@@ -163,5 +164,40 @@ func TestRefuseXRAY(t *testing.T) {
 	}
 	if CarsTable != "fleet_cars" || CardsTable != "fleet_cards" {
 		t.Fatalf("unexpected tables %s %s", CarsTable, CardsTable)
+	}
+}
+
+// A fresh roster ingest mints PDI-0001 from CSV row order. That label is not
+// a stable vehicle id: the shared fleet_cars row for PDI-0001 may already
+// belong to a different car. merge-duplicates must key on efleets_id so
+// last oil / Last Reading stay on the vehicle that earned them.
+func TestUpsertFleetCarsConflictsOnEFleetsID(t *testing.T) {
+	var gotPath string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.RequestURI()
+		w.WriteHeader(http.StatusCreated)
+	}))
+	defer srv.Close()
+
+	localPDIForDifferentCar := []CarRow{{
+		PDIID:     "PDI-0001",
+		EFleetsID: "27NEW1",
+		Nickname:  "NewTopRow",
+	}}
+	_, err := Run(t.Context(), Config{
+		URL:         srv.URL,
+		ServiceRole: "test-key",
+	}, localPDIForDifferentCar, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if gotPath == "" {
+		t.Fatal("no upsert")
+	}
+	if !strings.Contains(gotPath, "on_conflict=efleets_id") {
+		t.Fatalf("fleet_cars upsert must conflict on efleets_id, got %s", gotPath)
+	}
+	if strings.Contains(gotPath, "on_conflict=pdi_id") {
+		t.Fatalf("pdi_id conflict would move last oil onto the wrong car: %s", gotPath)
 	}
 }

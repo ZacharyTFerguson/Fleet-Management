@@ -46,7 +46,8 @@ type Snapshot struct {
 	Cards    []CardRow `json:"cards,omitempty"`
 }
 
-// CarRow is the list-view shape (opaque pdi_id, never embeds region in the key).
+// CarRow is the list-view shape. pdi_id is an opaque local label; the
+// shared-table merge key is efleets_id (see pushSupabase).
 type CarRow struct {
 	PDIID             string  `json:"pdi_id"`
 	EFleetsID         string  `json:"efleets_id"`
@@ -238,8 +239,13 @@ func pushSupabase(ctx context.Context, cfg Config, snap *Snapshot) error {
 	client := &http.Client{Timeout: 60 * time.Second}
 
 	// Prefer service-role PostgREST when available; else fleet-sync edge function.
+	// Conflict on efleets_id (the vehicle), never pdi_id. PDI-NNNN is minted
+	// locally from Fleet Summary row order / COUNT+1, so two desks — or a
+	// fresh roster ingest — can assign the same PDI to different cars.
+	// merge-duplicates on pdi_id then writes last oil / Last Reading onto
+	// the wrong fleet_cars row.
 	if cfg.ServiceRole != "" {
-		if err := upsert(ctx, client, base, cfg.ServiceRole, CarsTable, snap.Cars, "pdi_id"); err != nil {
+		if err := upsert(ctx, client, base, cfg.ServiceRole, CarsTable, snap.Cars, "efleets_id"); err != nil {
 			return fmt.Errorf("%s: %w", CarsTable, err)
 		}
 		if len(snap.Cards) > 0 {

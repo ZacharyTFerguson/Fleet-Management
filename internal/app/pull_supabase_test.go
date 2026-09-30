@@ -75,3 +75,53 @@ func TestPullSupabaseMergesNonNullAndKeepsLocalReading(t *testing.T) {
 		t.Fatalf("expected copied hold %+v", seed.HoldReason)
 	}
 }
+
+func TestPullSupabaseDoesNotRegressFresherLocalLastReading(t *testing.T) {
+	staleMiles := 140000
+	staleAt := "2026-08-01T12:00:00Z"
+	staleHold := "NO_DRIVESTOP"
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode([]syncsupabase.CarRow{
+			{
+				PDIID:            "PDI-0001",
+				EFleetsID:        "27TESTA",
+				Nickname:         "VA19",
+				LastReadingMiles: &staleMiles,
+				LastReadingAt:    &staleAt,
+				HoldReason:       &staleHold,
+			},
+		})
+	}))
+	defer srv.Close()
+
+	p := filepath.Join(t.TempDir(), "oil.sqlite")
+	st, err := store.Open("sqlite", p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	ctx := t.Context()
+	if err := st.UpsertCar(ctx, model.Car{EFleetsID: "27TESTA", Nickname: "VA19"}); err != nil {
+		t.Fatal(err)
+	}
+	localAt := time.Date(2026, 9, 10, 14, 0, 0, 0, time.UTC)
+	if err := st.WriteLastReading(ctx, "27TESTA", 150000, localAt, model.SourceFuelDetails); err != nil {
+		t.Fatal(err)
+	}
+
+	a := &App{Cfg: config.Config{SupabaseURL: srv.URL, SupabaseAnonKey: "anon"}, Store: st}
+	if _, err := a.PullSupabase(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	car, err := st.CarByEFleets(ctx, "27TESTA")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if car.LastReadingMiles == nil || *car.LastReadingMiles != 150000 {
+		t.Fatalf("pull-supabase must not clobber fresher local last reading with stale remote: %+v", car.LastReadingMiles)
+	}
+	if car.HoldReason != nil {
+		t.Fatalf("pull-supabase must not resurrect stale remote HOLD after local compute: %+v", car.HoldReason)
+	}
+}

@@ -145,6 +145,112 @@ func TestUpsertCarReconcilesOilChangeImportedBeforeRoster(t *testing.T) {
 	}
 }
 
+func TestMergeCarRemoteLastReadingForwardOnly(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "merge-last-reading.sqlite")
+	s, err := Open("sqlite", p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	ctx := context.Background()
+	if err := s.UpsertCar(ctx, model.Car{EFleetsID: "27TESTA", Nickname: "VA19"}); err != nil {
+		t.Fatal(err)
+	}
+	localAt := time.Date(2026, 9, 10, 14, 0, 0, 0, time.UTC)
+	if err := s.WriteLastReading(ctx, "27TESTA", 150000, localAt, model.SourceFuelDetails); err != nil {
+		t.Fatal(err)
+	}
+
+	staleMiles := 140000
+	staleAt := time.Date(2026, 8, 1, 12, 0, 0, 0, time.UTC)
+	staleSrc := model.SourceShopRO
+	if err := s.MergeCarRemote(ctx, model.Car{
+		EFleetsID:         "27TESTA",
+		LastReadingMiles:  &staleMiles,
+		LastReadingAt:     &staleAt,
+		LastReadingSource: &staleSrc,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	car, err := s.CarByEFleets(ctx, "27TESTA")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if car.LastReadingMiles == nil || *car.LastReadingMiles != 150000 {
+		t.Fatalf("stale remote last reading must not move miles backward: %+v", car.LastReadingMiles)
+	}
+	if car.LastReadingAt == nil || !car.LastReadingAt.Equal(localAt) {
+		t.Fatalf("stale remote last reading must not move at backward: %+v", car.LastReadingAt)
+	}
+	if car.LastReadingSource == nil || *car.LastReadingSource != model.SourceFuelDetails {
+		t.Fatalf("stale remote last reading must not replace source: %+v", car.LastReadingSource)
+	}
+
+	newerMiles := 151200
+	newerAt := time.Date(2026, 9, 20, 9, 0, 0, 0, time.UTC)
+	newerSrc := model.SourceShopRO
+	if err := s.MergeCarRemote(ctx, model.Car{
+		EFleetsID:         "27TESTA",
+		LastReadingMiles:  &newerMiles,
+		LastReadingAt:     &newerAt,
+		LastReadingSource: &newerSrc,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	car, _ = s.CarByEFleets(ctx, "27TESTA")
+	if car.LastReadingMiles == nil || *car.LastReadingMiles != 151200 {
+		t.Fatalf("higher remote last reading must advance: %+v", car.LastReadingMiles)
+	}
+	if car.LastReadingAt == nil || !car.LastReadingAt.Equal(newerAt) {
+		t.Fatalf("higher remote last reading at: %+v", car.LastReadingAt)
+	}
+	if car.LastReadingSource == nil || *car.LastReadingSource != model.SourceShopRO {
+		t.Fatalf("higher remote last reading source: %+v", car.LastReadingSource)
+	}
+}
+
+func TestMergeCarRemoteDoesNotResurrectStaleHold(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "merge-hold.sqlite")
+	s, err := Open("sqlite", p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	ctx := context.Background()
+	if err := s.UpsertCar(ctx, model.Car{EFleetsID: "27TESTA", Nickname: "VA19"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SetHold(ctx, "27TESTA", model.HoldNoDriveStop, "remote hold"); err != nil {
+		t.Fatal(err)
+	}
+	localAt := time.Date(2026, 9, 10, 14, 0, 0, 0, time.UTC)
+	if err := s.WriteLastReading(ctx, "27TESTA", 150000, localAt, model.SourceFuelDetails); err != nil {
+		t.Fatal(err)
+	}
+
+	staleMiles := 140000
+	staleAt := time.Date(2026, 8, 1, 12, 0, 0, 0, time.UTC)
+	remoteHold := model.HoldNoDriveStop
+	if err := s.MergeCarRemote(ctx, model.Car{
+		EFleetsID:        "27TESTA",
+		LastReadingMiles: &staleMiles,
+		LastReadingAt:    &staleAt,
+		HoldReason:       &remoteHold,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	car, err := s.CarByEFleets(ctx, "27TESTA")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if car.LastReadingMiles == nil || *car.LastReadingMiles != 150000 {
+		t.Fatalf("stale remote must not regress last reading: %+v", car.LastReadingMiles)
+	}
+	if car.HoldReason != nil {
+		t.Fatalf("stale remote HOLD must not resurrect after local compute: %+v", car.HoldReason)
+	}
+}
+
 func TestRemigrateReopenSameSQLite(t *testing.T) {
 	p := filepath.Join(t.TempDir(), "reopen.sqlite")
 	s1, err := Open("sqlite", p)

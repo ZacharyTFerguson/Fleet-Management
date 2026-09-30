@@ -15,7 +15,9 @@ type PullStats struct {
 }
 
 // PullSupabase copies fleet_cars into sqlite. Last Reading is merged only when
-// remote is non-null. Never calls WriteLastReading. Never invents miles.
+// remote is non-null and miles-forward (stale remote cannot overwrite a newer
+// local compute). Stale remote HOLD is not reapplied after local compute
+// cleared it. Never calls WriteLastReading. Never invents miles.
 func (a *App) PullSupabase(ctx context.Context) (PullStats, error) {
 	var st PullStats
 	cfg := syncsupabase.Config{

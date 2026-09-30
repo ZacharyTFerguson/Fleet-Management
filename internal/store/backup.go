@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"database/sql"
+	"strings"
 	"time"
 
 	"oilchange/internal/model"
@@ -10,11 +11,29 @@ import (
 
 // MergeCarRemote copies non-null remote last oil / Last Reading / HOLD / interval
 // onto an existing cars row. Remote NULL does not wipe a local value or HOLD.
-// It does not invent miles and does not call WriteLastReading.
+// Last Reading is miles-forward-only (matching evaluate LOWER_READING_REFUSED) —
+// a stale Supabase snapshot must not move odometer backward. A stale remote HOLD
+// is not applied when local compute already wrote a last reading the remote
+// does not beat. It does not invent miles and does not call WriteLastReading.
 func (s *Store) MergeCarRemote(ctx context.Context, c model.Car) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	readMiles := anyIntPtr(c.LastReadingMiles)
+	readAt := anyTimeRFC3339(c.LastReadingAt)
+	readSrc := anyStrPtr(c.LastReadingSource)
+	hold := anyStrPtr(c.HoldReason)
+	existing, err := s.carByEFleetsLocked(ctx, c.EFleetsID)
+	if err != nil || !remoteLastReadingAdvances(existing, c) {
+		readMiles = nil
+		readAt = nil
+		readSrc = nil
+	}
+	if err != nil || !remoteHoldApplies(existing, c) {
+		hold = nil
+	}
 	now := time.Now().UTC().Format(time.RFC3339)
 	iv := c.IntervalMiles
-	_, err := s.exec(ctx, `UPDATE cars SET
+	_, err = s.exec(ctx, `UPDATE cars SET
 		last_oil_miles=COALESCE(?, last_oil_miles),
 		last_oil_date=COALESCE(?, last_oil_date),
 		last_reading_miles=COALESCE(?, last_reading_miles),
@@ -25,9 +44,38 @@ func (s *Store) MergeCarRemote(ctx context.Context, c model.Car) error {
 		updated_at=?
 		WHERE efleets_id=?`,
 		anyIntPtr(c.LastOilMiles), anyTimeRFC3339(c.LastOilDate),
-		anyIntPtr(c.LastReadingMiles), anyTimeRFC3339(c.LastReadingAt), anyStrPtr(c.LastReadingSource),
-		anyStrPtr(c.HoldReason), iv, iv, now, c.EFleetsID)
+		readMiles, readAt, readSrc,
+		hold, iv, iv, now, c.EFleetsID)
 	return err
+}
+
+// remoteLastReadingAdvances reports whether remote Last Reading miles are
+// strictly higher than local. Compute refuses a lower reading; pull must not
+// undo that by COALESCE-ing an older shared snapshot.
+func remoteLastReadingAdvances(local *model.Car, remote model.Car) bool {
+	if remote.LastReadingMiles == nil {
+		return false
+	}
+	if local == nil || local.LastReadingMiles == nil {
+		return true
+	}
+	return *remote.LastReadingMiles > *local.LastReadingMiles
+}
+
+// remoteHoldApplies reports whether a non-null remote HOLD should land.
+// After WriteLastReading clears HOLD, a stale fleet_cars HOLD must not return
+// unless remote last reading also advances (shared state is newer).
+func remoteHoldApplies(local *model.Car, remote model.Car) bool {
+	if remote.HoldReason == nil || strings.TrimSpace(*remote.HoldReason) == "" {
+		return false
+	}
+	if local == nil {
+		return true
+	}
+	if local.HoldReason == nil && local.LastReadingMiles != nil && !remoteLastReadingAdvances(local, remote) {
+		return false
+	}
+	return true
 }
 
 // ApplyCarSnapshot copies last oil, Last Reading, HOLD, and interval onto an

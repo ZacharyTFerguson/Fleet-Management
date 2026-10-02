@@ -169,8 +169,16 @@ func (s *Store) upsertCarTx(ctx context.Context, c model.Car) error {
 	defer func() { _ = tx.Rollback() }()
 	existing, err := s.carByEFleetsTx(ctx, tx, c.EFleetsID)
 	if err == nil && existing != nil {
+		// Blank incoming identity (Active Vehicles without VIN, pull-supabase
+		// rows that never stored a plate, a Fleet Summary cell of "-") must
+		// not erase a value we already have. VIN-pair and History region
+		// columns both read these fields.
+		nick := keepNonEmpty(c.Nickname, existing.Nickname)
+		plate := keepNonEmpty(c.Plate, existing.Plate)
+		vin := keepNonEmpty(c.VIN, existing.VIN)
+		region := keepNonEmpty(c.Region, existing.Region)
 		_, err = tx.ExecContext(ctx, s.pg(`UPDATE cars SET nickname=?, plate=?, vin=?, region=?, updated_at=? WHERE efleets_id=?`),
-			c.Nickname, c.Plate, c.VIN, c.Region, time.Now().UTC().Format(time.RFC3339), c.EFleetsID)
+			nick, plate, vin, region, time.Now().UTC().Format(time.RFC3339), c.EFleetsID)
 		if err != nil {
 			return err
 		}
@@ -414,6 +422,17 @@ func nz(s, d string) string {
 		return d
 	}
 	return s
+}
+
+// keepNonEmpty prefers incoming roster text unless it is blank or the eFleets
+// dash placeholder. Used so a later vehicles file / pull-supabase row cannot
+// wipe VIN, plate, nickname, or region.
+func keepNonEmpty(incoming, existing string) string {
+	in := strings.TrimSpace(incoming)
+	if in == "" || in == "-" {
+		return existing
+	}
+	return incoming
 }
 
 // ListFills returns punches for one car, oldest first, so the fill picker can walk the chain.

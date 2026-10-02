@@ -75,3 +75,43 @@ func TestPullSupabaseMergesNonNullAndKeepsLocalReading(t *testing.T) {
 		t.Fatalf("expected copied hold %+v", seed.HoldReason)
 	}
 }
+
+func TestPullSupabaseDoesNotWipeLocalVIN(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode([]syncsupabase.CarRow{
+			{PDIID: "PDI-0001", EFleetsID: "27VA15", Nickname: ""},
+		})
+	}))
+	defer srv.Close()
+
+	p := filepath.Join(t.TempDir(), "oil.sqlite")
+	st, err := store.Open("sqlite", p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	ctx := t.Context()
+	if err := st.UpsertCar(ctx, model.Car{
+		EFleetsID: "27VA15",
+		Nickname:  "VA15",
+		VIN:       "4S3GTAB63P3706918",
+		Region:    "VA",
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	a := &App{Cfg: config.Config{SupabaseURL: srv.URL, SupabaseAnonKey: "anon"}, Store: st}
+	if _, err := a.PullSupabase(ctx); err != nil {
+		t.Fatal(err)
+	}
+	got, err := st.CarByEFleets(ctx, "27VA15")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.VIN != "4S3GTAB63P3706918" {
+		t.Fatalf("pull-supabase empty remote VIN wiped local: %+v", got)
+	}
+	if got.Nickname != "VA15" || got.Region != "VA" {
+		t.Fatalf("pull-supabase empty remote identity wiped local: %+v", got)
+	}
+}

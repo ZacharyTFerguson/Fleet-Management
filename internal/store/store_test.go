@@ -205,6 +205,67 @@ func TestUpsertCarAllocatesPastPDIConflictsAndGaps(t *testing.T) {
 	}
 }
 
+// TestUpsertCarKeepsIdentityWhenIncomingBlank locks the roster refresh rule:
+// a later vehicles file (Active Vehicles missing VIN, Fleet Summary cell "-")
+// or pull-supabase row with empty identity must not erase VIN/plate/nickname/region.
+// VIN-pair and History region columns both read these fields.
+func TestUpsertCarKeepsIdentityWhenIncomingBlank(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "identity.sqlite")
+	s, err := Open("sqlite", p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	ctx := context.Background()
+	if err := s.UpsertCar(ctx, model.Car{
+		EFleetsID: "27VA15",
+		Nickname:  "VA15",
+		Plate:     "TUK6062",
+		VIN:       "4S3GTAB63P3706918",
+		Region:    "VA",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.UpsertCar(ctx, model.Car{EFleetsID: "27VA15"}); err != nil {
+		t.Fatal(err)
+	}
+	got, err := s.CarByEFleets(ctx, "27VA15")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.VIN != "4S3GTAB63P3706918" || got.Plate != "TUK6062" || got.Nickname != "VA15" || got.Region != "VA" {
+		t.Fatalf("blank upsert wiped identity: %+v", got)
+	}
+
+	if err := s.UpsertCar(ctx, model.Car{EFleetsID: "27VA15", VIN: "-", Nickname: "-", Plate: "-", Region: "-"}); err != nil {
+		t.Fatal(err)
+	}
+	got, err = s.CarByEFleets(ctx, "27VA15")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.VIN != "4S3GTAB63P3706918" || got.Nickname != "VA15" {
+		t.Fatalf("eFleets dash placeholder wiped identity: %+v", got)
+	}
+
+	if err := s.UpsertCar(ctx, model.Car{
+		EFleetsID: "27VA15",
+		Nickname:  "VA15b",
+		Plate:     "NEWPLT",
+		VIN:       "4S3GTAB63P3700001",
+		Region:    "MD",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	got, err = s.CarByEFleets(ctx, "27VA15")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.VIN != "4S3GTAB63P3700001" || got.Plate != "NEWPLT" || got.Nickname != "VA15b" || got.Region != "MD" {
+		t.Fatalf("non-empty upsert must still replace identity: %+v", got)
+	}
+}
+
 func TestConcurrentHoldAndReadingStayConsistent(t *testing.T) {
 	p := filepath.Join(t.TempDir(), "hold-reading.sqlite")
 	s, err := Open("sqlite", p)

@@ -151,3 +151,43 @@ func TestMissingHeadersRefused(t *testing.T) {
 		t.Fatal("should refuse")
 	}
 }
+
+func TestParseFillsLogisticsLastRowKeepsDriverLink(t *testing.T) {
+	csv := `Vehicle,Provider Odometer,Provider Transaction Date,Provider Transaction Time,Provider Card Number,Provider Company Vehicle Number,Provider Driver First Name,Provider Driver Last Name,Provider Location,Provider Unusual Odometer Flag
+27TESTA,100000,06/01/2026,10:00:00 AM,CARD1,VA19,ALEX,DRIVER,SHELL,N
+27TESTA,100200,06/02/2026,10:00:00 AM,CARD1,VA19,TYLER,SHOP,SHELL,N
+`
+	_, _, cards, err := ParseFills(strings.NewReader(csv))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cards) != 1 {
+		t.Fatalf("cards %d", len(cards))
+	}
+	c := cards[0]
+	if c.LinkedCarEFleetsID == nil || *c.LinkedCarEFleetsID != "27TESTA" {
+		t.Fatalf("logistics last punch must not clear the driver pairing: %+v", c)
+	}
+	if c.Notes != "" {
+		t.Fatalf("paired card must not keep logistics-only notes: %q", c.Notes)
+	}
+}
+
+func TestParseFillsLogisticsOnlyHasNoLink(t *testing.T) {
+	csv := `Vehicle,Provider Odometer,Provider Transaction Date,Provider Transaction Time,Provider Card Number,Provider Company Vehicle Number,Provider Driver First Name,Provider Driver Last Name,Provider Location,Provider Unusual Odometer Flag
+27TESTA,100000,06/01/2026,10:00:00 AM,CARD1,VA19,RICH,SHOP,SHELL,N
+`
+	_, _, cards, err := ParseFills(strings.NewReader(csv))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cards) != 1 {
+		t.Fatalf("cards %d", len(cards))
+	}
+	if cards[0].LinkedCarEFleetsID != nil {
+		t.Fatalf("logistics-only punch is not a pairing key: %+v", cards[0])
+	}
+	if cards[0].Notes != "logistics personnel on punch; not a pairing key" {
+		t.Fatalf("notes %+v", cards[0].Notes)
+	}
+}

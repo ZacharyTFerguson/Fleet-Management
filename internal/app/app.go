@@ -80,6 +80,7 @@ func (a *App) SyncEnterprise(ctx context.Context, vehicles, fuel, shop, mileage 
 			known[c.EFleetsID] = true
 		}
 		skipped := 0
+		lastRosterCard := map[string]string{}
 		for _, f := range fills {
 			if !known[f.EFleetsID] {
 				skipped++
@@ -93,6 +94,9 @@ func (a *App) SyncEnterprise(ctx context.Context, vehicles, fuel, shop, mileage 
 					return err
 				}
 			}
+			if cid := strings.TrimSpace(f.CardID); cid != "" && !oil.HasLogisticsPersonnel(f.DriverFirst, f.DriverLast) {
+				lastRosterCard[cid] = f.EFleetsID
+			}
 		}
 		if skipped > 0 {
 			fmt.Fprintf(os.Stderr, "DETAILS skipped %d punches for vehicles not on the roster\n", skipped)
@@ -105,6 +109,11 @@ func (a *App) SyncEnterprise(ctx context.Context, vehicles, fuel, shop, mileage 
 		for _, c := range cardRows {
 			if c.LinkedCarEFleetsID != nil && !known[*c.LinkedCarEFleetsID] {
 				c.LinkedCarEFleetsID = nil
+			}
+			if c.LinkedCarEFleetsID == nil {
+				if eid, ok := lastRosterCard[c.ID]; ok {
+					c.LinkedCarEFleetsID = &eid
+				}
 			}
 			if err := a.Store.UpsertCard(ctx, c); err != nil {
 				return err

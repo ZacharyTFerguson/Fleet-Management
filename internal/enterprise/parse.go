@@ -112,10 +112,19 @@ func ParseFills(r io.Reader) ([]model.Fill, []model.GasStation, []model.Card, er
 		if cardID != "" {
 			cvn := f.ProviderCompanyVehicleNumber
 			c := model.Card{ID: cardID, CompanyVehicleNumber: cvn}
+			if prev, ok := cards[cardID]; ok {
+				c = prev
+				if cvn != "" {
+					c.CompanyVehicleNumber = cvn
+				}
+			}
 			if !oil.HasLogisticsPersonnel(f.DriverFirst, f.DriverLast) {
 				eid := id
 				c.LinkedCarEFleetsID = &eid
-			} else {
+				if c.Notes == "logistics personnel on punch; not a pairing key" {
+					c.Notes = ""
+				}
+			} else if c.LinkedCarEFleetsID == nil {
 				c.Notes = "logistics personnel on punch; not a pairing key"
 			}
 			cards[cardID] = c

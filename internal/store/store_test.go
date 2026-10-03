@@ -537,3 +537,69 @@ func TestListCardTxsNewestFirst(t *testing.T) {
 		t.Fatalf("newest-first stable order %+v", got)
 	}
 }
+
+func TestUpsertCardNilLinkDoesNotWipeExisting(t *testing.T) {
+	s, err := Open("sqlite", filepath.Join(t.TempDir(), "card-link.sqlite"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	ctx := context.Background()
+	if err := s.UpsertCar(ctx, model.Car{EFleetsID: "27TESTA", Nickname: "VA19"}); err != nil {
+		t.Fatal(err)
+	}
+	link := "27TESTA"
+	if err := s.UpsertCard(ctx, model.Card{ID: "CARD1", CompanyVehicleNumber: "VA19", LinkedCarEFleetsID: &link}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.UpsertCard(ctx, model.Card{ID: "CARD1", CompanyVehicleNumber: "VA19", Notes: "logistics personnel on punch; not a pairing key"}); err != nil {
+		t.Fatal(err)
+	}
+	cards, err := s.ListCards(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cards) != 1 || cards[0].LinkedCarEFleetsID == nil || *cards[0].LinkedCarEFleetsID != "27TESTA" {
+		t.Fatalf("nil incoming link must keep existing pairing: %+v", cards)
+	}
+	if err := s.ClearCardLink(ctx, "CARD1"); err != nil {
+		t.Fatal(err)
+	}
+	cards, err = s.ListCards(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cards) != 1 || cards[0].LinkedCarEFleetsID != nil {
+		t.Fatalf("ClearCardLink must still unpair: %+v", cards)
+	}
+}
+
+func TestUpsertCardKnownCarStillMovesLink(t *testing.T) {
+	s, err := Open("sqlite", filepath.Join(t.TempDir(), "card-move.sqlite"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	ctx := context.Background()
+	if err := s.UpsertCar(ctx, model.Car{EFleetsID: "27TESTA", Nickname: "VA19"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.UpsertCar(ctx, model.Car{EFleetsID: "27TESTB", Nickname: "VA15"}); err != nil {
+		t.Fatal(err)
+	}
+	from := "27TESTA"
+	to := "27TESTB"
+	if err := s.UpsertCard(ctx, model.Card{ID: "CARD1", CompanyVehicleNumber: "VA19", LinkedCarEFleetsID: &from}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.UpsertCard(ctx, model.Card{ID: "CARD1", CompanyVehicleNumber: "VA15", LinkedCarEFleetsID: &to}); err != nil {
+		t.Fatal(err)
+	}
+	cards, err := s.ListCards(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cards) != 1 || cards[0].LinkedCarEFleetsID == nil || *cards[0].LinkedCarEFleetsID != "27TESTB" {
+		t.Fatalf("roster-to-roster move must update the pairing: %+v", cards)
+	}
+}

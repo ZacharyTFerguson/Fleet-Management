@@ -489,14 +489,19 @@ func (s *Store) UpsertMaintLoc(ctx context.Context, m model.MaintenanceLocation)
 	return err
 }
 
-// UpsertCard stores a fuel card. CARD_MIX callers pass a nil link.
+// UpsertCard stores a fuel card. A nil incoming link does not wipe an
+// existing pairing — CARD_MIX uses ClearCardLink. Off-roster / logistics
+// punches reach here with a nil link and must not unpair the card.
 func (s *Store) UpsertCard(ctx context.Context, c model.Card) error {
 	var link any
 	if c.LinkedCarEFleetsID != nil {
 		link = *c.LinkedCarEFleetsID
 	}
 	_, err := s.exec(ctx, `INSERT INTO cards (id, company_vehicle_number, linked_car_efleets_id, notes) VALUES (?,?,?,?)
-		ON CONFLICT (id) DO UPDATE SET company_vehicle_number=excluded.company_vehicle_number, linked_car_efleets_id=excluded.linked_car_efleets_id, notes=excluded.notes`,
+		ON CONFLICT (id) DO UPDATE SET
+			company_vehicle_number=excluded.company_vehicle_number,
+			linked_car_efleets_id=COALESCE(excluded.linked_car_efleets_id, cards.linked_car_efleets_id),
+			notes=excluded.notes`,
 		c.ID, c.CompanyVehicleNumber, link, c.Notes)
 	return err
 }

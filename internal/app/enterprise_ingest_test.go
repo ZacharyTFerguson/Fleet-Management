@@ -2,7 +2,9 @@ package app
 
 import (
 	"context"
+	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"oilchange/internal/config"
@@ -10,7 +12,9 @@ import (
 )
 
 // TestSyncEnterpriseFullDumpIngest documents the operator path:
-//   oilchange sync-enterprise --vehicles fleetsummary.csv --fuel-details details.csv --shop-ro maintenance.csv
+//
+//	oilchange sync-enterprise --vehicles fleetsummary.csv --fuel-details details.csv --shop-ro maintenance.csv
+//
 // Maintenance may arrive before Fleet Summary; a later roster import must reconcile last oil.
 func TestSyncEnterpriseFullDumpIngest(t *testing.T) {
 	ctx := context.Background()
@@ -216,4 +220,119 @@ func TestLiveSep6IngestLandsInSQLite(t *testing.T) {
 	if carA.LastOilMiles == nil || *carA.LastOilMiles != 119800 {
 		t.Fatalf("re-ingest moved last oil: %+v", carA.LastOilMiles)
 	}
+}
+
+func TestSyncEnterpriseDoesNotWipeCardLink(t *testing.T) {
+	ctx := context.Background()
+	dbPath := filepath.Join(t.TempDir(), "card-link.sqlite")
+	st, err := store.Open("sqlite", dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	a := &App{Cfg: config.Config{SQLitePath: dbPath}, Store: st}
+
+	if err := a.SyncEnterprise(ctx,
+		testdata("enterprise", "fleetsummary.csv"),
+		testdata("enterprise", "details.csv"),
+		"",
+		"",
+	); err != nil {
+		t.Fatal(err)
+	}
+	mustLink := func(cardID, want string) {
+		t.Helper()
+		cards, err := st.ListCards(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, c := range cards {
+			if c.ID == cardID {
+				if c.LinkedCarEFleetsID == nil || *c.LinkedCarEFleetsID != want {
+					t.Fatalf("card %s link %+v want %s", cardID, c.LinkedCarEFleetsID, want)
+				}
+				return
+			}
+		}
+		t.Fatalf("card %s missing", cardID)
+	}
+	mustLink("x10010", "27TESTA")
+
+	offRoster := filepath.Join(t.TempDir(), "off-roster.csv")
+	if err := writeDetailsCSV(offRoster,
+		"27TESTA,06/01/2026,10:00:00 AM,x10010,VA19,ALEX,DRIVER,100000",
+		"27OFFROSTER,06/03/2026,10:00:00 AM,x10010,VA19,ALEX,DRIVER,101000",
+	); err != nil {
+		t.Fatal(err)
+	}
+	if err := a.SyncEnterprise(ctx, "", offRoster, "", ""); err != nil {
+		t.Fatal(err)
+	}
+	mustLink("x10010", "27TESTA")
+
+	logistics := filepath.Join(t.TempDir(), "logistics.csv")
+	if err := writeDetailsCSV(logistics,
+		"27TESTA,06/04/2026,10:00:00 AM,x10010,VA19,TYLER,SHOP,102000",
+	); err != nil {
+		t.Fatal(err)
+	}
+	if err := a.SyncEnterprise(ctx, "", logistics, "", ""); err != nil {
+		t.Fatal(err)
+	}
+	mustLink("x10010", "27TESTA")
+}
+
+func TestSyncEnterpriseFirstIngestKeepsRosterCardLink(t *testing.T) {
+	ctx := context.Background()
+	dbPath := filepath.Join(t.TempDir(), "card-link-first.sqlite")
+	st, err := store.Open("sqlite", dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	a := &App{Cfg: config.Config{SQLitePath: dbPath}, Store: st}
+
+	if err := a.SyncEnterprise(ctx, testdata("enterprise", "fleetsummary.csv"), "", "", ""); err != nil {
+		t.Fatal(err)
+	}
+	mixed := filepath.Join(t.TempDir(), "mixed.csv")
+	if err := writeDetailsCSV(mixed,
+		"27TESTA,06/01/2026,10:00:00 AM,CARD-NEW,VA19,ALEX,DRIVER,100000",
+		"27OFFROSTER,06/03/2026,10:00:00 AM,CARD-NEW,VA19,ALEX,DRIVER,101000",
+	); err != nil {
+		t.Fatal(err)
+	}
+	if err := a.SyncEnterprise(ctx, "", mixed, "", ""); err != nil {
+		t.Fatal(err)
+	}
+	cards, err := st.ListCards(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range cards {
+		if c.ID == "CARD-NEW" {
+			if c.LinkedCarEFleetsID == nil || *c.LinkedCarEFleetsID != "27TESTA" {
+				t.Fatalf("first ingest must pair from the roster punch, not the off-roster tail: %+v", c)
+			}
+			return
+		}
+	}
+	t.Fatal("CARD-NEW missing")
+}
+
+func writeDetailsCSV(path string, rows ...string) error {
+	var b strings.Builder
+	b.WriteString("Vehicle,Provider Odometer,Provider Transaction Date,Provider Transaction Time,Provider Card Number,Provider Company Vehicle Number,Provider Driver First Name,Provider Driver Last Name,Provider Location,Provider Unusual Odometer Flag\n")
+	for _, row := range rows {
+		parts := strings.Split(row, ",")
+		if len(parts) != 8 {
+			return os.ErrInvalid
+		}
+		// vehicle,date,time,card,cvn,first,last,odo
+		b.WriteString(strings.Join([]string{
+			parts[0], parts[7], parts[1], parts[2], parts[3], parts[4], parts[5], parts[6], "SHELL", "N",
+		}, ","))
+		b.WriteByte('\n')
+	}
+	return os.WriteFile(path, []byte(b.String()), 0o644)
 }

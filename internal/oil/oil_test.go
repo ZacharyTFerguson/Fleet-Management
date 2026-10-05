@@ -140,6 +140,55 @@ func TestShopROTypicallyBeatsFuel(t *testing.T) {
 	}
 }
 
+func TestLaterOutOfBandShopDoesNotReplaceFuel(t *testing.T) {
+	// Maintenance completed the next day (or later the same afternoon) with a
+	// fat-finger odo. No later fill exists yet to prove abandonment. The later
+	// stamp used to skip the band and become Last Reading (250000 + GPS).
+	shopAt := at(14)
+	in := ComputeIn{
+		Nickname: "VA10",
+		Fills:    []model.Fill{fill(100000, 10, false, "VA10")},
+		ShopROs:  []model.ShopRO{{EFleetsID: "CAR1", Odometer: 250000, At: shopAt, LocationName: "Shop"}},
+		Devices:  []model.OneStepDevice{{FactoryID: "F1"}},
+		MilesSince: []model.DriveStopMiles{{
+			FactoryID: "F1", Since: at(10), Miles: 12.4,
+		}},
+	}
+	out := EvaluateHolds(in)
+	if out.EnterpriseOdo == 250000 || out.Source == model.SourceShopRO {
+		t.Fatalf("out-of-band later shop became the anchor: %+v", out)
+	}
+	if out.SkipWrite {
+		t.Fatalf("trusted fill + measured miles must still write, holds %v", out.Holds)
+	}
+	if out.EnterpriseOdo != 100000 || out.Source != model.SourceFuelDetails {
+		t.Fatalf("fill must stay the anchor, got odo=%d source=%s holds=%v", out.EnterpriseOdo, out.Source, out.Holds)
+	}
+	if out.Reading != 100012 {
+		t.Fatalf("reading %d", out.Reading)
+	}
+}
+
+func TestLaterShopBehindFillDoesNotMoveLastReadingBack(t *testing.T) {
+	shopAt := at(14)
+	in := ComputeIn{
+		Nickname: "VA1",
+		Fills:    []model.Fill{fill(102000, 10, false, "VA1")},
+		ShopROs:  []model.ShopRO{{EFleetsID: "CAR1", Odometer: 99000, At: shopAt, LocationName: "Shop"}},
+		Devices:  []model.OneStepDevice{{FactoryID: "F1"}},
+		MilesSince: []model.DriveStopMiles{{
+			FactoryID: "F1", Since: at(10), Miles: 8,
+		}},
+	}
+	out := EvaluateHolds(in)
+	if out.EnterpriseOdo != 102000 || out.Source != model.SourceFuelDetails {
+		t.Fatalf("later shop below the fill must not become the anchor: %+v", out)
+	}
+	if out.SkipWrite {
+		t.Fatalf("fill + miles should write, holds %v", out.Holds)
+	}
+}
+
 func TestShopSpikeAbandonedByLaterFills(t *testing.T) {
 	// 148k…170k shop…149k fills: shop is junk (VA10).
 	fills := []model.Fill{

@@ -60,14 +60,15 @@ func EvaluateHolds(in ComputeIn) ComputeOut {
 	}
 
 	if shop != nil && chosen != nil {
-		// Shop typically beats fuel, then both must survive band. Shop can be wrong (VA10 spike).
+		// Shop typically beats fuel, then both must survive band. Shop can be
+		// wrong (VA10 spike). A later/same-second stamp must not skip the band:
+		// that wrote fat-finger shop odometers as Last Reading when no later
+		// fill existed yet to prove the spike abandoned.
 		shopBand := ExpectedBand(chosen.Odo, shop.At.Sub(chosen.At), nil)
 		if !shopBand.Contains(shop.Odo) && shopLooksAbandoned(*shop, in.Fills, chosen.Odo) {
 			holds = append(holds, model.Hold{Code: model.HoldSpikeAbandoned, Detail: fmt.Sprintf("shop RO %d abandoned by later in-band fills", shop.Odo)})
-		} else if shop.At.After(chosen.At) || shopBand.Contains(shop.Odo) || shop.At.Equal(chosen.At) {
-			if !shopLooksAbandoned(*shop, in.Fills, chosen.Odo) {
-				chosen = shop
-			}
+		} else if shopBand.Contains(shop.Odo) && !shopLooksAbandoned(*shop, in.Fills, chosen.Odo) {
+			chosen = shop
 		}
 	} else if shop != nil && chosen == nil {
 		if shopLooksAbandoned(*shop, in.Fills, shop.Odo) {

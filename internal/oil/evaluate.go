@@ -288,11 +288,11 @@ func sameSecondConflict(fills []model.Fill) *model.Hold {
 	return nil
 }
 
-// liveDevices drops dead factory_ids so a retired box cannot add miles.
+// liveDevices drops dead and inactive factory_ids so a retired or unplugged box cannot add miles.
 func liveDevices(devs []model.OneStepDevice) []model.OneStepDevice {
 	var live []model.OneStepDevice
 	for _, d := range devs {
-		if d.Dead || d.FactoryID == "" {
+		if d.Dead || !d.Active || d.FactoryID == "" {
 			continue
 		}
 		if HasLogisticsPersonnel(d.DisplayName) {

@@ -22,7 +22,7 @@ func TestUndatedShopRODoesNotReplaceDatedFillAnchor(t *testing.T) {
 			At:           time.Time{},
 			LocationName: "Shop (date missing in export)",
 		}},
-		Devices: []model.OneStepDevice{{FactoryID: "F1", DeviceID: "D1"}},
+		Devices: []model.OneStepDevice{{FactoryID: "F1", DeviceID: "D1", Active: true}},
 		MilesSince: []model.DriveStopMiles{{
 			FactoryID: "F1", Since: at(10), Miles: 12.4,
 		}},

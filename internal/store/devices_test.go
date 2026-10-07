@@ -62,6 +62,33 @@ func TestUpsertDeviceByFactoryID(t *testing.T) {
 	}
 }
 
+func TestUpsertDevicePreservesInactiveNotDead(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "inactive.sqlite")
+	s, err := Open("sqlite", p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	ctx := context.Background()
+	if err := s.UpsertCar(ctx, model.Car{EFleetsID: "27TESTA", Nickname: "VA19"}); err != nil {
+		t.Fatal(err)
+	}
+	link := "27TESTA"
+	if err := s.UpsertDevice(ctx, model.OneStepDevice{
+		FactoryID: "FACT-OLD", DeviceID: "DEV-OLD", LinkedCarEFleetsID: &link,
+		Active: false, Dead: false,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	got, err := s.GetDevice(ctx, "FACT-OLD")
+	if err != nil || got == nil {
+		t.Fatalf("get: %v %+v", err, got)
+	}
+	if got.Active || got.Dead {
+		t.Fatalf("inactive box must stay inactive and not dead, got %+v", got)
+	}
+}
+
 func TestDisplayNameIsNeverTheJoin(t *testing.T) {
 	p := filepath.Join(t.TempDir(), "dev.sqlite")
 	s, err := Open("sqlite", p)

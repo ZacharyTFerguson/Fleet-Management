@@ -517,10 +517,13 @@ func (s *Store) UpsertDevice(ctx context.Context, d model.OneStepDevice) error {
 	if d.LinkedCarPDIID != nil {
 		pdi = *d.LinkedCarPDIID
 	}
-	active := !d.Dead
-	if !active {
-		d.Dead = true
+	// Inactive ≠ dead. OneStep marks unplugged/inventory boxes active=false
+	// while dead=false; collapsing those flags made compute treat retired
+	// boxes as live and add their miles to Last Reading.
+	if d.Dead {
+		d.Active = false
 	}
+	active := d.Active && !d.Dead
 	now := time.Now().UTC().Format(time.RFC3339)
 	var retired any
 	if d.Dead {

@@ -214,7 +214,7 @@ func (a *App) scoreCar(ctx context.Context, car model.Car, fetchLive bool, onlyP
 func liveLinked(devs []model.OneStepDevice) []model.OneStepDevice {
 	var out []model.OneStepDevice
 	for _, d := range devs {
-		if d.Dead || d.FactoryID == "" {
+		if d.Dead || !d.Active || d.FactoryID == "" {
 			continue
 		}
 		if oil.HasLogisticsPersonnel(d.DisplayName) {

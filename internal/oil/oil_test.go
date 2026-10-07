@@ -13,6 +13,12 @@ func at(h int) time.Time {
 	return time.Date(2026, 6, 1, h, 0, 0, 0, time.UTC)
 }
 
+// liveBox is a compute-eligible OneStep unit. Active must be set: the zero
+// value is inactive, and inactive boxes must not add miles to Last Reading.
+func liveBox(factoryID string) model.OneStepDevice {
+	return model.OneStepDevice{FactoryID: factoryID, Active: true}
+}
+
 // fill is a DETAILS punch in tests; nickname is the card company vehicle number for CARD_MIX.
 func fill(odo int, hour int, unusual bool, nick string) model.Fill {
 	o := odo
@@ -57,7 +63,7 @@ func TestEvaluateGoldenFillPlusDriveStop(t *testing.T) {
 	in := ComputeIn{
 		Nickname: "VA1",
 		Fills:    []model.Fill{fill(100000, 10, false, "VA1")},
-		Devices:  []model.OneStepDevice{{FactoryID: "F1", DeviceID: "D1"}},
+		Devices:  []model.OneStepDevice{{FactoryID: "F1", DeviceID: "D1", Active: true}},
 		MilesSince: []model.DriveStopMiles{{
 			FactoryID: "F1",
 			Since:     at(10),
@@ -80,7 +86,7 @@ func TestUnusualYHoldNoWrite(t *testing.T) {
 	in := ComputeIn{
 		Nickname: "VA1",
 		Fills:    []model.Fill{fill(100000, 10, true, "VA1")},
-		Devices:  []model.OneStepDevice{{FactoryID: "F1"}},
+		Devices:  []model.OneStepDevice{liveBox("F1")},
 		MilesSince: []model.DriveStopMiles{{
 			FactoryID: "F1", Since: at(10), Miles: 1,
 		}},
@@ -101,7 +107,7 @@ func TestBackwardOdoRejected(t *testing.T) {
 			fill(100000, 8, false, "VA1"),
 			fill(90000, 12, false, "VA1"),
 		},
-		Devices: []model.OneStepDevice{{FactoryID: "F1"}},
+		Devices: []model.OneStepDevice{liveBox("F1")},
 		MilesSince: []model.DriveStopMiles{{
 			FactoryID: "F1", Since: at(8), Miles: 10,
 		}},
@@ -123,7 +129,7 @@ func TestShopROTypicallyBeatsFuel(t *testing.T) {
 		Nickname: "VA1",
 		Fills:    []model.Fill{fill(100000, 8, false, "VA1")},
 		ShopROs:  []model.ShopRO{{EFleetsID: "CAR1", Odometer: 100200, At: at(12), LocationName: "Valvoline"}},
-		Devices:  []model.OneStepDevice{{FactoryID: "F1"}},
+		Devices:  []model.OneStepDevice{liveBox("F1")},
 		MilesSince: []model.DriveStopMiles{{
 			FactoryID: "F1", Since: at(12), Miles: 5,
 		}},
@@ -153,7 +159,7 @@ func TestShopSpikeAbandonedByLaterFills(t *testing.T) {
 		Nickname: "VA10",
 		Fills:    fills,
 		ShopROs:  []model.ShopRO{{EFleetsID: "CAR1", Odometer: 170000, At: at(8), LocationName: "Shop"}},
-		Devices:  []model.OneStepDevice{{FactoryID: "F1"}},
+		Devices:  []model.OneStepDevice{liveBox("F1")},
 		MilesSince: []model.DriveStopMiles{{
 			FactoryID: "F1", Since: at(14), Miles: 8,
 		}},
@@ -182,7 +188,7 @@ func TestFuelSpikeAbandoned(t *testing.T) {
 	in := ComputeIn{
 		Nickname: "VA1",
 		Fills:    fills,
-		Devices:  []model.OneStepDevice{{FactoryID: "F1"}},
+		Devices:  []model.OneStepDevice{liveBox("F1")},
 		MilesSince: []model.DriveStopMiles{{
 			FactoryID: "F1", Since: at(14), Miles: 3,
 		}},
@@ -201,7 +207,7 @@ func TestLowerReadingRefusedAndOverride(t *testing.T) {
 	in := ComputeIn{
 		Nickname:          "VA1",
 		Fills:             []model.Fill{fill(199000, 10, false, "VA1")},
-		Devices:           []model.OneStepDevice{{FactoryID: "F1"}},
+		Devices:           []model.OneStepDevice{liveBox("F1")},
 		MilesSince:        []model.DriveStopMiles{{FactoryID: "F1", Since: at(10), Miles: 0}},
 		StoredLastReading: &stored,
 	}
@@ -224,8 +230,8 @@ func TestMultiDeviceFight(t *testing.T) {
 		Nickname: "VA1",
 		Fills:    []model.Fill{fill(100000, 10, false, "VA1")},
 		Devices: []model.OneStepDevice{
-			{FactoryID: "F1", DeviceID: "D1"},
-			{FactoryID: "F2", DeviceID: "D2"},
+			{FactoryID: "F1", DeviceID: "D1", Active: true},
+			{FactoryID: "F2", DeviceID: "D2", Active: true},
 		},
 		MilesSince: []model.DriveStopMiles{
 			{FactoryID: "F1", Since: at(10), Miles: 10},
@@ -244,7 +250,7 @@ func TestDeadFactoryIDNotSummed(t *testing.T) {
 		Fills:    []model.Fill{fill(100000, 10, false, "VA1")},
 		Devices: []model.OneStepDevice{
 			{FactoryID: "OLD", DeviceID: "D0", Dead: true},
-			{FactoryID: "NEW", DeviceID: "D1"},
+			{FactoryID: "NEW", DeviceID: "D1", Active: true},
 		},
 		MilesSince: []model.DriveStopMiles{
 			{FactoryID: "OLD", Since: at(10), Miles: 9000},
@@ -268,7 +274,7 @@ func TestDigitSwapOnlyWhenFlaggedAndInBand(t *testing.T) {
 			fill(12500, 8, false, "VA1"),
 			fill(15230, 9, true, "VA1"),
 		},
-		Devices:    []model.OneStepDevice{{FactoryID: "F1"}},
+		Devices:    []model.OneStepDevice{liveBox("F1")},
 		MilesSince: []model.DriveStopMiles{{FactoryID: "F1", Since: at(9), Miles: 2}},
 	}
 	out := EvaluateHolds(in)
@@ -287,7 +293,7 @@ func TestCardMixVA15VA19(t *testing.T) {
 	in := ComputeIn{
 		Nickname: "VA19",
 		Fills:    []model.Fill{fill(100000, 10, false, "VA15")},
-		Devices:  []model.OneStepDevice{{FactoryID: "F1"}},
+		Devices:  []model.OneStepDevice{liveBox("F1")},
 		MilesSince: []model.DriveStopMiles{{
 			FactoryID: "F1", Since: at(10), Miles: 1,
 		}},
@@ -305,7 +311,7 @@ func TestSameSecondDifferentOdo(t *testing.T) {
 	in := ComputeIn{
 		Nickname:   "VA1",
 		Fills:      []model.Fill{a, b},
-		Devices:    []model.OneStepDevice{{FactoryID: "F1"}},
+		Devices:    []model.OneStepDevice{liveBox("F1")},
 		MilesSince: []model.DriveStopMiles{{FactoryID: "F1", Since: at(10), Miles: 1}},
 	}
 	out := EvaluateHolds(in)
@@ -320,7 +326,7 @@ func TestSameSecondSameOdoIsOneRow(t *testing.T) {
 	in := ComputeIn{
 		Nickname:   "VA1",
 		Fills:      []model.Fill{a, b},
-		Devices:    []model.OneStepDevice{{FactoryID: "F1"}},
+		Devices:    []model.OneStepDevice{liveBox("F1")},
 		MilesSince: []model.DriveStopMiles{{FactoryID: "F1", Since: at(10), Miles: 4.4}},
 	}
 	out := EvaluateHolds(in)
@@ -345,7 +351,7 @@ func TestLogisticsPersonnelDoesNotLinkDevice(t *testing.T) {
 	in := ComputeIn{
 		Nickname: "VA1",
 		Fills:    []model.Fill{fill(100000, 10, false, "VA1")},
-		Devices:  []model.OneStepDevice{{FactoryID: "F1", DisplayName: "Tyler spare", Dead: false}},
+		Devices:  []model.OneStepDevice{{FactoryID: "F1", DisplayName: "Tyler spare", Dead: false, Active: true}},
 		MilesSince: []model.DriveStopMiles{{
 			FactoryID: "F1", Since: at(10), Miles: 3,
 		}},
@@ -354,6 +360,48 @@ func TestLogisticsPersonnelDoesNotLinkDevice(t *testing.T) {
 	// liveDevices drops logistics labels, so this looks like NO_DEVICE
 	if !out.SkipWrite || !hasCode(out.Holds, model.HoldNoDevice) {
 		t.Fatalf("want NO_DEVICE after refusing personnel box, %+v", out)
+	}
+}
+
+func TestInactiveFactoryIDNotSummed(t *testing.T) {
+	// GPS box swap: old unit still linked, OneStep marks it inactive (not dead).
+	// Its leftover miles must not fight or inflate Last Reading.
+	in := ComputeIn{
+		Nickname: "VA1",
+		Fills:    []model.Fill{fill(100000, 10, false, "VA1")},
+		Devices: []model.OneStepDevice{
+			{FactoryID: "OLD", DeviceID: "D0", Active: false, Dead: false},
+			{FactoryID: "NEW", DeviceID: "D1", Active: true},
+		},
+		MilesSince: []model.DriveStopMiles{
+			{FactoryID: "OLD", Since: at(10), Miles: 9000},
+			{FactoryID: "NEW", Since: at(10), Miles: 11.4},
+		},
+	}
+	out := EvaluateHolds(in)
+	if out.SkipWrite {
+		t.Fatalf("inactive leftover box must not HOLD, %v", out.Holds)
+	}
+	if out.Reading != 100011 {
+		t.Fatalf("inactive box leaked, reading %d", out.Reading)
+	}
+}
+
+func TestInactiveOnlyIsNoDevice(t *testing.T) {
+	in := ComputeIn{
+		Nickname: "VA1",
+		Fills:    []model.Fill{fill(100000, 10, false, "VA1")},
+		Devices:  []model.OneStepDevice{{FactoryID: "OLD", Active: false, Dead: false}},
+		MilesSince: []model.DriveStopMiles{{
+			FactoryID: "OLD", Since: at(10), Miles: 12,
+		}},
+	}
+	out := EvaluateHolds(in)
+	if !out.SkipWrite || !hasCode(out.Holds, model.HoldNoDevice) {
+		t.Fatalf("want NO_DEVICE when the only linked box is inactive, %+v", out)
+	}
+	if out.Reading != 0 {
+		t.Fatalf("inactive miles must not become Last Reading, got %d", out.Reading)
 	}
 }
 
@@ -372,7 +420,7 @@ func TestMissingDriveStopHold(t *testing.T) {
 	in := ComputeIn{
 		Nickname: "VA1",
 		Fills:    []model.Fill{fill(100000, 10, false, "VA1")},
-		Devices:  []model.OneStepDevice{{FactoryID: "F1"}},
+		Devices:  []model.OneStepDevice{liveBox("F1")},
 	}
 	out := EvaluateHolds(in)
 	if !out.SkipWrite || !hasCode(out.Holds, model.HoldNoDriveStop) {
@@ -391,7 +439,7 @@ func TestJoinIsFactoryIDNotDisplayName(t *testing.T) {
 	in := ComputeIn{
 		Nickname: "VA1",
 		Fills:    []model.Fill{fill(100000, 10, false, "VA1")},
-		Devices:  []model.OneStepDevice{{FactoryID: "F1", DisplayName: "VA1"}},
+		Devices:  []model.OneStepDevice{{FactoryID: "F1", DisplayName: "VA1", Active: true}},
 		MilesSince: []model.DriveStopMiles{{
 			FactoryID: "OTHER", Since: at(10), Miles: 99,
 		}},

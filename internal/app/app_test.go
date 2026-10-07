@@ -123,6 +123,7 @@ func TestSyncOneStepFetchesFromTrustedEnterpriseAnchor(t *testing.T) {
 		FactoryID:          "FACT1",
 		DeviceID:           "DEV1",
 		LinkedCarEFleetsID: &carID,
+		Active:             true,
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -202,6 +203,7 @@ func TestSyncOneStepReturnsDriveStopFailures(t *testing.T) {
 		FactoryID:          "FACT1",
 		DeviceID:           "DEV1",
 		LinkedCarEFleetsID: &carID,
+		Active:             true,
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -215,6 +217,63 @@ func TestSyncOneStepReturnsDriveStopFailures(t *testing.T) {
 	err = a.SyncOneStep(ctx, "", client)
 	if err == nil || !strings.Contains(err.Error(), "factory_id FACT1") {
 		t.Fatalf("expected surfaced OneStep failure, got %v", err)
+	}
+}
+
+func TestComputeIgnoresInactiveLinkedBox(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "inactive-compute.sqlite")
+	st, err := store.Open("sqlite", p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	ctx := context.Background()
+	if err := st.UpsertCar(ctx, model.Car{EFleetsID: "CAR1", Nickname: "VA1"}); err != nil {
+		t.Fatal(err)
+	}
+	odo := 100000
+	trusted := time.Date(2026, 6, 1, 10, 0, 0, 0, time.UTC)
+	if err := st.UpsertFill(ctx, model.Fill{
+		EFleetsID:                    "CAR1",
+		ProviderCompanyVehicleNumber: "VA1",
+		Odometer:                     &odo,
+		ProviderTransactionTime:      trusted,
+		Source:                       model.SourceFuelDetails,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	carID := "CAR1"
+	if err := st.UpsertDevice(ctx, model.OneStepDevice{
+		FactoryID: "FACT-OLD", DeviceID: "DEV-OLD", LinkedCarEFleetsID: &carID,
+		Active: false, Dead: false,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.UpsertDevice(ctx, model.OneStepDevice{
+		FactoryID: "FACT-NEW", DeviceID: "DEV-NEW", LinkedCarEFleetsID: &carID,
+		Active: true,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.SaveMilesSince(ctx, model.DriveStopMiles{FactoryID: "FACT-OLD", Since: trusted, Miles: 9000}); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.SaveMilesSince(ctx, model.DriveStopMiles{FactoryID: "FACT-NEW", Since: trusted, Miles: 11.4}); err != nil {
+		t.Fatal(err)
+	}
+	a := &App{Store: st}
+	if code, err := a.Compute(ctx, false); err != nil || code != model.ExitOK {
+		t.Fatalf("compute exit %d err %v", code, err)
+	}
+	car, err := st.CarByEFleets(ctx, "CAR1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if car.HoldReason != nil {
+		t.Fatalf("inactive leftover box must not HOLD, %s", *car.HoldReason)
+	}
+	if car.LastReadingMiles == nil || *car.LastReadingMiles != 100011 {
+		t.Fatalf("want Last Reading 100011 from the live box, got %+v", car.LastReadingMiles)
 	}
 }
 

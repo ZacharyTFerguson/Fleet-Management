@@ -74,9 +74,6 @@ func (a *App) PullSupabase(ctx context.Context) (PullStats, error) {
 			Dead:               d.Dead,
 			Active:             d.Active,
 		}
-		if !md.Dead {
-			md.Active = true
-		}
 		if err := a.Store.UpsertDevice(ctx, md); err != nil {
 			return st, fmt.Errorf("upsert device %s: %w", d.FactoryID, err)
 		}

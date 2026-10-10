@@ -19,8 +19,8 @@ func TestScorePunchesExpectedVsGasCard(t *testing.T) {
 		MaintAt:   maint,
 		HasDevice: true,
 		Punches: []GasCardPunch{
-			{EFleetsID: "27VA15", Recorded: 10120, At: p1},          // expected 10100 → overage 20
-			{EFleetsID: "27VA15", Recorded: 10205, At: p2},          // expected 10200 → overage 5 (gap down)
+			{EFleetsID: "27VA15", Recorded: 10120, At: p1},                 // expected 10100 → overage 20
+			{EFleetsID: "27VA15", Recorded: 10205, At: p2},                 // expected 10200 → overage 5 (gap down)
 			{EFleetsID: "27VA15", Recorded: 99999, At: p3, UnusualY: true}, // suspect, no trend
 		},
 		MilesToPunch: map[int64]float64{
@@ -95,8 +95,8 @@ func TestScorePunchesHoldWhenMilesMissing(t *testing.T) {
 func TestScorePunchesHoldWhenMaintMissing(t *testing.T) {
 	at := time.Date(2026, 6, 1, 8, 0, 0, 0, time.UTC)
 	out := ScorePunches(BoxScoreIn{
-		HasDevice: true,
-		Punches:   []GasCardPunch{{Recorded: 5100, At: at}},
+		HasDevice:    true,
+		Punches:      []GasCardPunch{{Recorded: 5100, At: at}},
 		MilesToPunch: map[int64]float64{at.Unix(): 100},
 	})
 	if out.Rows[0].Status != LedgerHold || out.Rows[0].Expected != nil || out.Rows[0].Difference != nil {
@@ -127,6 +127,38 @@ func TestScorePunchesNeverUsesZeroForMissingGPS(t *testing.T) {
 	})
 	if out.Rows[0].Expected != nil {
 		t.Fatal("missing drive-stop must not become expected=maint+0")
+	}
+}
+
+func TestScorePunchesHoldWhenDevicesFight(t *testing.T) {
+	maint := time.Date(2026, 5, 1, 12, 0, 0, 0, time.UTC)
+	punch := time.Date(2026, 5, 2, 12, 0, 0, 0, time.UTC)
+	out := ScorePunches(BoxScoreIn{
+		HasMaint: true, MaintOdo: 10000, MaintAt: maint, HasDevice: true,
+		Punches:      []GasCardPunch{{Recorded: 10200, At: punch}},
+		MilesToPunch: map[int64]float64{punch.Unix(): 100},
+		FightPunches: map[int64]bool{punch.Unix(): true},
+	})
+	if out.Rows[0].Status != LedgerHold || out.Rows[0].HoldReason != model.HoldMultiDeviceFight {
+		t.Fatalf("disagreeing boxes must HOLD, not trust first-box miles: %+v", out.Rows[0])
+	}
+	if out.Rows[0].Expected != nil || out.Rows[0].InTrend {
+		t.Fatal("MULTI_DEVICE_FIGHT must not invent expected")
+	}
+}
+
+func TestDriveStopFightThreshold(t *testing.T) {
+	if !DriveStopFight([]float64{100, 200}) {
+		t.Fatal("100 vs 200 must fight (same rule as Last Reading)")
+	}
+	if DriveStopFight([]float64{100, 110}) {
+		t.Fatal("10-mile gap is agreement, not a fight")
+	}
+	if DriveStopFight([]float64{100}) || DriveStopFight(nil) {
+		t.Fatal("one or zero measurements cannot fight")
+	}
+	if PreferDriveStopMiles([]float64{100, 110}) != 110 {
+		t.Fatal("agreeing boxes use the larger measured trip")
 	}
 }
 

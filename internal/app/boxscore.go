@@ -180,6 +180,7 @@ func (a *App) scoreCar(ctx context.Context, car model.Car, fetchLive bool, onlyP
 		HasMaint:     hasMaint,
 		HasDevice:    len(live) > 0,
 		MilesToPunch: map[int64]float64{},
+		FightPunches: map[int64]bool{},
 	}
 	for _, f := range fills {
 		if f.Odometer == nil {
@@ -200,11 +201,13 @@ func (a *App) scoreCar(ctx context.Context, car model.Car, fetchLive bool, onlyP
 		if !onlyPunch.IsZero() && !to.Equal(onlyPunch.UTC().Truncate(time.Second)) {
 			continue
 		}
-		miles, ok, err := a.windowMiles(ctx, live, maintAt, to, fetchLive)
+		miles, ok, fight, err := a.windowMiles(ctx, live, maintAt, to, fetchLive)
 		if err != nil {
 			return oil.BoxScoreOut{}, err
 		}
-		if ok {
+		if fight {
+			in.FightPunches[to.Unix()] = true
+		} else if ok {
 			in.MilesToPunch[to.Unix()] = miles
 		}
 	}
@@ -225,33 +228,55 @@ func liveLinked(devs []model.OneStepDevice) []model.OneStepDevice {
 	return out
 }
 
-func (a *App) windowMiles(ctx context.Context, live []model.OneStepDevice, from, to time.Time, fetchLive bool) (float64, bool, error) {
+func (a *App) windowMiles(ctx context.Context, live []model.OneStepDevice, from, to time.Time, fetchLive bool) (float64, bool, bool, error) {
+	var vals []float64
 	for _, d := range live {
 		if m, ok, err := a.Store.GetDriveStopWindow(ctx, d.FactoryID, from, to); err != nil {
-			return 0, false, err
+			return 0, false, false, err
 		} else if ok {
-			return m, true, nil
+			vals = append(vals, m)
 		}
 	}
-	if !fetchLive {
-		return 0, false, nil
+	if oil.DriveStopFight(vals) {
+		return 0, false, true, nil
+	}
+	if len(vals) > 0 {
+		return oil.PreferDriveStopMiles(vals), true, false, nil
+	}
+	if !fetchLive || len(live) == 0 {
+		return 0, false, false, nil
 	}
 	c := a.oneStepClient()
 	if c == nil {
-		return 0, false, nil
+		return 0, false, false, nil
 	}
-	did := live[0].DeviceID
-	if did == "" {
-		did = live[0].FactoryID
+	var fetched []float64
+	var fetchErr error
+	for _, d := range live {
+		did := d.DeviceID
+		if did == "" {
+			did = d.FactoryID
+		}
+		n, err := c.DriveStopMilesWindow(ctx, did, from, to)
+		if err != nil {
+			fetchErr = err
+			continue
+		}
+		if err := a.Store.SaveDriveStopWindow(ctx, d.FactoryID, from, to, n); err != nil {
+			return 0, false, false, err
+		}
+		fetched = append(fetched, n)
 	}
-	n, err := c.DriveStopMilesWindow(ctx, did, from, to)
-	if err != nil {
-		return 0, false, err
+	if oil.DriveStopFight(fetched) {
+		return 0, false, true, nil
 	}
-	if err := a.Store.SaveDriveStopWindow(ctx, live[0].FactoryID, from, to, n); err != nil {
-		return 0, false, err
+	if len(fetched) > 0 {
+		return oil.PreferDriveStopMiles(fetched), true, false, nil
 	}
-	return n, true, nil
+	if fetchErr != nil {
+		return 0, false, false, fetchErr
+	}
+	return 0, false, false, nil
 }
 
 // MeasureBoxScorePunch fetches drive-stop for one punch window (maint → gas card time) and rebuilds that car.

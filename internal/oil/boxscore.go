@@ -33,16 +33,19 @@ type GasCardPunch struct {
 
 // BoxScoreIn is everything ScorePunches may see. No HTTP, no SQL, no invented miles.
 type BoxScoreIn struct {
-	EFleetsID    string
-	Nickname     string
-	MaintOdo     int       // last good shop/RO (or validated maintenance)
-	MaintAt      time.Time // maintenance timestamp
-	HasMaint     bool
-	HasDevice    bool
-	Punches      []GasCardPunch
+	EFleetsID string
+	Nickname  string
+	MaintOdo  int       // last good shop/RO (or validated maintenance)
+	MaintAt   time.Time // maintenance timestamp
+	HasMaint  bool
+	HasDevice bool
+	Punches   []GasCardPunch
 	// MilesToPunch is measured drive-stop miles from MaintAt to that punch second.
 	// Missing key → HOLD NO_DRIVESTOP (not zero).
 	MilesToPunch map[int64]float64
+	// FightPunches are punch seconds where live boxes disagree on trip miles.
+	// Those punches HOLD MULTI_DEVICE_FIGHT — never a first-box TRUSTED expected.
+	FightPunches map[int64]bool
 }
 
 // LedgerRow is one punch vs expected. Last Reading is not written here.
@@ -54,17 +57,17 @@ type LedgerRow struct {
 	Recorded   int       `json:"recorded"`
 	MaintOdo   int       `json:"maint_odo"`
 	MaintAt    time.Time `json:"maint_at"`
-	MilesSince  *float64  `json:"miles_since,omitempty"`
-	Expected    *int      `json:"expected,omitempty"`
-	Difference  *int      `json:"difference,omitempty"` // recorded − expected; nil when HOLD/skip
-	Overage     int       `json:"overage"`
-	Shortage    int       `json:"shortage"`
-	AbsDiff     *int      `json:"abs_diff,omitempty"`
-	Trend       string    `json:"trend"`
-	Status      string    `json:"status"`
-	HoldReason  string    `json:"hold_reason,omitempty"`
-	HoldDetail  string    `json:"hold_detail,omitempty"`
-	InTrend     bool      `json:"in_trend"`
+	MilesSince *float64  `json:"miles_since,omitempty"`
+	Expected   *int      `json:"expected,omitempty"`
+	Difference *int      `json:"difference,omitempty"` // recorded − expected; nil when HOLD/skip
+	Overage    int       `json:"overage"`
+	Shortage   int       `json:"shortage"`
+	AbsDiff    *int      `json:"abs_diff,omitempty"`
+	Trend      string    `json:"trend"`
+	Status     string    `json:"status"`
+	HoldReason string    `json:"hold_reason,omitempty"`
+	HoldDetail string    `json:"hold_detail,omitempty"`
+	InTrend    bool      `json:"in_trend"`
 }
 
 // BoxScoreOut is per-vehicle ledger + rollup. Suspect/HOLD rows stay visible.
@@ -79,11 +82,11 @@ type BoxScoreOut struct {
 	TrendUp       int         `json:"trend_up"`
 	TrendDown     int         `json:"trend_down"`
 	TrendFlat     int         `json:"trend_flat"`
-	SumOverage     int         `json:"sum_overage"`
-	SumShortage    int         `json:"sum_shortage"`
-	LatestAbsDiff  *int        `json:"latest_abs_diff,omitempty"`
-	LatestTrend    string      `json:"latest_trend,omitempty"`
-	AbsDiffSeries  []int       `json:"abs_diff_series"`
+	SumOverage    int         `json:"sum_overage"`
+	SumShortage   int         `json:"sum_shortage"`
+	LatestAbsDiff *int        `json:"latest_abs_diff,omitempty"`
+	LatestTrend   string      `json:"latest_trend,omitempty"`
+	AbsDiffSeries []int       `json:"abs_diff_series"`
 }
 
 // ScorePunches compares each gas card transaction to maintenance + measured drive-stop.
@@ -172,6 +175,11 @@ func scoreOne(in BoxScoreIn, p GasCardPunch) LedgerRow {
 		return row
 	}
 	key := p.At.UTC().Truncate(time.Second).Unix()
+	if in.FightPunches[key] {
+		row.HoldReason = model.HoldMultiDeviceFight
+		row.HoldDetail = "live devices disagree on drive-stop miles since maintenance"
+		return row
+	}
 	miles, ok := in.MilesToPunch[key]
 	if !ok {
 		row.HoldReason = model.HoldNoDriveStop

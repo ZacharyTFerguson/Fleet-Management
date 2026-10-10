@@ -324,19 +324,27 @@ func pickMilesSince(live []model.OneStepDevice, rows []model.DriveStopMiles, sin
 	if len(vals) == 0 {
 		return 0, []model.Hold{{Code: model.HoldNoDriveStop, Detail: "no drive-stop miles after the trusted second"}}
 	}
-	if len(vals) > 1 {
-		min, max := vals[0], vals[0]
-		for _, v := range vals[1:] {
-			if v < min {
-				min = v
-			}
-			if v > max {
-				max = v
-			}
-		}
-		if max-min > 50 && (min == 0 || max/min > 1.5) {
-			return 0, []model.Hold{{Code: model.HoldMultiDeviceFight, Detail: fmt.Sprintf("live devices miles-since %.1f vs %.1f", min, max)}}
-		}
+	if DriveStopFight(vals) {
+		min, max := driveStopRange(vals)
+		return 0, []model.Hold{{Code: model.HoldMultiDeviceFight, Detail: fmt.Sprintf("live devices miles-since %.1f vs %.1f", min, max)}}
+	}
+	return PreferDriveStopMiles(vals), nil
+}
+
+// DriveStopFight is MULTI_DEVICE_FIGHT: two live boxes' trip miles for the
+// same window are too far apart to pick an expected odometer or Last Reading.
+func DriveStopFight(vals []float64) bool {
+	if len(vals) < 2 {
+		return false
+	}
+	min, max := driveStopRange(vals)
+	return max-min > 50 && (min == 0 || max/min > 1.5)
+}
+
+// PreferDriveStopMiles picks the larger measured trip when boxes agree.
+func PreferDriveStopMiles(vals []float64) float64 {
+	if len(vals) == 0 {
+		return 0
 	}
 	best := vals[0]
 	for _, v := range vals[1:] {
@@ -344,7 +352,20 @@ func pickMilesSince(live []model.OneStepDevice, rows []model.DriveStopMiles, sin
 			best = v
 		}
 	}
-	return best, nil
+	return best
+}
+
+func driveStopRange(vals []float64) (min, max float64) {
+	min, max = vals[0], vals[0]
+	for _, v := range vals[1:] {
+		if v < min {
+			min = v
+		}
+		if v > max {
+			max = v
+		}
+	}
+	return min, max
 }
 
 // skip is the HOLD path: no last_reading_* write, so operators cannot trust a flagged number.

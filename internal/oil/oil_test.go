@@ -140,6 +140,38 @@ func TestShopROTypicallyBeatsFuel(t *testing.T) {
 	}
 }
 
+func TestPredatedInBandShopDoesNotReplaceLaterFill(t *testing.T) {
+	// DATE-only RO Completed Date is midnight NY; Under Shop Review uses RO
+	// Created Date. Both can sit *before* a same-day DETAILS fill while the
+	// shop odo is still inside the 25-mile min-band (negative elapsed
+	// collapses ExpectedBand to prior+25). Choosing that earlier second
+	// made pickMilesSince add the longer window onto the shop odo and
+	// inflate Last Reading.
+	in := ComputeIn{
+		Nickname: "VA1",
+		Fills:    []model.Fill{fill(100000, 10, false, "VA1")},
+		ShopROs:  []model.ShopRO{{EFleetsID: "CAR1", Odometer: 100015, At: at(8), LocationName: "Valvoline"}},
+		Devices:  []model.OneStepDevice{{FactoryID: "F1"}},
+		MilesSince: []model.DriveStopMiles{
+			{FactoryID: "F1", Since: at(10), Miles: 12.4},
+			{FactoryID: "F1", Since: at(8), Miles: 500},
+		},
+	}
+	out := EvaluateHolds(in)
+	if out.Source == model.SourceShopRO || out.EnterpriseOdo == 100015 {
+		t.Fatalf("predated in-band shop became the anchor: %+v", out)
+	}
+	if out.SkipWrite {
+		t.Fatalf("trusted fill + measured miles must still write, holds %v", out.Holds)
+	}
+	if out.EnterpriseOdo != 100000 || out.Source != model.SourceFuelDetails {
+		t.Fatalf("fill must stay the anchor, got odo=%d source=%s holds=%v", out.EnterpriseOdo, out.Source, out.Holds)
+	}
+	if out.Reading != 100012 {
+		t.Fatalf("inflated reading %d (used earlier shop window?)", out.Reading)
+	}
+}
+
 func TestShopSpikeAbandonedByLaterFills(t *testing.T) {
 	// 148k…170k shop…149k fills: shop is junk (VA10).
 	fills := []model.Fill{

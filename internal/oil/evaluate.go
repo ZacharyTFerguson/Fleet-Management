@@ -59,8 +59,14 @@ func EvaluateHolds(in ComputeIn) ComputeOut {
 		chosen = &last
 	}
 
-	if shop != nil && chosen != nil {
+	if shop != nil && chosen != nil && !shop.At.Before(chosen.At) {
 		// Shop typically beats fuel, then both must survive band. Shop can be wrong (VA10 spike).
+		// A shop stamp *before* the trusted fill must not become the Last Reading
+		// anchor. DATE-only RO Completed Date is midnight NY, and Under Shop Review
+		// uses RO Created Date — both can sit earlier the same day (or earlier days)
+		// while the odo is still inside the collapsed 25-mile min-band from negative
+		// elapsed time. Choosing that earlier second makes pickMilesSince add morning
+		// (or prior-day) drive-stop onto the shop odo and inflates Last Reading.
 		shopBand := ExpectedBand(chosen.Odo, shop.At.Sub(chosen.At), nil)
 		if !shopBand.Contains(shop.Odo) && shopLooksAbandoned(*shop, in.Fills, chosen.Odo) {
 			holds = append(holds, model.Hold{Code: model.HoldSpikeAbandoned, Detail: fmt.Sprintf("shop RO %d abandoned by later in-band fills", shop.Odo)})

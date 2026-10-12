@@ -85,3 +85,37 @@ func TestRefreshGPSCallsDoesNotMoveOwner(t *testing.T) {
 		t.Fatalf("want GPS flag %+v", cur)
 	}
 }
+
+func TestRefreshGPSCallsEmptyDoesNotWipePrior(t *testing.T) {
+	s, err := Open("sqlite", filepath.Join(t.TempDir(), "g2.sqlite"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	ctx := context.Background()
+	at := time.Date(2026, 8, 20, 14, 0, 0, 0, time.UTC)
+	tx := model.CardTx{CardID: "C1", At: at, RecordedEFleetsID: "27VA15"}
+	if _, err := s.AssignTx(ctx, tx.Key(), "27VA19", "PDI-0020", "owner", "manual_drag"); err != nil {
+		t.Fatal(err)
+	}
+	named := tx
+	named.CalledEFleetsID = "27VA15"
+	if err := s.RefreshGPSCalls(ctx, []model.CardTx{named}); err != nil {
+		t.Fatal(err)
+	}
+	blank := tx
+	blank.CalledEFleetsID = ""
+	if err := s.RefreshGPSCalls(ctx, []model.CardTx{blank}); err != nil {
+		t.Fatal(err)
+	}
+	cur, err := s.GetAssignment(ctx, tx.Key())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cur.AssignedEFleetsID != "27VA19" {
+		t.Fatalf("owner must stay %+v", cur)
+	}
+	if cur.GPSCalledEFleetsID != "27VA15" || !cur.GPSDisagrees {
+		t.Fatalf("empty rematch must not wipe GPS call or disagree flag %+v", cur)
+	}
+}

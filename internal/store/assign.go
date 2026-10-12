@@ -124,6 +124,9 @@ func (s *Store) AssignTx(ctx context.Context, txKey, toEFleets, toPDI, actor, re
 
 // RefreshGPSCalls stores GPS-named cars after rematch. Owner Assigned* is kept.
 // When GPS names a different car than the owner, GPSDisagrees becomes true.
+// An empty CalledEFleetsID means this pass did not name the swipe (fleet-sight
+// drop, missing GPS cache, or inconclusive match) — it is not a new fact that
+// GPS called nobody, so a stored gps_called_efleets_id must stay put.
 func (s *Store) RefreshGPSCalls(ctx context.Context, txs []model.CardTx) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -134,13 +137,16 @@ func (s *Store) RefreshGPSCalls(ctx context.Context, txs []model.CardTx) error {
 			continue
 		}
 		called := strings.TrimSpace(t.CalledEFleetsID)
+		if called == "" {
+			continue
+		}
 		cur, err := s.getAssignmentLocked(ctx, key)
 		if err != nil {
 			return err
 		}
 		assigned := cur.AssignedEFleetsID
 		flag := 0
-		if assigned != "" && called != "" && assigned != called {
+		if assigned != "" && assigned != called {
 			flag = 1
 		}
 		src := cur.Source
@@ -151,7 +157,7 @@ func (s *Store) RefreshGPSCalls(ctx context.Context, txs []model.CardTx) error {
 			  gps_called_efleets_id=excluded.gps_called_efleets_id,
 			  gps_disagrees=excluded.gps_disagrees`,
 			key, nullIfEmpty(assigned), nullIfEmpty(cur.AssignedPDIID), src,
-			nullIfEmpty(called), flag, now); err != nil {
+			called, flag, now); err != nil {
 			return err
 		}
 	}

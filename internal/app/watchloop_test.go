@@ -403,6 +403,68 @@ func TestCardsRebuildPreservesNearbyCertainEra(t *testing.T) {
 	}
 }
 
+func TestCardsRebuildPartialFleetSightKeepsGPSCall(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "oil.sqlite")
+	st, err := store.Open("sqlite", p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	cache := filepath.Join(t.TempDir(), "gps-stops.json")
+	a := &App{Store: st, GPSStopsPath: cache}
+	ctx := context.Background()
+
+	aug := time.Date(2026, 8, 20, 14, 0, 0, 0, time.UTC)
+	may := time.Date(2026, 6, 16, 14, 0, 0, 0, time.UTC)
+	var visits []model.StopVisit
+	for i := 1; i <= 8; i++ {
+		car := "CAR-" + string(rune('A'+i-1))
+		fid := "F" + string(rune('0'+i))
+		if err := st.UpsertCar(ctx, model.Car{EFleetsID: car, Nickname: car}); err != nil {
+			t.Fatal(err)
+		}
+		link := car
+		if err := st.UpsertDevice(ctx, model.OneStepDevice{
+			FactoryID: fid, DeviceID: "D" + fid, LinkedCarEFleetsID: &link, Active: true,
+		}); err != nil {
+			t.Fatal(err)
+		}
+		visits = append(visits, model.StopVisit{
+			FactoryID: fid, From: may.Add(-24 * time.Hour), To: may.Add(48 * time.Hour), HasPos: true,
+		})
+	}
+	// Watch-loop one-box fetch into August — not enough fleet sight for GPS-first.
+	visits = append(visits, model.StopVisit{
+		FactoryID: "F1", From: aug.Add(-24 * time.Hour), To: aug.Add(48 * time.Hour), HasPos: true,
+	})
+	if err := cards.SaveStopVisits(cache, visits); err != nil {
+		t.Fatal(err)
+	}
+
+	tx := model.CardTx{
+		CardID: "AUG-CARD", At: aug, RecordedEFleetsID: "CAR-A", StationName: "SHEETZ",
+	}
+	if err := st.UpsertCardTx(ctx, tx); err != nil {
+		t.Fatal(err)
+	}
+	named := tx
+	named.CalledEFleetsID = "CAR-A"
+	if err := st.RefreshGPSCalls(ctx, []model.CardTx{named}); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := a.CardsRebuild(ctx, ""); err != nil {
+		t.Fatal(err)
+	}
+	cur, err := st.GetAssignment(ctx, tx.Key())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cur.GPSCalledEFleetsID != "CAR-A" {
+		t.Fatalf("partial August cache must not wipe stored GPS call %+v", cur)
+	}
+}
+
 func TestCardsWatchDoesNotRetryHTTP500(t *testing.T) {
 	p := filepath.Join(t.TempDir(), "oil.sqlite")
 	st, err := store.Open("sqlite", p)

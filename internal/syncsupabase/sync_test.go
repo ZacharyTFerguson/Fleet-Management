@@ -2,11 +2,15 @@ package syncsupabase
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"sync"
 	"testing"
+
+	"oilchange/internal/model"
 )
 
 func TestWriteMirrorRoundTrip(t *testing.T) {
@@ -163,5 +167,93 @@ func TestRefuseXRAY(t *testing.T) {
 	}
 	if CarsTable != "fleet_cars" || CardsTable != "fleet_cards" {
 		t.Fatalf("unexpected tables %s %s", CarsTable, CardsTable)
+	}
+}
+
+func TestCarsForRemoteUpsertOmitsBlankIdentity(t *testing.T) {
+	rows, err := carsForRemoteUpsert([]CarRow{{
+		PDIID:     "PDI-0001",
+		EFleetsID: "27VA15",
+		Nickname:  "VA15",
+		VIN:       "",
+		Plate:     "-",
+		Region:    "  ",
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("rows %d", len(rows))
+	}
+	if _, ok := rows[0]["vin"]; ok {
+		t.Fatalf("blank VIN must be omitted so merge-duplicates cannot wipe remote: %#v", rows[0])
+	}
+	if _, ok := rows[0]["plate"]; ok {
+		t.Fatalf("placeholder plate must be omitted: %#v", rows[0])
+	}
+	if _, ok := rows[0]["region"]; ok {
+		t.Fatalf("blank region must be omitted: %#v", rows[0])
+	}
+	if rows[0]["nickname"] != "VA15" || rows[0]["efleets_id"] != "27VA15" || rows[0]["pdi_id"] != "PDI-0001" {
+		t.Fatalf("known identity must stay: %#v", rows[0])
+	}
+}
+
+func TestCarsForRemoteUpsertKeepsRealVIN(t *testing.T) {
+	rows, err := carsForRemoteUpsert([]CarRow{{
+		PDIID:     "PDI-0001",
+		EFleetsID: "26LSZW",
+		Nickname:  "Bing-2",
+		VIN:       "4S3GTAB63P3706918",
+		Plate:     "ABC1234",
+		Region:    "VA",
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rows[0]["vin"] != "4S3GTAB63P3706918" {
+		t.Fatalf("real VIN must be sent: %#v", rows[0]["vin"])
+	}
+	if rows[0]["plate"] != "ABC1234" || rows[0]["region"] != "VA" || rows[0]["nickname"] != "Bing-2" {
+		t.Fatalf("real identity must be sent: %#v", rows[0])
+	}
+}
+
+func TestFromCarsMirrorKeepsBlankVIN(t *testing.T) {
+	rows := FromCars([]model.Car{{
+		PDIID:     "PDI-0001",
+		EFleetsID: "27VA15",
+		Nickname:  "VA15",
+	}})
+	if len(rows) != 1 || rows[0].VIN != "" {
+		t.Fatalf("mirror FromCars must still carry blank VIN: %+v", rows)
+	}
+}
+
+func TestPushOmitsBlankVINInPostgRESTBody(t *testing.T) {
+	var body []byte
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ = io.ReadAll(r.Body)
+		w.WriteHeader(http.StatusCreated)
+	}))
+	defer srv.Close()
+	_, err := Run(t.Context(), Config{
+		URL:         srv.URL,
+		ServiceRole: "test-key",
+	}, []CarRow{{PDIID: "PDI-0001", EFleetsID: "27VA15", Nickname: "VA15", VIN: "", Plate: "-"}}, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(body), `"vin":""`) {
+		t.Fatalf("PostgREST upsert must not send empty vin: %s", body)
+	}
+	if strings.Contains(string(body), `"plate":"-"`) || strings.Contains(string(body), `"plate":""`) {
+		t.Fatalf("PostgREST upsert must not send blank/placeholder plate: %s", body)
+	}
+	if !strings.Contains(string(body), `"efleets_id":"27VA15"`) {
+		t.Fatalf("identity missing from upsert: %s", body)
+	}
+	if !strings.Contains(string(body), `"nickname":"VA15"`) {
+		t.Fatalf("known nickname missing from upsert: %s", body)
 	}
 }

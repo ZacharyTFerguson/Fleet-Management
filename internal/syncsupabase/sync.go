@@ -236,10 +236,14 @@ func replaceFile(tmp, dest string) error {
 func pushSupabase(ctx context.Context, cfg Config, snap *Snapshot) error {
 	base := strings.TrimRight(cfg.URL, "/")
 	client := &http.Client{Timeout: 60 * time.Second}
+	cars, err := carsForRemoteUpsert(snap.Cars)
+	if err != nil {
+		return err
+	}
 
 	// Prefer service-role PostgREST when available; else fleet-sync edge function.
 	if cfg.ServiceRole != "" {
-		if err := upsert(ctx, client, base, cfg.ServiceRole, CarsTable, snap.Cars, "pdi_id"); err != nil {
+		if err := upsert(ctx, client, base, cfg.ServiceRole, CarsTable, cars, "pdi_id"); err != nil {
 			return fmt.Errorf("%s: %w", CarsTable, err)
 		}
 		if len(snap.Cards) > 0 {
@@ -249,13 +253,13 @@ func pushSupabase(ctx context.Context, cfg Config, snap *Snapshot) error {
 		}
 		return nil
 	}
-	return pushEdgeSync(ctx, client, base, cfg.SyncSecret, snap)
+	return pushEdgeSync(ctx, client, base, cfg.SyncSecret, cars, snap.Cards)
 }
 
-func pushEdgeSync(ctx context.Context, client *http.Client, base, secret string, snap *Snapshot) error {
-	payload := map[string]any{"cars": snap.Cars}
-	if len(snap.Cards) > 0 {
-		payload["cards"] = snap.Cards
+func pushEdgeSync(ctx context.Context, client *http.Client, base, secret string, cars []map[string]any, cards []CardRow) error {
+	payload := map[string]any{"cars": cars}
+	if len(cards) > 0 {
+		payload["cards"] = cards
 	}
 	body, err := json.Marshal(payload)
 	if err != nil {
@@ -307,4 +311,30 @@ func upsert(ctx context.Context, client *http.Client, base, key, table string, r
 		return fmt.Errorf("HTTP %d: %s", res.StatusCode, strings.TrimSpace(string(b)))
 	}
 	return nil
+}
+
+// carsForRemoteUpsert drops JSON-null hold_reason when local sqlite never
+// computed (no HOLD and no Last Reading). PostgREST merge-duplicates writes
+// every key present, including null, so a roster-only oilchange sync would
+// otherwise clear a HOLD another desk already stored on fleet_cars.
+// After a successful compute, Last Reading is present and HOLD is gone —
+// send hold_reason null so the shared row can clear. On HOLD, send the reason.
+func carsForRemoteUpsert(cars []CarRow) ([]map[string]any, error) {
+	out := make([]map[string]any, 0, len(cars))
+	for _, c := range cars {
+		b, err := json.Marshal(c)
+		if err != nil {
+			return nil, err
+		}
+		var m map[string]any
+		if err := json.Unmarshal(b, &m); err != nil {
+			return nil, err
+		}
+		hold := c.HoldReason != nil && strings.TrimSpace(*c.HoldReason) != ""
+		if !hold && c.LastReadingMiles == nil {
+			delete(m, "hold_reason")
+		}
+		out = append(out, m)
+	}
+	return out, nil
 }

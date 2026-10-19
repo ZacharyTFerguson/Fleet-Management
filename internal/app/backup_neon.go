@@ -216,8 +216,12 @@ func CopyDurable(ctx context.Context, src, dest *store.Store) (BackupCounts, err
 	if err != nil {
 		return c, fmt.Errorf("list eras: %w", err)
 	}
-	if err := dest.ReplaceEras(ctx, eras); err != nil {
-		return c, fmt.Errorf("replace eras: %w", err)
+	// ReplaceEras is a full-table DELETE+insert. A roster-only sqlite (never
+	// ran cards rebuild) would otherwise wipe Neon card history.
+	if len(eras) > 0 {
+		if err := dest.ReplaceEras(ctx, eras); err != nil {
+			return c, fmt.Errorf("replace eras: %w", err)
+		}
 	}
 	c.Eras = len(eras)
 
@@ -235,8 +239,11 @@ func CopyDurable(ctx context.Context, src, dest *store.Store) (BackupCounts, err
 	if err != nil {
 		return c, fmt.Errorf("list assignment events: %w", err)
 	}
-	if err := dest.ReplaceAssignmentEvents(ctx, events); err != nil {
-		return c, fmt.Errorf("assignment events: %w", err)
+	// Same full-table rewrite as eras: empty local audit must not erase Neon.
+	if len(events) > 0 {
+		if err := dest.ReplaceAssignmentEvents(ctx, events); err != nil {
+			return c, fmt.Errorf("assignment events: %w", err)
+		}
 	}
 	c.AssignmentEvents = len(events)
 

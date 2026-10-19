@@ -157,6 +157,86 @@ func TestCopyDurableSQLiteToSQLite(t *testing.T) {
 	}
 }
 
+func TestCopyDurableRosterOnlyDoesNotWipeDest(t *testing.T) {
+	ctx := context.Background()
+	src, err := store.Open("sqlite", filepath.Join(t.TempDir(), "src-roster.sqlite"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer src.Close()
+	dest, err := store.Open("sqlite", filepath.Join(t.TempDir(), "dest-full.sqlite"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer dest.Close()
+
+	at := time.Date(2026, 8, 1, 15, 4, 5, 0, time.UTC)
+	if err := dest.UpsertCar(ctx, model.Car{
+		PDIID: "PDI-0042", EFleetsID: "27TESTA", Nickname: "VA19", VIN: "1HGCM82633A004352", Region: "VA", IntervalMiles: 7500,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := dest.InsertOilChange(ctx, model.OilChange{EFleetsID: "27TESTA", Miles: 100500, Date: at, Source: "shop_ro"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := dest.WriteLastReading(ctx, "27TESTA", 100010, at, model.SourceFuelDetails); err != nil {
+		t.Fatal(err)
+	}
+	if err := dest.SetHold(ctx, "27TESTA", model.HoldNoDriveStop, "gps missing"); err != nil {
+		t.Fatal(err)
+	}
+	if err := dest.ReplaceEras(ctx, []model.CardEra{{
+		CardID: "CARD1", EFleetsID: "27TESTA", HolderType: "car", HolderKey: "27TESTA",
+		From: at, To: at, EvidenceN: 1, Stations: []string{"Shell"}, Rung: 3,
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := dest.ReplaceAssignmentEvents(ctx, []model.AssignmentEvent{{
+		TxKey: "CARD1|" + at.UTC().Format(time.RFC3339Nano) + "|27TESTA|100000",
+		ToEFleetsID: "27TESTA", Actor: "owner", Reason: "manual_drag", At: at,
+	}}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Source is a roster-only rebuild: identity, no compute, no cards ladder.
+	if err := src.UpsertCar(ctx, model.Car{EFleetsID: "27TESTA", Nickname: "VA19"}); err != nil {
+		t.Fatal(err)
+	}
+
+	counts, err := CopyDurable(ctx, src, dest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if counts.Cars != 1 || counts.Eras != 0 || counts.AssignmentEvents != 0 {
+		t.Fatalf("roster-only counts %+v", counts)
+	}
+
+	got, err := dest.CarByEFleets(ctx, "27TESTA")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.LastOilMiles == nil || *got.LastOilMiles != 100500 {
+		t.Fatalf("last oil wiped: %+v", got.LastOilMiles)
+	}
+	if got.LastReadingMiles == nil || *got.LastReadingMiles != 100010 {
+		t.Fatalf("last reading wiped: %+v", got.LastReadingMiles)
+	}
+	if got.HoldReason == nil || *got.HoldReason != model.HoldNoDriveStop {
+		t.Fatalf("HOLD wiped: %+v", got.HoldReason)
+	}
+	if got.IntervalMiles != 7500 {
+		t.Fatalf("interval reset to %d", got.IntervalMiles)
+	}
+	eras, err := dest.ListEras(ctx)
+	if err != nil || len(eras) != 1 || eras[0].CardID != "CARD1" {
+		t.Fatalf("eras wiped: %+v %v", eras, err)
+	}
+	events, err := dest.ListAssignmentEvents(ctx, "")
+	if err != nil || len(events) != 1 {
+		t.Fatalf("assignment events wiped: %+v %v", events, err)
+	}
+}
+
 func TestBackupNeonIntegration(t *testing.T) {
 	url := os.Getenv("DATABASE_URL")
 	if url == "" {

@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"database/sql"
+	"strings"
 	"time"
 
 	"oilchange/internal/model"
@@ -30,20 +31,41 @@ func (s *Store) MergeCarRemote(ctx context.Context, c model.Car) error {
 	return err
 }
 
-// ApplyCarSnapshot copies last oil, Last Reading, HOLD, and interval onto an
-// existing cars row. It does not invent miles and does not clear HOLD.
+// ApplyCarSnapshot copies last oil, Last Reading, HOLD, interval, and identity
+// onto an existing cars row. It does not invent miles. Roster-only / never-
+// computed source rows (no Last Reading and no HOLD) must not NULL dest
+// last_oil_*, last_reading_*, or hold_reason, blank VIN/plate/region/nickname,
+// or reset interval_miles to 0. A successful compute (Last Reading present)
+// may still clear dest HOLD by sending hold_reason NULL.
 func (s *Store) ApplyCarSnapshot(ctx context.Context, c model.Car) error {
 	now := time.Now().UTC().Format(time.RFC3339)
+	holdWrite := 0
+	if c.LastReadingMiles != nil || (c.HoldReason != nil && strings.TrimSpace(*c.HoldReason) != "") {
+		holdWrite = 1
+	}
+	iv := c.IntervalMiles
 	_, err := s.exec(ctx, `UPDATE cars SET
-		nickname=?, plate=?, vin=?, region=?,
-		last_oil_miles=?, last_oil_date=?,
-		last_reading_miles=?, last_reading_at=?, last_reading_source=?,
-		hold_reason=?, interval_miles=?, updated_at=?
+		nickname=CASE WHEN TRIM(?) != '' THEN ? ELSE nickname END,
+		plate=CASE WHEN TRIM(?) != '' THEN ? ELSE plate END,
+		vin=CASE WHEN TRIM(?) != '' THEN ? ELSE vin END,
+		region=CASE WHEN TRIM(?) != '' THEN ? ELSE region END,
+		last_oil_miles=COALESCE(?, last_oil_miles),
+		last_oil_date=COALESCE(?, last_oil_date),
+		last_reading_miles=COALESCE(?, last_reading_miles),
+		last_reading_at=COALESCE(?, last_reading_at),
+		last_reading_source=COALESCE(?, last_reading_source),
+		hold_reason=CASE WHEN ? != 0 THEN ? ELSE hold_reason END,
+		interval_miles=CASE WHEN ? > 0 THEN ? ELSE interval_miles END,
+		updated_at=?
 		WHERE efleets_id=?`,
-		c.Nickname, c.Plate, c.VIN, c.Region,
+		c.Nickname, c.Nickname,
+		c.Plate, c.Plate,
+		c.VIN, c.VIN,
+		c.Region, c.Region,
 		anyIntPtr(c.LastOilMiles), anyTimeRFC3339(c.LastOilDate),
 		anyIntPtr(c.LastReadingMiles), anyTimeRFC3339(c.LastReadingAt), anyStrPtr(c.LastReadingSource),
-		anyStrPtr(c.HoldReason), c.IntervalMiles, now, c.EFleetsID)
+		holdWrite, anyStrPtr(c.HoldReason),
+		iv, iv, now, c.EFleetsID)
 	return err
 }
 

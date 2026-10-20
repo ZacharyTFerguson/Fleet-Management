@@ -236,10 +236,14 @@ func replaceFile(tmp, dest string) error {
 func pushSupabase(ctx context.Context, cfg Config, snap *Snapshot) error {
 	base := strings.TrimRight(cfg.URL, "/")
 	client := &http.Client{Timeout: 60 * time.Second}
+	cars, err := carsForRemoteUpsert(snap.Cars)
+	if err != nil {
+		return err
+	}
 
 	// Prefer service-role PostgREST when available; else fleet-sync edge function.
 	if cfg.ServiceRole != "" {
-		if err := upsert(ctx, client, base, cfg.ServiceRole, CarsTable, snap.Cars, "pdi_id"); err != nil {
+		if err := upsert(ctx, client, base, cfg.ServiceRole, CarsTable, cars, "pdi_id"); err != nil {
 			return fmt.Errorf("%s: %w", CarsTable, err)
 		}
 		if len(snap.Cards) > 0 {
@@ -249,13 +253,13 @@ func pushSupabase(ctx context.Context, cfg Config, snap *Snapshot) error {
 		}
 		return nil
 	}
-	return pushEdgeSync(ctx, client, base, cfg.SyncSecret, snap)
+	return pushEdgeSync(ctx, client, base, cfg.SyncSecret, cars, snap.Cards)
 }
 
-func pushEdgeSync(ctx context.Context, client *http.Client, base, secret string, snap *Snapshot) error {
-	payload := map[string]any{"cars": snap.Cars}
-	if len(snap.Cards) > 0 {
-		payload["cards"] = snap.Cards
+func pushEdgeSync(ctx context.Context, client *http.Client, base, secret string, cars []map[string]any, cards []CardRow) error {
+	payload := map[string]any{"cars": cars}
+	if len(cards) > 0 {
+		payload["cards"] = cards
 	}
 	body, err := json.Marshal(payload)
 	if err != nil {
@@ -307,4 +311,28 @@ func upsert(ctx context.Context, client *http.Client, base, key, table string, r
 		return fmt.Errorf("HTTP %d: %s", res.StatusCode, strings.TrimSpace(string(b)))
 	}
 	return nil
+}
+
+// carsForRemoteUpsert drops interval_miles when it is 0 (the sqlite default
+// meaning "use 5000"). PostgREST merge-duplicates writes every key present,
+// so a roster-only oilchange sync would otherwise overwrite a custom interval
+// already stored on shared fleet_cars. The local cars.json mirror still uses
+// FromCars unchanged. A real per-car override (> 0) is still sent.
+func carsForRemoteUpsert(cars []CarRow) ([]map[string]any, error) {
+	out := make([]map[string]any, 0, len(cars))
+	for _, c := range cars {
+		b, err := json.Marshal(c)
+		if err != nil {
+			return nil, err
+		}
+		var m map[string]any
+		if err := json.Unmarshal(b, &m); err != nil {
+			return nil, err
+		}
+		if c.IntervalMiles <= 0 {
+			delete(m, "interval_miles")
+		}
+		out = append(out, m)
+	}
+	return out, nil
 }
